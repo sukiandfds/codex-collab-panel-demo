@@ -1,5 +1,11 @@
 # Codex Dream Skin
 
+> 本仓库是基于 Codex Dream Skin 的私有实验分支，当前正在开发
+> **Codex Collab Panel**：Codex 右侧实时总结与跨设备项目协作面板。
+> 项目目标、当前进度和下一步见 [`PROJECT.md`](./PROJECT.md)。
+
+---
+
 <p align="center">
   <strong>中文</strong> · <a href="./README.en.md">English</a>
 </p>

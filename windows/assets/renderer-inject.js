@@ -29,6 +29,9 @@
     "--dream-image-luma",
   ];
   const HOME_UTILITY_CLASS = "dream-home-utility";
+  const SUMMARY_PANEL_ID = "codex-dream-summary-panel";
+  const SUMMARY_STYLE_ID = "codex-dream-summary-style";
+  const SUMMARY_STATE_KEY = "__CODEX_DREAM_SUMMARY_STATE__";
   const installToken = {};
   let samplingNativeShell = false;
   let observer = null;
@@ -99,6 +102,19 @@
     return URL.createObjectURL(new Blob([bytes], { type: mime }));
   })();
   const config = normalizeConfig(rawConfig);
+  const summaryState = window[SUMMARY_STATE_KEY] || {
+    open: true,
+    view: "summary",
+    enabled: true,
+    model: "fast-summary",
+    endpoint: "",
+    apiKey: "",
+    lastUpdated: Date.now(),
+    connection: "未连接总结模型",
+    capture: null,
+  };
+  if (summaryState.captureTimer) clearInterval(summaryState.captureTimer);
+  window[SUMMARY_STATE_KEY] = summaryState;
   let profile = {
     ...defaultProfile,
     aspect: config.initialAspect ?? defaultProfile.aspect,
@@ -285,7 +301,253 @@
     document.querySelectorAll(`.${HOME_UTILITY_CLASS}`).forEach((node) => node.classList.remove(HOME_UTILITY_CLASS));
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(CHROME_ID)?.remove();
+    document.getElementById(SUMMARY_PANEL_ID)?.remove();
+    document.getElementById(SUMMARY_STYLE_ID)?.remove();
   };
+
+  const summaryCss = `
+    #${SUMMARY_PANEL_ID} {
+      --summary-bg: color-mix(in srgb, #171a21 94%, var(--dream-accent, #8da7ff));
+      --summary-border: color-mix(in srgb, #ffffff 14%, transparent);
+      --summary-text: #f3f5f8;
+      --summary-muted: #aeb7c6;
+      position: fixed; top: 76px; right: 18px; width: 348px; max-height: calc(100vh - 98px);
+      display: flex; flex-direction: column; z-index: 2147483000; overflow: hidden;
+      color: var(--summary-text); background: var(--summary-bg); border: 1px solid var(--summary-border);
+      border-radius: 16px; box-shadow: 0 18px 55px rgba(0,0,0,.34); backdrop-filter: blur(22px);
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    #${SUMMARY_PANEL_ID} * { box-sizing: border-box; }
+    #${SUMMARY_PANEL_ID}[data-closed="true"] { display: none; }
+    #${SUMMARY_PANEL_ID} .summary-head { display:flex; align-items:center; justify-content:space-between; padding: 14px 16px 10px; border-bottom:1px solid var(--summary-border); }
+    #${SUMMARY_PANEL_ID} .summary-title { display:flex; align-items:center; gap:9px; font-weight:700; letter-spacing:.01em; }
+    #${SUMMARY_PANEL_ID} .summary-dot { width:8px; height:8px; border-radius:50%; background:#6ee7b7; box-shadow:0 0 0 4px rgba(110,231,183,.13); }
+    #${SUMMARY_PANEL_ID} .summary-icon { border:0; color:var(--summary-muted); background:transparent; cursor:pointer; font-size:18px; line-height:1; padding:2px 4px; }
+    #${SUMMARY_PANEL_ID} .summary-tabs { display:flex; gap:5px; padding: 10px 12px 0; }
+    #${SUMMARY_PANEL_ID} .summary-tab { flex:1; border:1px solid transparent; border-radius:9px; padding:7px 8px; color:var(--summary-muted); background:transparent; cursor:pointer; }
+    #${SUMMARY_PANEL_ID} .summary-tab[data-active="true"] { color:var(--summary-text); background:rgba(255,255,255,.09); border-color:var(--summary-border); }
+    #${SUMMARY_PANEL_ID} .summary-body { overflow:auto; padding: 12px; }
+    #${SUMMARY_PANEL_ID} .summary-card { padding:12px; margin-bottom:9px; border:1px solid var(--summary-border); border-radius:11px; background:rgba(255,255,255,.045); }
+    #${SUMMARY_PANEL_ID} .summary-label { color:var(--summary-muted); font-size:11px; margin-bottom:4px; }
+    #${SUMMARY_PANEL_ID} .summary-value { color:var(--summary-text); font-weight:600; }
+    #${SUMMARY_PANEL_ID} .summary-list { margin:7px 0 0; padding-left:17px; color:#d8dee8; }
+    #${SUMMARY_PANEL_ID} .summary-list li { margin:4px 0; }
+    #${SUMMARY_PANEL_ID} .summary-preview { color:#d8dee8; white-space:pre-wrap; overflow-wrap:anywhere; }
+    #${SUMMARY_PANEL_ID} .summary-foot { padding:9px 14px 12px; color:var(--summary-muted); font-size:11px; border-top:1px solid var(--summary-border); }
+    #${SUMMARY_PANEL_ID} label { display:block; color:var(--summary-muted); font-size:11px; margin:10px 0 5px; }
+    #${SUMMARY_PANEL_ID} input, #${SUMMARY_PANEL_ID} select { width:100%; border:1px solid var(--summary-border); border-radius:8px; padding:9px 10px; color:var(--summary-text); background:rgba(0,0,0,.2); outline:none; }
+    #${SUMMARY_PANEL_ID} input:focus, #${SUMMARY_PANEL_ID} select:focus { border-color:var(--dream-accent, #8da7ff); }
+    #${SUMMARY_PANEL_ID} .summary-actions { display:flex; gap:8px; margin-top:14px; }
+    #${SUMMARY_PANEL_ID} .summary-action { flex:1; border:1px solid var(--summary-border); border-radius:8px; padding:8px 10px; color:var(--summary-text); background:rgba(255,255,255,.08); cursor:pointer; }
+    #${SUMMARY_PANEL_ID} .summary-action.primary { color:#10131a; background:#dce6ff; border-color:transparent; font-weight:650; }
+    #codex-dream-summary-tab { position:fixed; right:0; top:42%; z-index:2147482999; border:1px solid rgba(255,255,255,.16); border-right:0; border-radius:10px 0 0 10px; padding:11px 8px; color:#f3f5f8; background:#202630; cursor:pointer; writing-mode:vertical-rl; font:600 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+    #codex-dream-summary-tab[data-closed="false"] { display:none; }
+  `;
+
+  const bindSummaryEvent = (target, eventName, handler) => {
+    if (typeof target?.addEventListener === "function") target.addEventListener(eventName, handler);
+  };
+
+  const makeSummaryButton = (label, className, handler) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.textContent = label;
+    bindSummaryEvent(button, "click", (event) => { event.stopPropagation?.(); handler(); });
+    return button;
+  };
+
+  const appendSummaryChildren = (parent, ...children) => {
+    if (typeof parent?.append === "function") parent.append(...children);
+    else children.forEach((child) => parent?.appendChild?.(child));
+  };
+
+  const renderSummaryPanel = (panel, tab) => {
+    if (typeof panel?.appendChild !== "function") return;
+    panel.dataset.closed = String(!summaryState.open);
+    tab.dataset.closed = String(!summaryState.open);
+    if (typeof panel.replaceChildren === "function") panel.replaceChildren();
+    else panel.textContent = "";
+
+    const head = document.createElement("div");
+    head.className = "summary-head";
+    const title = document.createElement("div");
+    title.className = "summary-title";
+    const dot = document.createElement("span");
+    dot.className = "summary-dot";
+    const titleText = document.createElement("span");
+    titleText.textContent = "项目实时总结";
+    appendSummaryChildren(title, dot, titleText);
+    appendSummaryChildren(head, title, makeSummaryButton("×", "summary-icon", () => {
+      summaryState.open = false;
+      renderSummaryPanel(panel, tab);
+    }));
+    panel.appendChild(head);
+
+    const tabs = document.createElement("div");
+    tabs.className = "summary-tabs";
+    for (const [key, label] of [["summary", "实时总结"], ["settings", "设置"]]) {
+      const tabButton = makeSummaryButton(label, "summary-tab", () => {
+        summaryState.view = key;
+        renderSummaryPanel(panel, tab);
+      });
+      tabButton.dataset.active = String(summaryState.view === key);
+      tabs.appendChild(tabButton);
+    }
+    panel.appendChild(tabs);
+
+    const body = document.createElement("div");
+    body.className = "summary-body";
+    if (summaryState.view === "summary") {
+      const status = document.createElement("div");
+      status.className = "summary-card";
+      status.innerHTML = '<div class="summary-label">本地记录状态</div><div id="summary-capture-status" class="summary-value">正在等待本地记录服务</div><div id="summary-capture-meta" class="summary-label" style="margin-top:7px">尚未读取当前 Codex 会话</div>';
+      body.appendChild(status);
+      const latestUser = document.createElement("div");
+      latestUser.className = "summary-card";
+      latestUser.innerHTML = '<div class="summary-label">最近用户要求</div><div id="summary-last-user" class="summary-preview">尚未捕获</div>';
+      body.appendChild(latestUser);
+      const latestAssistant = document.createElement("div");
+      latestAssistant.className = "summary-card";
+      latestAssistant.innerHTML = '<div class="summary-label">最近 Codex 回复</div><div id="summary-last-assistant" class="summary-preview">尚未捕获</div>';
+      body.appendChild(latestAssistant);
+      const aiSummary = document.createElement("div");
+      aiSummary.className = "summary-card";
+      aiSummary.innerHTML = '<div class="summary-label">Luna 实时总结</div><div id="summary-ai-text" class="summary-preview">等待本地总结服务</div><div id="summary-ai-meta" class="summary-label" style="margin-top:7px">尚未调用模型</div>';
+      body.appendChild(aiSummary);
+      const topic = document.createElement("div");
+      topic.className = "summary-card";
+      topic.innerHTML = '<div class="summary-label">讨论主题</div><div class="summary-value">Codex 协作面板 Demo</div><ul class="summary-list"><li>增加项目实时总结面板</li><li>增加 API Key 与模型设置入口</li><li>暂不执行代码修改或上传数据</li></ul>';
+      body.appendChild(topic);
+      const pending = document.createElement("div");
+      pending.className = "summary-card";
+      pending.innerHTML = '<div class="summary-label">模型连接</div><div class="summary-value">未连接</div><div class="summary-label" style="margin-top:7px">这是界面验证版本，尚未接入真实总结模型。</div>';
+      body.appendChild(pending);
+    } else {
+      const label = document.createElement("label");
+      label.textContent = "总结模型";
+      const model = document.createElement("select");
+      for (const optionValue of ["fast-summary", "balanced-summary"]) {
+        const option = document.createElement("option");
+        option.value = optionValue;
+        option.textContent = optionValue === "fast-summary" ? "快速低价模型" : "平衡模型";
+        option.selected = summaryState.model === optionValue;
+        model.appendChild(option);
+      }
+      bindSummaryEvent(model, "change", () => { summaryState.model = model.value; });
+      appendSummaryChildren(body, label, model);
+      const endpointLabel = document.createElement("label");
+      endpointLabel.textContent = "API 地址（可选）";
+      const endpoint = document.createElement("input");
+      endpoint.placeholder = "https://api.example.com/v1";
+      endpoint.value = summaryState.endpoint;
+      bindSummaryEvent(endpoint, "input", () => { summaryState.endpoint = endpoint.value; });
+      appendSummaryChildren(body, endpointLabel, endpoint);
+      const keyLabel = document.createElement("label");
+      keyLabel.textContent = "API Key（仅保存在当前会话）";
+      const key = document.createElement("input");
+      key.type = "password";
+      key.placeholder = summaryState.apiKey ? "已填写" : "sk-...";
+      key.value = summaryState.apiKey;
+      bindSummaryEvent(key, "input", () => { summaryState.apiKey = key.value; });
+      appendSummaryChildren(body, keyLabel, key);
+      const actions = document.createElement("div");
+      actions.className = "summary-actions";
+      appendSummaryChildren(actions,
+        makeSummaryButton("测试连接", "summary-action primary", () => {
+          summaryState.connection = summaryState.apiKey ? "已填写 Key，等待接入测试" : "请先填写 API Key";
+          summaryState.lastUpdated = Date.now();
+          renderSummaryPanel(panel, tab);
+        }),
+        makeSummaryButton(summaryState.enabled ? "暂停总结" : "启用总结", "summary-action", () => {
+          summaryState.enabled = !summaryState.enabled;
+          renderSummaryPanel(panel, tab);
+        }),
+      );
+      body.appendChild(actions);
+      const note = document.createElement("div");
+      note.className = "summary-foot";
+      note.textContent = `当前状态：${summaryState.connection}。本版本不会上传 API Key。`;
+      body.appendChild(note);
+    }
+    panel.appendChild(body);
+    const foot = document.createElement("div");
+    foot.className = "summary-foot";
+    foot.textContent = `界面 Demo · ${summaryState.enabled ? "总结已启用" : "总结已暂停"} · 刚刚更新`;
+    panel.appendChild(foot);
+  };
+
+  const ensureSummaryPanel = () => {
+    if (!document.body) return;
+    let style = document.getElementById(SUMMARY_STYLE_ID);
+    if (!style) {
+      style = document.createElement("style");
+      style.id = SUMMARY_STYLE_ID;
+      style.textContent = summaryCss;
+      document.head?.appendChild(style);
+    }
+    let tab = document.getElementById("codex-dream-summary-tab");
+    let created = false;
+    if (!tab) {
+      created = true;
+      tab = document.createElement("button");
+      tab.id = "codex-dream-summary-tab";
+      tab.type = "button";
+      tab.textContent = "AI 总结";
+      bindSummaryEvent(tab, "click", () => {
+        summaryState.open = true;
+        const panel = document.getElementById(SUMMARY_PANEL_ID);
+        if (panel) renderSummaryPanel(panel, tab);
+      });
+      document.body.appendChild(tab);
+    }
+    let panel = document.getElementById(SUMMARY_PANEL_ID);
+    if (!panel) {
+      created = true;
+      panel = document.createElement("aside");
+      panel.id = SUMMARY_PANEL_ID;
+      panel.setAttribute("aria-label", "项目实时总结");
+      document.body.appendChild(panel);
+    }
+    if (created) renderSummaryPanel(panel, tab);
+  };
+
+  const applySummaryCapture = (capture) => {
+    summaryState.capture = capture && typeof capture === "object" ? capture : { connected: false };
+    const status = document.getElementById("summary-capture-status");
+    const meta = document.getElementById("summary-capture-meta");
+    const lastUser = document.getElementById("summary-last-user");
+    const lastAssistant = document.getElementById("summary-last-assistant");
+    const aiText = document.getElementById("summary-ai-text");
+    const aiMeta = document.getElementById("summary-ai-meta");
+    if (!status || !meta) return;
+    if (!capture?.connected) {
+      status.textContent = "本地记录服务未连接";
+      meta.textContent = "启动 summary-observer 后，这里会显示新增对话捕获状态";
+      if (lastUser) lastUser.textContent = "尚未捕获";
+      if (lastAssistant) lastAssistant.textContent = "尚未捕获";
+      if (aiText) aiText.textContent = "等待本地总结服务";
+      if (aiMeta) aiMeta.textContent = "尚未调用模型";
+      return;
+    }
+    status.textContent = "本地记录服务已连接";
+    meta.textContent = `用户 ${capture.userMessages || 0} 条 · Codex 回复 ${capture.assistantMessages || 0} 条 · 最近更新 ${capture.lastUpdated ? new Date(capture.lastUpdated).toLocaleTimeString() : "暂无"}`;
+    if (lastUser) lastUser.textContent = capture.lastUserPreview || "尚未捕获";
+    if (lastAssistant) lastAssistant.textContent = capture.lastAssistantPreview || "尚未捕获";
+    if (aiText) {
+      if (capture.summaryStatus === "summarizing") aiText.textContent = "Luna 正在总结最近一轮对话…";
+      else if (capture.summaryStatus === "error") aiText.textContent = `总结失败：${capture.summaryError || "未知错误"}`;
+      else aiText.textContent = capture.summary || "等待一轮对话结束后总结";
+    }
+    if (aiMeta) {
+      if (capture.summaryStatus === "ready") {
+        aiMeta.textContent = `${capture.summaryModel || "Luna"} · ${capture.summaryElapsedMs || 0} ms · 最近更新 ${capture.summaryUpdated ? new Date(capture.summaryUpdated).toLocaleTimeString() : "暂无"}`;
+      } else if (capture.summaryStatus === "error") aiMeta.textContent = "未自动回退到其他模型";
+      else if (capture.summaryStatus === "waiting" && capture.summary) aiMeta.textContent = "上一轮已完成 · 等待下一轮对话";
+      else aiMeta.textContent = `状态：${capture.summaryStatus || "waiting"}`;
+    }
+  };
+  window.__CODEX_DREAM_APPLY_CAPTURE__ = applySummaryCapture;
 
   const applyProfile = (root) => {
     const focusX = config.focusX ?? profile.focusX;
@@ -368,6 +630,7 @@
       document.body.appendChild(chrome);
     }
     chrome.classList.toggle("dream-home-shell", Boolean(home));
+    ensureSummaryPanel();
   };
 
   const cleanup = () => {
@@ -379,6 +642,7 @@
     if (state?.timer) clearInterval(state.timer);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
     if (state?.artUrl) URL.revokeObjectURL(state.artUrl);
+    delete window[SUMMARY_STATE_KEY];
     delete window[STATE_KEY];
     return true;
   };
@@ -391,8 +655,12 @@
       ensure();
     }, 180);
   };
-  observer = new MutationObserver(() => {
+  observer = new MutationObserver((records) => {
     if (samplingNativeShell) return;
+    if (records.length && records.every((record) => {
+      const target = record.target instanceof Element ? record.target : record.target.parentElement;
+      return target?.closest?.(`#${SUMMARY_PANEL_ID}, #codex-dream-summary-tab`);
+    })) return;
     scheduleEnsure();
   });
   observer.observe(document.documentElement, {
@@ -405,7 +673,9 @@
   window[STATE_KEY] = {
     ensure, cleanup, observer, timer, scheduler, artUrl, profile, config, installToken, version: "1.2.0",
   };
+  summaryState.captureTimer = setInterval(() => applySummaryCapture(summaryState.capture), 1200);
   ensure();
+  applySummaryCapture(summaryState.capture);
   analyzeArt().then((result) => {
     const state = window[STATE_KEY];
     if (state?.installToken !== installToken || window.__CODEX_DREAM_SKIN_DISABLED__) return;

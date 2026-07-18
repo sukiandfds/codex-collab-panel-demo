@@ -9,6 +9,11 @@ docs/readme-preview.html
 release/
 runtime/
 
+# Local Codex isolation and visual verification artifacts
+isolated-profile/
+isolated-*.png
+summary-*.log
+
 # local agent context
 AGENTS.md
 TASK_PROGRESS.md
