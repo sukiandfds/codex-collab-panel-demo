@@ -333,6 +333,11 @@
     #${SUMMARY_PANEL_ID} .summary-list { margin:7px 0 0; padding-left:17px; color:#d8dee8; }
     #${SUMMARY_PANEL_ID} .summary-list li { margin:4px 0; }
     #${SUMMARY_PANEL_ID} .summary-preview { color:#d8dee8; white-space:pre-wrap; overflow-wrap:anywhere; }
+    #${SUMMARY_PANEL_ID} .summary-section { padding:8px 0; border-top:1px solid rgba(255,255,255,.09); }
+    #${SUMMARY_PANEL_ID} .summary-section:first-child { padding-top:0; border-top:0; }
+    #${SUMMARY_PANEL_ID} .summary-section-title { color:#f3f5f8; font-size:12px; font-weight:700; margin-bottom:4px; }
+    #${SUMMARY_PANEL_ID} .summary-section-item { color:#d8dee8; margin:3px 0; padding-left:12px; position:relative; }
+    #${SUMMARY_PANEL_ID} .summary-section-item::before { content:""; width:4px; height:4px; border-radius:50%; background:#8da7ff; position:absolute; left:1px; top:.62em; }
     #${SUMMARY_PANEL_ID} .summary-foot { padding:9px 14px 12px; color:var(--summary-muted); font-size:11px; border-top:1px solid var(--summary-border); }
     #${SUMMARY_PANEL_ID} label { display:block; color:var(--summary-muted); font-size:11px; margin:10px 0 5px; }
     #${SUMMARY_PANEL_ID} input, #${SUMMARY_PANEL_ID} select { width:100%; border:1px solid var(--summary-border); border-radius:8px; padding:9px 10px; color:var(--summary-text); background:rgba(0,0,0,.2); outline:none; }
@@ -376,7 +381,7 @@
     const dot = document.createElement("span");
     dot.className = "summary-dot";
     const titleText = document.createElement("span");
-    titleText.textContent = "项目实时总结";
+    titleText.textContent = "研发实时记录";
     appendSummaryChildren(title, dot, titleText);
     appendSummaryChildren(head, title, makeSummaryButton("×", "summary-icon", () => {
       summaryState.open = false;
@@ -386,7 +391,7 @@
 
     const tabs = document.createElement("div");
     tabs.className = "summary-tabs";
-    for (const [key, label] of [["summary", "实时总结"], ["settings", "设置"]]) {
+    for (const [key, label] of [["summary", "研发记录"], ["settings", "设置"]]) {
       const tabButton = makeSummaryButton(label, "summary-tab", () => {
         summaryState.view = key;
         renderSummaryPanel(panel, tab);
@@ -401,26 +406,30 @@
     if (summaryState.view === "summary") {
       const status = document.createElement("div");
       status.className = "summary-card";
+      status.hidden = true;
       status.innerHTML = '<div class="summary-label">本地记录状态</div><div id="summary-capture-status" class="summary-value">正在等待本地记录服务</div><div id="summary-capture-meta" class="summary-label" style="margin-top:7px">尚未读取当前 Codex 会话</div>';
       body.appendChild(status);
       const latestUser = document.createElement("div");
       latestUser.className = "summary-card";
+      latestUser.hidden = true;
       latestUser.innerHTML = '<div class="summary-label">最近用户要求</div><div id="summary-last-user" class="summary-preview">尚未捕获</div>';
       body.appendChild(latestUser);
       const latestAssistant = document.createElement("div");
       latestAssistant.className = "summary-card";
+      latestAssistant.hidden = true;
       latestAssistant.innerHTML = '<div class="summary-label">最近 Codex 回复</div><div id="summary-last-assistant" class="summary-preview">尚未捕获</div>';
       body.appendChild(latestAssistant);
       const aiSummary = document.createElement("div");
       aiSummary.className = "summary-card";
-      aiSummary.innerHTML = '<div class="summary-label">Luna 实时总结</div><div id="summary-ai-text" class="summary-preview">等待本地总结服务</div><div id="summary-ai-meta" class="summary-label" style="margin-top:7px">尚未调用模型</div>';
-      body.appendChild(aiSummary);
+      aiSummary.innerHTML = '<div class="summary-label">研发记录</div><div id="summary-ai-text" class="summary-preview">等待本地总结服务</div><div id="summary-ai-meta" class="summary-label" style="margin-top:7px">尚未调用模型</div>';
       const topic = document.createElement("div");
       topic.className = "summary-card";
       topic.innerHTML = '<div class="summary-label">讨论主题</div><div class="summary-value">Codex 协作面板 Demo</div><ul class="summary-list"><li>增加项目实时总结面板</li><li>增加 API Key 与模型设置入口</li><li>暂不执行代码修改或上传数据</li></ul>';
       body.appendChild(topic);
+      body.appendChild(aiSummary);
       const pending = document.createElement("div");
       pending.className = "summary-card";
+      pending.hidden = true;
       pending.innerHTML = '<div class="summary-label">模型连接</div><div class="summary-value">未连接</div><div class="summary-label" style="margin-top:7px">这是界面验证版本，尚未接入真实总结模型。</div>';
       body.appendChild(pending);
     } else {
@@ -506,10 +515,65 @@
       created = true;
       panel = document.createElement("aside");
       panel.id = SUMMARY_PANEL_ID;
-      panel.setAttribute("aria-label", "项目实时总结");
+      panel.setAttribute("aria-label", "研发实时记录");
       document.body.appendChild(panel);
     }
     if (created) renderSummaryPanel(panel, tab);
+  };
+
+  const summarySectionNames = new Set([
+    "当前主题", "用户需求与确认", "AI执行与进度", "已完成与验证",
+    "问题与风险", "待办", "待讨论", "经验与关联上下文",
+  ]);
+
+  const renderSummaryText = (container, text) => {
+    const normalizedText = String(text || "");
+    if (container.dataset.renderedSummary === normalizedText &&
+        container.querySelector(".summary-section")) return;
+    const scrollRoot = container.closest(".summary-body");
+    const previousScrollTop = scrollRoot?.scrollTop || 0;
+    const lines = normalizedText.split(/\r?\n/);
+    const sections = [];
+    let current = null;
+    for (const rawLine of lines) {
+      const line = rawLine.replace(/^\s*(?:#{1,3}\s*)?/, "").trim();
+      if (!line) continue;
+      const heading = line.replace(/[：:]\s*$/, "").trim();
+      if (summarySectionNames.has(heading)) {
+        current = { title: heading, items: [] };
+        sections.push(current);
+        continue;
+      }
+      if (!current) {
+        current = { title: "记录", items: [] };
+        sections.push(current);
+      }
+      const item = line.replace(/^(?:[-*•]|\d+[.)])\s*/, "").trim();
+      if (item) current.items.push(item);
+    }
+    if (!sections.length) {
+      container.textContent = normalizedText || "等待一轮对话结束后总结";
+      container.dataset.renderedSummary = normalizedText;
+      return;
+    }
+    container.replaceChildren();
+    for (const section of sections) {
+      const block = document.createElement("section");
+      block.className = "summary-section";
+      const heading = document.createElement("div");
+      heading.className = "summary-section-title";
+      heading.textContent = section.title;
+      block.appendChild(heading);
+      for (const item of section.items) {
+        const row = document.createElement("div");
+        row.className = "summary-section-item";
+        row.textContent = item;
+        block.appendChild(row);
+      }
+      container.appendChild(block);
+    }
+    container.dataset.renderedSummary = normalizedText;
+    if (scrollRoot) scrollRoot.scrollTop = previousScrollTop;
   };
 
   const applySummaryCapture = (capture) => {
@@ -535,9 +599,20 @@
     if (lastUser) lastUser.textContent = capture.lastUserPreview || "尚未捕获";
     if (lastAssistant) lastAssistant.textContent = capture.lastAssistantPreview || "尚未捕获";
     if (aiText) {
-      if (capture.summaryStatus === "summarizing") aiText.textContent = "Luna 正在总结最近一轮对话…";
-      else if (capture.summaryStatus === "error") aiText.textContent = `总结失败：${capture.summaryError || "未知错误"}`;
-      else aiText.textContent = capture.summary || "等待一轮对话结束后总结";
+      if (capture.summaryStatus === "summarizing") {
+        if (!aiText.dataset.renderedSummary && !aiText.querySelector(".summary-section") &&
+            aiText.dataset.summaryStatus !== "summarizing") {
+          aiText.textContent = "Luna 正在总结最近一轮对话…";
+          delete aiText.dataset.renderedSummary;
+        }
+      } else if (capture.summaryStatus === "error") {
+        const errorText = `总结失败：${capture.summaryError || "未知错误"}`;
+        if (aiText.textContent !== errorText) aiText.textContent = errorText;
+        delete aiText.dataset.renderedSummary;
+      } else {
+        renderSummaryText(aiText, capture.summary || "等待一轮对话结束后总结");
+      }
+      aiText.dataset.summaryStatus = capture.summaryStatus || "waiting";
     }
     if (aiMeta) {
       if (capture.summaryStatus === "ready") {
@@ -673,7 +748,6 @@
   window[STATE_KEY] = {
     ensure, cleanup, observer, timer, scheduler, artUrl, profile, config, installToken, version: "1.2.0",
   };
-  summaryState.captureTimer = setInterval(() => applySummaryCapture(summaryState.capture), 1200);
   ensure();
   applySummaryCapture(summaryState.capture);
   analyzeArt().then((result) => {

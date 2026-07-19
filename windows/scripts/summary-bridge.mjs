@@ -39,18 +39,32 @@ const sendCdp = (webSocketDebuggerUrl, method, params = {}) => new Promise((reso
   ws.addEventListener("error", () => { clearTimeout(timer); reject(new Error("CDP WebSocket failed")); }, { once: true });
 });
 
+let lastCaptureSignature = "";
+
 const bridgeOnce = async () => {
-  const [status, targets] = await Promise.all([
-    getJson(`http://127.0.0.1:${observerPort}/status`),
-    getJson(`http://127.0.0.1:${port}/json/list`),
-  ]);
+  const targets = await getJson(`http://127.0.0.1:${port}/json/list`);
   const target = targets.find((item) => item.type === "page" && item.webSocketDebuggerUrl);
   if (!target) throw new Error("No Codex renderer target");
+  const activeThreadResult = await sendCdp(target.webSocketDebuggerUrl, "Runtime.evaluate", {
+    expression: `(() => {
+      const activeRow = document.querySelector('[data-app-action-sidebar-thread-active="true"]');
+      const rowId = activeRow?.getAttribute('data-app-action-sidebar-thread-id') || '';
+      const composer = document.querySelector('[data-above-composer-conversation-id]');
+      return rowId.replace(/^local:/, '') || composer?.getAttribute('data-above-composer-conversation-id') || '';
+    })()`,
+    returnByValue: true,
+  });
+  const activeThreadId = activeThreadResult?.result?.value || "";
+  const threadQuery = activeThreadId ? `?threadId=${encodeURIComponent(activeThreadId)}` : "";
+  const status = await getJson(`http://127.0.0.1:${observerPort}/status${threadQuery}`);
+  const signature = JSON.stringify(status);
+  if (signature === lastCaptureSignature) return;
   const encoded = JSON.stringify(status);
   await sendCdp(target.webSocketDebuggerUrl, "Runtime.evaluate", {
     expression: `window.__CODEX_DREAM_APPLY_CAPTURE__?.(${encoded})`,
     returnByValue: true,
   });
+  lastCaptureSignature = signature;
 };
 
 console.log(`[summary-bridge] watching CDP ${port} and observer ${observerPort}`);

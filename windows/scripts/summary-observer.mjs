@@ -9,7 +9,7 @@ const getArg = (name, fallback = "") => {
   return index >= 0 ? args[index + 1] : fallback;
 };
 const port = Number(getArg("--port", "9350"));
-const threadId = getArg("--thread-id");
+const initialThreadId = getArg("--thread-id");
 const summaryModel = getArg("--model", "gpt-5.6-luna");
 const codexRoot = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
 const sessionRoot = process.env.CODEX_SESSION_DIR || path.join(os.homedir(), ".codex", "sessions");
@@ -25,7 +25,7 @@ const state = {
   lastAssistantPreview: "",
   lastUpdated: null,
   error: "",
-  threadId,
+  threadId: initialThreadId,
   summary: "",
   summaryStatus: "waiting",
   summaryModel,
@@ -36,6 +36,7 @@ const state = {
   summaryError: "",
 };
 let activeFile = "";
+let activeThreadId = initialThreadId;
 let offset = 0;
 let carry = "";
 const seen = new Set();
@@ -43,6 +44,8 @@ const recentMessages = [];
 let summaryDueAt = 0;
 let summarizing = false;
 let lastSummaryKey = "";
+let threadRevision = 0;
+let scanRunning = false;
 
 const textFrom = (value, depth = 0) => {
   if (depth > 5 || value === null || value === undefined) return "";
@@ -59,10 +62,10 @@ const textFrom = (value, depth = 0) => {
   return "";
 };
 
-const normalizePreview = (value) => value.replace(/\s+/g, " ").trim().slice(0, 180);
+const normalizeMessage = (value) => value.replace(/\s+/g, " ").trim().slice(0, 1200);
 
 const recordMessage = (role, payload) => {
-  const text = normalizePreview(textFrom(payload));
+  const text = normalizeMessage(textFrom(payload));
   if (!text) return;
   const key = `${role}:${text}`;
   if (seen.has(key)) return;
@@ -70,15 +73,52 @@ const recordMessage = (role, payload) => {
   if (seen.size > 200) seen.delete(seen.values().next().value);
   if (role === "user") state.userMessages += 1;
   if (role === "assistant") state.assistantMessages += 1;
-  if (role === "user") state.lastUserPreview = text;
-  if (role === "assistant") state.lastAssistantPreview = text;
+  const preview = text.slice(0, 180);
+  if (role === "user") state.lastUserPreview = preview;
+  if (role === "assistant") state.lastAssistantPreview = preview;
   recentMessages.push({ role, text });
-  if (recentMessages.length > 12) recentMessages.shift();
+  if (recentMessages.length > 16) recentMessages.shift();
   summaryDueAt = Date.now() + 12000;
   state.summaryStatus = "waiting";
   state.lastRole = role;
-  state.lastPreview = text;
+  state.lastPreview = preview;
   state.lastUpdated = new Date().toISOString();
+};
+
+const switchThread = (nextThreadId) => {
+  const normalized = String(nextThreadId || "").replace(/^local:/, "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(normalized) || normalized === activeThreadId) return false;
+  activeThreadId = normalized;
+  threadRevision += 1;
+  activeFile = "";
+  offset = 0;
+  carry = "";
+  seen.clear();
+  recentMessages.length = 0;
+  summaryDueAt = 0;
+  summarizing = false;
+  lastSummaryKey = "";
+  Object.assign(state, {
+    connected: false,
+    sourceFile: "",
+    userMessages: 0,
+    assistantMessages: 0,
+    lastRole: "",
+    lastPreview: "",
+    lastUserPreview: "",
+    lastAssistantPreview: "",
+    lastUpdated: null,
+    error: "",
+    threadId: normalized,
+    summary: "",
+    summaryStatus: "waiting",
+    summaryUpdated: null,
+    summaryElapsedMs: null,
+    summaryInputTokens: null,
+    summaryOutputTokens: null,
+    summaryError: "",
+  });
+  return true;
 };
 
 const parseStringSetting = (text, key) => {
@@ -119,13 +159,18 @@ const updateSummary = async () => {
   const summaryKey = `${state.userMessages}:${state.assistantMessages}:${state.lastUserPreview}:${state.lastAssistantPreview}`;
   if (summarizing || state.lastRole !== "assistant" || summaryKey === lastSummaryKey || recentMessages.length < 2) return;
   summarizing = true;
+  const revision = threadRevision;
   lastSummaryKey = summaryKey;
   state.summaryStatus = "summarizing";
   state.summaryError = "";
   const transcript = recentMessages.map((item) => `${item.role === "user" ? "用户" : "Codex"}：${item.text}`).join("\n");
   const prompt = [
-    "你是 Codex 项目的会议记录员，只总结需求与结论，不提出新方案。",
-    "请用简洁中文输出四项：当前目标、已确认、进行中、待确认。没有内容写‘暂无’。",
+    "你是跟随 Codex 开发过程的研发记录员。只记录对话中已经出现的事实，不提出新方案，不替用户做决定。",
+    "必须区分闲聊、设想、明确需求和已确认决定。用户没有明确确认的内容只能放入‘待讨论’，不能写成需求或决定。",
+    "必须区分尝试、完成、验证成功和失败。没有测试或证据时，不得写成已验证成功。",
+    "请用简洁中文固定输出八项：当前主题、用户需求与确认、AI执行与进度、已完成与验证、问题与风险、待办、待讨论、经验与关联上下文。没有内容写‘暂无’。",
+    "‘经验’只记录已经发生的成功方法、失败原因或用户纠正；‘关联上下文’只能引用最近对话或上一版记录中已经出现的资料、决策和来源，不能假装完成外部检索。",
+    "只输出适合窄侧边栏阅读的纯文本，不使用 Markdown 粗体、标题符号或代码块。每项最多两条，每条一行，总长度控制在 1200 个中文字符以内。",
     state.summary ? `上一版摘要：\n${state.summary}` : "上一版摘要：暂无",
     `最近对话：\n${transcript}`,
   ].join("\n\n");
@@ -142,11 +187,12 @@ const updateSummary = async () => {
         model: summaryModel,
         input: prompt,
         reasoning: { effort: "low" },
-        max_output_tokens: 240,
+        max_output_tokens: 520,
         store: false,
       }),
     });
     const payload = await response.json();
+    if (revision !== threadRevision) return;
     if (!response.ok) throw new Error(payload?.error?.message || `HTTP ${response.status}`);
     const text = responseText(payload);
     if (!text) throw new Error("Summary model returned no text");
@@ -157,10 +203,11 @@ const updateSummary = async () => {
     state.summaryInputTokens = payload?.usage?.input_tokens ?? null;
     state.summaryOutputTokens = payload?.usage?.output_tokens ?? null;
   } catch (error) {
+    if (revision !== threadRevision) return;
     state.summaryStatus = "error";
     state.summaryError = error instanceof Error ? error.message : String(error);
   } finally {
-    summarizing = false;
+    if (revision === threadRevision) summarizing = false;
   }
 };
 
@@ -199,18 +246,24 @@ const walk = async (directory) => {
   return files;
 };
 
-const findLatestSession = async () => {
+const findLatestSession = async (selectedThreadId) => {
   const allFiles = await walk(sessionRoot);
-  const files = threadId ? allFiles.filter((file) => path.basename(file).includes(threadId)) : allFiles;
-  if (threadId && files.length === 0) throw new Error(`No session JSONL found for thread ${threadId}`);
+  const files = selectedThreadId ? allFiles.filter((file) => path.basename(file).includes(selectedThreadId)) : allFiles;
+  if (selectedThreadId && files.length === 0) throw new Error(`No session JSONL found for thread ${selectedThreadId}`);
   const stats = await Promise.all(files.map(async (file) => ({ file, stat: await fs.stat(file) })));
   stats.sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs);
   return stats[0]?.file || "";
 };
 
 const scan = async () => {
+  if (scanRunning) return;
+  scanRunning = true;
+  const revision = threadRevision;
+  const selectedThreadId = activeThreadId;
+  let handle;
   try {
-    const file = await findLatestSession();
+    const file = await findLatestSession(selectedThreadId);
+    if (revision !== threadRevision) return;
     if (!file) throw new Error("No Codex session JSONL found");
     if (file !== activeFile) {
       activeFile = file;
@@ -218,34 +271,42 @@ const scan = async () => {
       carry = "";
       state.sourceFile = path.basename(file);
     }
-    const handle = await fs.open(file, "r");
+    handle = await fs.open(file, "r");
     const stat = await handle.stat();
+    if (revision !== threadRevision) return;
     if (stat.size < offset) offset = 0;
     const length = stat.size - offset;
     if (length > 0) {
       const buffer = Buffer.alloc(length);
       await handle.read(buffer, 0, length, offset);
+      if (revision !== threadRevision) return;
       offset = stat.size;
       const lines = (carry + buffer.toString("utf8")).split(/\r?\n/);
       carry = lines.pop() || "";
       lines.forEach(processLine);
     }
-    await handle.close();
     state.connected = true;
     state.error = "";
     maybeSummarize();
   } catch (error) {
+    if (revision !== threadRevision) return;
     state.connected = false;
     state.error = error instanceof Error ? error.message : String(error);
+  } finally {
+    await handle?.close().catch(() => {});
+    scanRunning = false;
   }
 };
 
 const server = http.createServer((request, response) => {
-  if (request.url !== "/status") {
+  const requestUrl = new URL(request.url || "/", "http://127.0.0.1");
+  if (requestUrl.pathname !== "/status") {
     response.writeHead(404);
     response.end();
     return;
   }
+  const requestedThreadId = requestUrl.searchParams.get("threadId");
+  if (requestedThreadId && switchThread(requestedThreadId)) setTimeout(scan, 0);
   response.writeHead(200, {
     "Access-Control-Allow-Origin": "*",
     "Cache-Control": "no-store",

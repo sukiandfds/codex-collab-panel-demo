@@ -429,7 +429,7 @@ async function probeSession(session) {
     const markers = {
       shell: Boolean(document.querySelector('main.main-surface')),
       sidebar: Boolean(document.querySelector('aside.app-shell-left-panel')),
-      composer: Boolean(document.querySelector('.composer-surface-chrome')),
+      composer: Boolean(document.querySelector('.composer-surface-chrome, [data-above-composer-conversation-id]')),
       main: Boolean(document.querySelector('[role="main"]')),
     };
     return {
