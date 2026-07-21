@@ -1,0 +1,102 @@
+.windowBar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: var(--windowbar-height);
+  background: var(--color-windowbar);
+  color: var(--color-text-muted);
+  user-select: none;
+}
+
+.navigation,
+.menu,
+.windowControls {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.navigation {
+  gap: 5px;
+  padding-left: 12px;
+}
+
+.iconButton,
+.windowControls button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.iconButton {
+  width: 32px;
+  height: 30px;
+  border-radius: 5px;
+}
+
+.iconButton svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.8;
+}
+
+.disabled {
+  opacity: .32;
+}
+
+.menu {
+  gap: 2px;
+  margin-left: 14px;
+}
+
+.menu button {
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.dragRegion {
+  min-width: 24px;
+  flex: 1;
+}
+
+.windowControls button {
+  width: 54px;
+  height: 100%;
+}
+
+.windowControls svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.7;
+}
+
+@media (hover: hover) {
+  .iconButton:not(:disabled):hover,
+  .menu button:hover,
+  .windowControls button:hover {
+    background: rgba(255, 255, 255, .06);
+    color: var(--color-text-secondary);
+  }
+
+  .windowControls .close:hover {
+    background: #c42b1c;
+    color: white;
+  }
+}
+
+@media (max-width: 760px) {
+  .menu {
+    display: none;
+  }
+
+  .windowControls button {
+    width: 42px;
+  }
+}

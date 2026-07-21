@@ -1,0 +1,7 @@
+.root { display: flex; min-height: 50px; align-items: center; gap: 9px; padding: 7px 10px 7px 16px; border-top: 1px solid var(--color-border); }
+.dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #777; }
+.connected { background: var(--color-success); box-shadow: 0 0 0 3px rgba(105,207,141,.1); }
+.name { min-width: 0; flex: 1; overflow: hidden; color: var(--color-text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.root button { display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 5px; background: transparent; color: var(--color-text-muted); }
+.root button svg { width: 15px; height: 15px; }
+@media (hover: hover) { .root button:hover { background: var(--color-surface-hover); color: var(--color-text); } }

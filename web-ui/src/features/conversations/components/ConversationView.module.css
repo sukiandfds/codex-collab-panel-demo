@@ -1,0 +1,17 @@
+.scrollArea { height: 100%; overflow-y: auto; padding: 30px 30px 154px; scrollbar-color: #3b3d3f transparent; scrollbar-width: thin; }
+.conversation { width: min(var(--content-width), 100%); min-height: 100%; margin: 0 auto; }
+.virtualList { position: relative; width: 100%; }
+.virtualRow { position: absolute; top: 0; left: 0; width: 100%; }
+.message { padding-bottom: 34px; }
+.body { color: var(--color-text); }
+.user .body { width: fit-content; max-width: min(620px, 82%); margin-left: auto; padding: 10px 14px; border: 1px solid rgba(255,255,255,.04); border-radius: 16px; background: var(--color-user-message); }
+.assistant .body { max-width: 100%; }
+.state { display: grid; min-height: 50vh; place-items: center; color: var(--color-text-muted); text-align: center; }
+.loading,
+.older { padding: 16px 0; color: var(--color-text-muted); font-size: 13px; text-align: center; }
+.older { position: sticky; z-index: 2; top: 0; background: var(--color-bg); }
+@media (max-width: 760px) {
+  .scrollArea { padding: 22px 15px 142px; }
+  .message { padding-bottom: 28px; }
+  .user .body { max-width: 92%; }
+}

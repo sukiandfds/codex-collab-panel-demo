@@ -17,3 +17,13 @@ summary-*.log
 # local agent context
 AGENTS.md
 TASK_PROGRESS.md
+
+# Local frontend dependencies, caches, and generated output
+.pnpm-store/
+.playwright-mcp/
+web-ui/node_modules/
+web-ui/dist/
+web-ui/*.tsbuildinfo
+web-ui/vite.config.js
+web-ui/vite.config.d.ts
+web-ui/package-lock.json
