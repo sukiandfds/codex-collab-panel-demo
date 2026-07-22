@@ -1,7 +1,39 @@
 # Codex Collab Panel
 
-更新日期：2026-07-19
-当前阶段：`v0.1` 本地实时总结面板
+更新日期：2026-07-22
+当前阶段：单项目真实对话 Web Demo，已完成浏览器双向 Codex 技术闭环
+
+完整的原始设想、推演过程、商业愿景与顾虑见 [VISION_NOTES.md](VISION_NOTES.md)。
+
+## 2026-07-22 当前状态
+
+当前 Demo 已经具备：
+
+- 读取一个项目中的真实 Codex Thread、真实标题和结构化内容；
+- 分页、缓存、虚拟列表及 Markdown、代码、表格和媒体渲染；
+- 从电脑或手机浏览器向当前真实 Thread 发送指令；
+- 通过 app-server Notification 和 SSE 展示执行状态与流式回复；
+- 自动选择可运行的 Codex Desktop 运行时，并在单次读取失败时回退 JSONL。
+
+浏览器发送已由用户实测成功，但当前仍有一个重要边界：网页使用独立 app-server 进程。消息和回复会保存到同一个 Thread，已经打开的 Codex Desktop 页面却不会实时显示外部进程追加的内容。因此目前是“同一任务持久化 + Web 实时执行”，尚不是 Desktop 与 Web 的完整双端实时同步。
+
+当前最近目标：
+
+1. 明确 Desktop 重新打开任务后的刷新行为；
+2. 评估 Desktop daemon/proxy/IPC 或统一 Connector；
+3. 在同步机制完成前避免同一 Thread 双端并发发送；
+4. 正式远程使用前解决固定 token、监听范围、审批和权限；
+5. 之后再进入多人项目群、项目经理 Agent 和多 Agent 组织层。
+
+当天开发记录与调研入口：
+
+- [DEVELOPMENT_LOG_2026-07-22.md](DEVELOPMENT_LOG_2026-07-22.md)
+- [DEVELOPMENT_BUG_LOG_2026-07-22.md](DEVELOPMENT_BUG_LOG_2026-07-22.md)
+- [AI_ASSISTANT_READ_FIRST.md](AI_ASSISTANT_READ_FIRST.md)
+- [多人协作与多 Agent 技术路径调研报告](项目战略与多角色评审/05-多人协作与多Agent技术路径调研报告-2026-07-22.md)
+- [群聊方向历史交互原型](docs/codex-group-chat-prototype.html)
+
+以下 `v0.1` 内容保留为项目早期阶段记录，不代表当前功能上限。
 
 ## 项目愿景
 

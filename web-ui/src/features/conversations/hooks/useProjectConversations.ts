@@ -3,6 +3,7 @@ import { conversationApi } from "../data/conversationApi";
 import { hasAccessToken } from "../data/http";
 import type { ProjectInfo, SessionDetail, SessionSummary } from "../model/types";
 import { useConversationEvents } from "../realtime/useConversationEvents";
+import { useCodexExecution } from "../../execution/hooks/useCodexExecution";
 
 export function useProjectConversations() {
   const [project, setProject] = useState<ProjectInfo | null>(null);
@@ -95,7 +96,11 @@ export function useProjectConversations() {
     if (threadId) sessionCache.current.delete(threadId);
     void refreshSessions(false, threadId);
   }, [refreshSessions]);
-  const connected = useConversationEvents(onSessionsChanged);
+  const onMessageAccepted = useCallback(() => {
+    if (selectedIdRef.current) void loadSession(selectedIdRef.current, { quiet: true });
+  }, [loadSession]);
+  const execution = useCodexExecution(selectedId, onMessageAccepted);
+  const connected = useConversationEvents(onSessionsChanged, execution.handleEvent);
 
   useEffect(() => () => requestRef.current?.abort(), []);
 
@@ -119,6 +124,10 @@ export function useProjectConversations() {
   return {
     project, sessions, selectedId, session, loadingList, loadingSession, loadingOlder,
     connected, listError, sessionError, selectSession, loadOlder,
+    executionStatus: execution.status,
+    streamingText: execution.streamingText,
+    sending: execution.sending,
+    sendMessage: execution.sendMessage,
     refresh: () => refreshSessions(),
   };
 }

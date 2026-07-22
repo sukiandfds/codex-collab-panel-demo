@@ -24,3 +24,16 @@ export const fetchJson = async <T,>(pathname: string, signal?: AbortSignal): Pro
     throw new Error("项目数据返回格式错误");
   }
 };
+
+export const postJson = async <T,>(pathname: string, body: unknown, signal?: AbortSignal): Promise<T> => {
+  const response = await fetch(withAccessToken(pathname), {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  const payload = await response.json().catch(() => ({})) as { error?: string };
+  if (!response.ok) throw new Error(payload.error || `发送失败（${response.status}）`);
+  return payload as T;
+};

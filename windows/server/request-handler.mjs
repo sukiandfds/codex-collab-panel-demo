@@ -3,6 +3,27 @@ const sendJson = (response, value, status = 200) => {
   response.end(JSON.stringify(value));
 };
 
+const readJson = async (request, limit = 64 * 1024) => {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > limit) {
+      const error = new Error("Request body is too large.");
+      error.statusCode = 413;
+      throw error;
+    }
+    chunks.push(chunk);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+  } catch {
+    const error = new Error("Request body must be valid JSON.");
+    error.statusCode = 400;
+    throw error;
+  }
+};
+
 const authorized = (request, token) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "127.0.0.1"}`);
   return url.searchParams.get("token") === token;
@@ -19,7 +40,7 @@ const paginationFrom = (url) => {
   };
 };
 
-export const createRequestHandler = ({ token, project, projectRoot, observerPort, conversations, media, realtime, serveStatic }) => {
+export const createRequestHandler = ({ token, project, projectRoot, observerPort, conversations, execution, media, realtime, serveStatic }) => {
   const readObserverStatus = async (threadId = "") => {
     try {
       const query = threadId ? `?threadId=${encodeURIComponent(threadId)}` : "";
@@ -42,7 +63,23 @@ export const createRequestHandler = ({ token, project, projectRoot, observerPort
 
     try {
       if (url.pathname === "/api/project") {
-        sendJson(response, { name: project, root: projectRoot, mode: "read-only" });
+        sendJson(response, { name: project, root: projectRoot, mode: "interactive" });
+        return;
+      }
+      if (url.pathname === "/api/session/message" && request.method === "POST") {
+        const body = await readJson(request);
+        const threadId = String(body.threadId || "").trim();
+        const text = String(body.text || "").trim();
+        if (!threadId || !text) return sendJson(response, { error: "threadId and text are required" }, 400);
+        if (text.length > 32000) return sendJson(response, { error: "message is too long" }, 413);
+        const result = await conversations.sendMessage(threadId, text);
+        sendJson(response, { threadId, turnId: result.turn?.id || "", status: result.turn?.status || "inProgress" }, 202);
+        return;
+      }
+      if (url.pathname === "/api/execution-status") {
+        const threadId = url.searchParams.get("threadId") || "";
+        if (!threadId) return sendJson(response, { error: "threadId is required" }, 400);
+        sendJson(response, execution.getStatus(threadId));
         return;
       }
       if (url.pathname === "/api/sessions") {
@@ -74,7 +111,7 @@ export const createRequestHandler = ({ token, project, projectRoot, observerPort
       }
       await serveStatic(url, response);
     } catch (error) {
-      sendJson(response, { error: error instanceof Error ? error.message : String(error) }, 503);
+      sendJson(response, { error: error instanceof Error ? error.message : String(error) }, error?.statusCode || 503);
     }
   };
 };

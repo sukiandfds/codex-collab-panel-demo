@@ -4,7 +4,7 @@ export type SessionSource = "codex" | "happy";
 export interface ProjectInfo {
   name: string;
   root: string;
-  mode: "read-only";
+  mode: "read-only" | "interactive";
 }
 
 export interface MarkdownBlock { id: string; type: "markdown"; text: string }

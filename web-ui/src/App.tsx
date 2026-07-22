@@ -40,10 +40,19 @@ export function App() {
           loadingOlder={conversations.loadingOlder}
           error={conversations.sessionError}
           listAvailable={!conversations.listError}
+          streamingText={conversations.streamingText}
           onLoadOlder={conversations.loadOlder}
         />
       }
-      composer={<Composer />}
+      composer={
+        <Composer
+          connected={conversations.connected}
+          selected={Boolean(conversations.selectedId)}
+          sending={conversations.sending}
+          status={conversations.executionStatus}
+          onSend={conversations.sendMessage}
+        />
+      }
     />
   );
 }

@@ -7,6 +7,7 @@ import { createAppServerConversationStore } from "../server/app-server-conversat
 import { createConversationService } from "../server/conversation-service.mjs";
 import { createMediaService } from "../server/media-service.mjs";
 import { createRealtimeHub } from "../server/realtime-hub.mjs";
+import { createExecutionTracker } from "../server/execution-tracker.mjs";
 import { createRequestHandler } from "../server/request-handler.mjs";
 import { createStaticFileServer } from "../server/static-files.mjs";
 
@@ -25,18 +26,25 @@ const token = getArg("--token", randomBytes(12).toString("hex"));
 const sessionRoot = process.env.CODEX_SESSION_DIR || path.join(os.homedir(), ".codex", "sessions");
 const media = createMediaService();
 const realtime = createRealtimeHub();
+const execution = createExecutionTracker({ broadcast: realtime.broadcast });
 const jsonlConversations = createJsonlConversationStore({
   sessionRoot,
   projectRoot,
   registerMedia: media.register,
   onChange: realtime.broadcast,
 });
-const appServerConversations = createAppServerConversationStore({ projectRoot, registerMedia: media.register });
+const appServerConversations = createAppServerConversationStore({
+  projectRoot,
+  registerMedia: media.register,
+  onProtocolMessage: execution.handleProtocolMessage,
+  onSubmitted: execution.markSubmitted,
+  onFailed: execution.markFailed,
+});
 const conversations = createConversationService({ primary: appServerConversations, fallback: jsonlConversations });
 
 const serveStatic = createStaticFileServer(webRoot);
 const requestHandler = createRequestHandler({
-  token, project, projectRoot, observerPort, conversations, media, realtime, serveStatic,
+  token, project, projectRoot, observerPort, conversations, execution, media, realtime, serveStatic,
 });
 const server = http.createServer(requestHandler);
 

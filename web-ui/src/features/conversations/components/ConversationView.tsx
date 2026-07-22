@@ -18,19 +18,23 @@ interface ConversationViewProps {
   loadingOlder: boolean;
   error: string;
   listAvailable: boolean;
+  streamingText: string;
   onLoadOlder: () => Promise<void>;
 }
 
-export function ConversationView({ session, loading, loadingOlder, error, listAvailable, onLoadOlder }: ConversationViewProps) {
+export function ConversationView({ session, loading, loadingOlder, error, listAvailable, streamingText, onLoadOlder }: ConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingOlderRef = useRef(false);
   const messages = session?.messages || [];
+  const visibleMessages = streamingText
+    ? [...messages, { id: "streaming-assistant", role: "assistant" as const, text: streamingText }]
+    : messages;
   const virtualizer = useVirtualizer({
-    count: messages.length,
+    count: visibleMessages.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: (index) => messages[index]?.role === "user" ? 84 : 160,
+    estimateSize: (index) => visibleMessages[index]?.role === "user" ? 84 : 160,
     overscan: 6,
-    getItemKey: (index) => messages[index]?.id || index,
+    getItemKey: (index) => visibleMessages[index]?.id || index,
   });
 
   useEffect(() => {
@@ -38,6 +42,11 @@ export function ConversationView({ session, loading, loadingOlder, error, listAv
       requestAnimationFrame(() => virtualizer.scrollToIndex(messages.length - 1, { align: "end" }));
     }
   }, [loading, session?.threadId]);
+
+  useEffect(() => {
+    if (!streamingText || !visibleMessages.length) return;
+    requestAnimationFrame(() => virtualizer.scrollToIndex(visibleMessages.length - 1, { align: "end" }));
+  }, [streamingText]);
 
   useEffect(() => {
     const root = scrollRef.current;
@@ -71,7 +80,7 @@ export function ConversationView({ session, loading, loadingOlder, error, listAv
                 ref={virtualizer.measureElement}
                 style={{ transform: `translateY(${virtualRow.start}px)` }}
               >
-                <Message message={messages[virtualRow.index]} />
+                <Message message={visibleMessages[virtualRow.index]} />
               </div>
             ))}
           </div>

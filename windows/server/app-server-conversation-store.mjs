@@ -1,10 +1,12 @@
+import path from "node:path";
 import { messageFromThreadItem, previewText } from "./content-blocks.mjs";
 import { createAppServerClient } from "./app-server-client.mjs";
 
 const sourceFromThread = (thread) => thread.source === "cli" && thread.cliVersion === "0.122.0" ? "happy" : "codex";
 
-export const createAppServerConversationStore = ({ projectRoot, registerMedia }) => {
+export const createAppServerConversationStore = ({ projectRoot, registerMedia, onProtocolMessage, onSubmitted, onFailed }) => {
   const client = createAppServerClient();
+  const unsubscribe = client.subscribe(onProtocolMessage || (() => {}));
   const threadCache = new Map();
 
   const listThreads = async () => {
@@ -68,5 +70,28 @@ export const createAppServerConversationStore = ({ projectRoot, registerMedia })
     };
   };
 
-  return { listSessions, findSession, close: client.close };
+  const sendMessage = async (threadId, text) => {
+    const thread = threadCache.get(threadId) || (await client.request("thread/read", { threadId, includeTurns: false })).thread;
+    if (!thread?.cwd || path.resolve(thread.cwd).toLowerCase() !== path.resolve(projectRoot).toLowerCase()) {
+      throw new Error("This conversation does not belong to the current project.");
+    }
+    onSubmitted?.(threadId);
+    try {
+      await client.request("thread/resume", { threadId, persistExtendedHistory: true });
+      return await client.request("turn/start", {
+        threadId,
+        input: [{ type: "text", text, text_elements: [] }],
+      });
+    } catch (error) {
+      onFailed?.(threadId, error);
+      throw error;
+    }
+  };
+
+  const close = () => {
+    unsubscribe();
+    client.close();
+  };
+
+  return { listSessions, findSession, sendMessage, close };
 };

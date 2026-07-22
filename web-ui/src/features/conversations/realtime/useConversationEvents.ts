@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { hasAccessToken, withAccessToken } from "../data/http";
+import type { ProjectEvent } from "../../execution/model/types";
 
-export function useConversationEvents(onSessionsChanged: (threadId?: string) => void) {
+export function useConversationEvents(
+  onSessionsChanged: (threadId?: string) => void,
+  onEvent: (event: ProjectEvent) => void,
+) {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
@@ -12,17 +16,19 @@ export function useConversationEvents(onSessionsChanged: (threadId?: string) => 
     events.onerror = () => setConnected(false);
     events.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data) as { type?: string; threadId?: string };
-        if (payload.type !== "sessions_changed") return;
-        window.clearTimeout(timer);
-        timer = window.setTimeout(() => onSessionsChanged(payload.threadId), 180);
+        const payload = JSON.parse(event.data) as ProjectEvent;
+        onEvent(payload);
+        if (payload.type === "sessions_changed") {
+          window.clearTimeout(timer);
+          timer = window.setTimeout(() => onSessionsChanged(payload.threadId), 180);
+        }
       } catch {}
     };
     return () => {
       window.clearTimeout(timer);
       events.close();
     };
-  }, [onSessionsChanged]);
+  }, [onEvent, onSessionsChanged]);
 
   return connected;
 }
