@@ -40,7 +40,10 @@ const paginationFrom = (url) => {
   };
 };
 
-export const createRequestHandler = ({ token, project, projectRoot, observerPort, conversations, execution, media, realtime, serveStatic }) => {
+export const createRequestHandler = ({
+  token, project, projectRoot, observerPort, conversations, execution, media, realtime,
+  groupRoom, multiAgent, serveStatic,
+}) => {
   const readObserverStatus = async (threadId = "") => {
     try {
       const query = threadId ? `?threadId=${encodeURIComponent(threadId)}` : "";
@@ -62,6 +65,40 @@ export const createRequestHandler = ({ token, project, projectRoot, observerPort
     }
 
     try {
+      if (url.pathname === "/api/group/snapshot") {
+        sendJson(response, groupRoom.snapshot());
+        return;
+      }
+      if ((url.pathname === "/api/group/join" || url.pathname === "/api/group/presence") && request.method === "POST") {
+        const body = await readJson(request);
+        const member = groupRoom.touchMember(body.memberId, body.name);
+        sendJson(response, member);
+        return;
+      }
+      if (url.pathname === "/api/group/message" && request.method === "POST") {
+        const body = await readJson(request);
+        const mode = body.mode === "development" ? "development" : "discussion";
+        const member = groupRoom.touchMember(body.memberId, body.authorName);
+        const text = String(body.text || "").trim();
+        if (!text) return sendJson(response, { error: "消息不能为空" }, 400);
+        const targetAgentId = String(body.agentId || "").trim();
+        const messageInput = {
+          type: "human", authorId: member.id, authorName: member.name,
+          agentId: targetAgentId || null,
+          mode, text,
+        };
+        if (targetAgentId) {
+          let message;
+          const executionResult = await multiAgent.dispatch(targetAgentId, text, mode, async () => {
+            message = await groupRoom.addMessage(messageInput);
+          });
+          sendJson(response, { message, execution: executionResult }, 202);
+        } else {
+          const message = await groupRoom.addMessage(messageInput);
+          sendJson(response, { message }, 201);
+        }
+        return;
+      }
       if (url.pathname === "/api/project") {
         sendJson(response, { name: project, root: projectRoot, mode: "interactive" });
         return;

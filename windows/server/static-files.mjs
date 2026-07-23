@@ -20,7 +20,7 @@ export const createStaticFileServer = (webRoot) => async (url, response) => {
     const content = await fs.readFile(file);
     response.writeHead(200, {
       "Content-Type": mimeTypes.get(path.extname(file).toLowerCase()) || "application/octet-stream",
-      "Cache-Control": file.endsWith("index.html") ? "no-cache" : "public, max-age=31536000, immutable",
+      "Cache-Control": file.endsWith(".html") ? "no-cache" : "public, max-age=31536000, immutable",
     });
     response.end(content);
   } catch {

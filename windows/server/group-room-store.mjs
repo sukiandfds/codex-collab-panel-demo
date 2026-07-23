@@ -1,0 +1,136 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
+
+const agentDefinitions = [
+  {
+    id: "manager",
+    name: "项目经理 Agent",
+    shortName: "PM",
+    responsibility: "澄清目标、拆解任务、汇总结论",
+    instructions: "你是当前项目群的项目经理 Agent。优先澄清目标、拆解任务、识别依赖与风险，并给出简洁、可执行的项目结论。除非用户明确要求你直接修改代码，否则不要修改文件。遵守项目中的 AGENTS.md 和现有维护边界。最终回复会公开显示在项目群中，请只输出对团队有用的结果，不展示隐藏推理。",
+  },
+  {
+    id: "researcher",
+    name: "研究 Agent",
+    shortName: "研",
+    responsibility: "只读调研、技术验证、方案比较",
+    instructions: "你是当前项目群的研究 Agent。只进行只读检查、技术调研、证据收集和方案比较，不修改项目文件、配置或本机环境。遵守项目中的 AGENTS.md。最终回复会公开显示在项目群中，请提供事实、来源、风险和建议，不展示隐藏推理。",
+  },
+  {
+    id: "developer",
+    name: "开发 Agent",
+    shortName: "开",
+    responsibility: "实现明确任务、运行基础代码检查",
+    instructions: "你是当前项目群的开发 Agent。只在用户给出明确开发任务时修改代码，并保持快速、轻量、最小范围；遵守项目中的 AGENTS.md、现有架构和 pnpm 约束。不要擅自修改既有 UI 样式、全局环境或 Codex JSONL。完成后只做与改动相称的基础检查。最终回复会公开显示在项目群中，请简洁说明结果和未完成事项，不展示隐藏推理。",
+  },
+  {
+    id: "reviewer",
+    name: "审查 Agent",
+    shortName: "审",
+    responsibility: "只读检查缺陷、风险和遗漏",
+    instructions: "你是当前项目群的审查 Agent。默认只读审查现有实现，优先发现真实 Bug、回归风险、安全问题和缺失检查，不修改文件，除非用户之后明确授权修复。遵守项目中的 AGENTS.md。最终回复会公开显示在项目群中，请按严重程度给出简洁结论，不展示隐藏推理。",
+  },
+];
+
+const cleanText = (value, maxLength) => String(value || "").trim().slice(0, maxLength);
+
+const initialAgent = (definition, saved = {}) => ({
+  ...definition,
+  threadId: cleanText(saved.threadId, 80) || null,
+  phase: "idle",
+  label: saved.threadId ? "等待新任务" : "尚未启动",
+  detail: "",
+  active: false,
+  updatedAt: saved.updatedAt || null,
+});
+
+export const createGroupRoomStore = async ({ stateFile, project, broadcast }) => {
+  let stored = {};
+  try {
+    stored = JSON.parse(await fs.readFile(stateFile, "utf8"));
+  } catch {}
+
+  const savedAgents = new Map((Array.isArray(stored.agents) ? stored.agents : []).map((agent) => [agent.id, agent]));
+  const agents = new Map(agentDefinitions.map((definition) => [definition.id, initialAgent(definition, savedAgents.get(definition.id))]));
+  const messages = (Array.isArray(stored.messages) ? stored.messages : [])
+    .filter((message) => message?.id && message?.text && message?.createdAt)
+    .slice(-300);
+  const members = new Map();
+  let writeQueue = Promise.resolve();
+
+  const persist = () => {
+    const payload = JSON.stringify({
+      version: 1,
+      messages: messages.slice(-300),
+      agents: [...agents.values()].map(({ instructions, ...agent }) => agent),
+    }, null, 2);
+    writeQueue = writeQueue
+      .catch(() => {})
+      .then(async () => {
+        await fs.mkdir(path.dirname(stateFile), { recursive: true });
+        await fs.writeFile(stateFile, payload, "utf8");
+      });
+    return writeQueue;
+  };
+
+  const publicAgent = ({ instructions, ...agent }) => agent;
+  const activeMembers = () => {
+    const cutoff = Date.now() - 60000;
+    return [...members.values()].filter((member) => Date.parse(member.lastSeenAt) >= cutoff);
+  };
+
+  const snapshot = () => ({
+    project,
+    room: { id: "current-project", name: `${project} 项目群` },
+    messages: [...messages],
+    agents: [...agents.values()].map(publicAgent),
+    members: activeMembers(),
+  });
+
+  const touchMember = (memberId, name) => {
+    const id = cleanText(memberId, 80);
+    const displayName = cleanText(name, 24);
+    if (!id || !displayName) throw Object.assign(new Error("成员名称不能为空"), { statusCode: 400 });
+    const member = { id, name: displayName, lastSeenAt: new Date().toISOString() };
+    members.set(id, member);
+    broadcast({ type: "group_members_changed", members: activeMembers() });
+    return member;
+  };
+
+  const addMessage = async ({ type = "human", authorId, authorName, agentId = null, mode = "discussion", text }) => {
+    const content = cleanText(text, 12000);
+    if (!content) throw Object.assign(new Error("消息不能为空"), { statusCode: 400 });
+    const message = {
+      id: randomUUID(),
+      type,
+      authorId: cleanText(authorId, 80),
+      authorName: cleanText(authorName, 40),
+      agentId,
+      mode,
+      text: content,
+      createdAt: new Date().toISOString(),
+    };
+    messages.push(message);
+    if (messages.length > 300) messages.splice(0, messages.length - 300);
+    await persist();
+    broadcast({ type: "group_message_created", message });
+    return message;
+  };
+
+  const getAgent = (agentId) => agents.get(agentId) || null;
+
+  const updateAgent = async (agentId, patch) => {
+    const current = agents.get(agentId);
+    if (!current) throw Object.assign(new Error("Agent 不存在"), { statusCode: 404 });
+    const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
+    agents.set(agentId, next);
+    await persist();
+    const agent = publicAgent(next);
+    broadcast({ type: "group_agent_updated", agent });
+    return agent;
+  };
+
+  await persist();
+  return { snapshot, touchMember, addMessage, getAgent, updateAgent, close: () => writeQueue };
+};

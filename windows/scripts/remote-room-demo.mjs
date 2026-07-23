@@ -10,6 +10,8 @@ import { createRealtimeHub } from "../server/realtime-hub.mjs";
 import { createExecutionTracker } from "../server/execution-tracker.mjs";
 import { createRequestHandler } from "../server/request-handler.mjs";
 import { createStaticFileServer } from "../server/static-files.mjs";
+import { createGroupRoomStore } from "../server/group-room-store.mjs";
+import { createMultiAgentService } from "../server/multi-agent-service.mjs";
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -41,16 +43,25 @@ const appServerConversations = createAppServerConversationStore({
   onFailed: execution.markFailed,
 });
 const conversations = createConversationService({ primary: appServerConversations, fallback: jsonlConversations });
+const groupRoom = await createGroupRoomStore({
+  stateFile: path.join(projectRoot, "runtime", "group-room.json"),
+  project,
+  broadcast: realtime.broadcast,
+});
+const multiAgent = createMultiAgentService({ projectRoot, room: groupRoom, broadcast: realtime.broadcast });
 
 const serveStatic = createStaticFileServer(webRoot);
 const requestHandler = createRequestHandler({
-  token, project, projectRoot, observerPort, conversations, execution, media, realtime, serveStatic,
+  token, project, projectRoot, observerPort, conversations, execution, media, realtime,
+  groupRoom, multiAgent, serveStatic,
 });
 const server = http.createServer(requestHandler);
 
 const close = () => {
   realtime.close();
   conversations.close();
+  multiAgent.close();
+  void groupRoom.close();
   server.close();
 };
 process.once("SIGINT", close);
@@ -59,4 +70,5 @@ process.once("SIGTERM", close);
 server.listen(port, "0.0.0.0", () => {
   console.log(`[remote-room-demo] ${projectRoot}`);
   console.log(`[remote-room-demo] http://127.0.0.1:${port}/?token=${token}`);
+  console.log(`[remote-room-demo] http://127.0.0.1:${port}/group.html?token=${token}`);
 });
