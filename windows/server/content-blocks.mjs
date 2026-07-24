@@ -99,6 +99,16 @@ const visibleText = (blocks) => blocks
   .join("\n")
   .trim();
 
+const cleanUserAttachmentEnvelope = (blocks) => blocks.flatMap((block) => {
+  if (block.type !== "markdown") return [block];
+  const text = String(block.text || "");
+  if (!text.trimStart().startsWith("# Files mentioned by the user:")) return [block];
+  const marker = /^## My request for Codex:\s*$/mu.exec(text);
+  if (!marker) return [block];
+  const cleaned = text.slice(marker.index + marker[0].length).trim();
+  return cleaned ? [{ ...block, text: cleaned }] : [];
+});
+
 const typedInputs = (value, type) => {
   const items = Array.isArray(value) ? value : value ? [value] : [];
   return items.map((item) => typeof item === "string" ? { type, path: item } : item);
@@ -141,7 +151,8 @@ export const messageFromItem = (item, registerMedia) => {
     return null;
   }
 
-  const blocks = blocksFromContent(content, registerMedia);
+  const parsedBlocks = blocksFromContent(content, registerMedia);
+  const blocks = role === "user" ? cleanUserAttachmentEnvelope(parsedBlocks) : parsedBlocks;
   const text = visibleText(blocks);
   if (role === "user" && !isUsefulUserMessage(text, blocks)) return null;
   if (!blocks.length) return null;
@@ -153,7 +164,7 @@ export const previewText = (value, limit = 180) => cleanText(value).replace(/\s+
 
 export const messageFromThreadItem = (item, registerMedia) => {
   if (item?.type === "userMessage") {
-    const blocks = blocksFromContent(item.content, registerMedia);
+    const blocks = cleanUserAttachmentEnvelope(blocksFromContent(item.content, registerMedia));
     const text = visibleText(blocks);
     if (!isUsefulUserMessage(text, blocks)) return null;
     return { id: item.id || blockId("message", JSON.stringify(blocks)), role: "user", text, blocks };

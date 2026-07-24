@@ -98,15 +98,19 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     return member;
   };
 
-  const addMessage = async ({ type = "human", authorId, authorName, agentId = null, mode = "discussion", text }) => {
+  const addMessage = async ({ type = "human", authorId, authorName, agentId = null, targetAgentIds = [], mode = "discussion", text }) => {
     const content = cleanText(text, 12000);
     if (!content) throw Object.assign(new Error("消息不能为空"), { statusCode: 400 });
+    const targets = [...new Set((Array.isArray(targetAgentIds) ? targetAgentIds : [])
+      .map((id) => cleanText(id, 80))
+      .filter((id) => agents.has(id)))];
     const message = {
       id: randomUUID(),
       type,
       authorId: cleanText(authorId, 80),
       authorName: cleanText(authorName, 40),
-      agentId,
+      agentId: agentId || targets[0] || null,
+      targetAgentIds: targets,
       mode,
       text: content,
       createdAt: new Date().toISOString(),

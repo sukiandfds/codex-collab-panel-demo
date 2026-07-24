@@ -16,11 +16,13 @@ const idleStatus = (threadId: string): ExecutionStatus => ({
 export function useCodexExecution(threadId: string, onMessageAccepted: () => void) {
   const [status, setStatus] = useState<ExecutionStatus>(() => idleStatus(threadId));
   const [streamingText, setStreamingText] = useState("");
+  const [commentaryText, setCommentaryText] = useState("");
   const streamingItemId = useRef("");
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
     setStreamingText("");
+    setCommentaryText("");
     streamingItemId.current = "";
     if (!threadId) {
       setStatus(idleStatus(""));
@@ -39,8 +41,13 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
       setStatus(event);
       if (["completed", "failed", "interrupted", "systemError"].includes(event.phase)) {
         setStreamingText("");
+        setCommentaryText("");
         streamingItemId.current = "";
       }
+      return;
+    }
+    if (event.type === "assistant_commentary") {
+      setCommentaryText(event.text);
       return;
     }
     if (event.type === "assistant_delta") {
@@ -59,6 +66,7 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
     const message = text.trim();
     if (!threadId || !message || sending || status.active) return false;
     setSending(true);
+    setCommentaryText("");
     setStatus({
       ...idleStatus(threadId),
       phase: "submitted",
@@ -85,5 +93,5 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
     }
   }, [onMessageAccepted, sending, status.active, threadId]);
 
-  return { status, streamingText, sending, handleEvent, sendMessage };
+  return { status, streamingText, commentaryText, sending, handleEvent, sendMessage };
 }

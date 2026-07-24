@@ -9,10 +9,11 @@ interface ComposerProps {
   selected: boolean;
   sending: boolean;
   status: ExecutionStatusValue;
+  commentary: string;
   onSend: (text: string) => Promise<boolean>;
 }
 
-export function Composer({ connected, selected, sending, status, onSend }: ComposerProps) {
+export function Composer({ connected, selected, sending, status, commentary, onSend }: ComposerProps) {
   const [text, setText] = useState("");
   const disabled = !connected || !selected || sending || status.active;
   const submit = async () => {
@@ -39,7 +40,7 @@ export function Composer({ connected, selected, sending, status, onSend }: Compo
           }}
         />
         <div className={styles.footer}>
-          <ExecutionStatus connected={connected} status={status} />
+          <ExecutionStatus connected={connected} status={status} commentary={commentary} />
           <span className={styles.spacer} />
           <button
             className={styles.sendButton}

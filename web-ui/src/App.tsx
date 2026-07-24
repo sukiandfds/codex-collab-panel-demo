@@ -50,6 +50,7 @@ export function App() {
           selected={Boolean(conversations.selectedId)}
           sending={conversations.sending}
           status={conversations.executionStatus}
+          commentary={conversations.commentaryText}
           onSend={conversations.sendMessage}
         />
       }

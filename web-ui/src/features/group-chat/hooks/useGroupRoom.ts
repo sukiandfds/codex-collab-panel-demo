@@ -102,12 +102,12 @@ export function useGroupRoom() {
     return joined;
   }, [member?.id]);
 
-  const send = useCallback(async (mode: GroupMode, agentId: string, text: string) => {
+  const send = useCallback(async (mode: GroupMode, agentIds: string[], text: string) => {
     if (!member || sending || !text.trim()) return false;
     setSending(true);
     setError("");
     try {
-      await groupApi.send(member, mode, agentId, text.trim());
+      await groupApi.send(member, mode, agentIds, text.trim());
       return true;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));

@@ -126,6 +126,7 @@ export function useProjectConversations() {
     connected, listError, sessionError, selectSession, loadOlder,
     executionStatus: execution.status,
     streamingText: execution.streamingText,
+    commentaryText: execution.commentaryText,
     sending: execution.sending,
     sendMessage: execution.sendMessage,
     refresh: () => refreshSessions(),

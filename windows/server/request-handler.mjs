@@ -81,22 +81,22 @@ export const createRequestHandler = ({
         const member = groupRoom.touchMember(body.memberId, body.authorName);
         const text = String(body.text || "").trim();
         if (!text) return sendJson(response, { error: "消息不能为空" }, 400);
-        const targetAgentId = String(body.agentId || "").trim();
+        const requestedAgentIds = Array.isArray(body.agentIds)
+          ? body.agentIds
+          : [body.agentId];
+        const availableAgentIds = new Set(groupRoom.snapshot().agents.map((agent) => agent.id));
+        const targetAgentIds = [...new Set(requestedAgentIds
+          .map((agentId) => String(agentId || "").trim())
+          .filter((agentId) => availableAgentIds.has(agentId)))];
+        if (!targetAgentIds.length) targetAgentIds.push("manager");
         const messageInput = {
           type: "human", authorId: member.id, authorName: member.name,
-          agentId: targetAgentId || null,
+          agentId: targetAgentIds[0], targetAgentIds,
           mode, text,
         };
-        if (targetAgentId) {
-          let message;
-          const executionResult = await multiAgent.dispatch(targetAgentId, text, mode, async () => {
-            message = await groupRoom.addMessage(messageInput);
-          });
-          sendJson(response, { message, execution: executionResult }, 202);
-        } else {
-          const message = await groupRoom.addMessage(messageInput);
-          sendJson(response, { message }, 201);
-        }
+        const message = await groupRoom.addMessage(messageInput);
+        const execution = multiAgent.enqueueDiscussion({ agentIds: targetAgentIds, mode, requestText: text });
+        sendJson(response, { message, execution }, 202);
         return;
       }
       if (url.pathname === "/api/project") {

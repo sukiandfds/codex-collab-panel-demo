@@ -32,9 +32,16 @@ export interface AssistantDeltaEvent {
   delta: string;
 }
 
+export interface AssistantCommentaryEvent {
+  type: "assistant_commentary";
+  threadId: string;
+  itemId: string;
+  text: string;
+}
+
 export interface SessionsChangedEvent {
   type: "sessions_changed";
   threadId?: string;
 }
 
-export type ProjectEvent = ExecutionStatus | AssistantDeltaEvent | SessionsChangedEvent | { type: "connected" };
+export type ProjectEvent = ExecutionStatus | AssistantDeltaEvent | AssistantCommentaryEvent | SessionsChangedEvent | { type: "connected" };

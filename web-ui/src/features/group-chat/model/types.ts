@@ -25,6 +25,7 @@ export interface GroupMessage {
   authorId: string;
   authorName: string;
   agentId: string | null;
+  targetAgentIds?: string[];
   mode: GroupMode;
   text: string;
   createdAt: string;

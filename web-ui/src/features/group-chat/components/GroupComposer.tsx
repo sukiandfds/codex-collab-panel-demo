@@ -14,10 +14,11 @@ const findMention = (text: string, caret: number): MentionState | null => {
   return atIndex >= 0 ? { start: atIndex, end: caret, query: match[1].trim() } : null;
 };
 
-const mentionedAgentId = (text: string, agents: GroupAgent[]) => agents
+const mentionedAgentIds = (text: string, agents: GroupAgent[]) => agents
   .map((agent) => ({ id: agent.id, index: text.indexOf(`@${agent.name}`) }))
   .filter((value) => value.index >= 0)
-  .sort((left, right) => left.index - right.index)[0]?.id;
+  .sort((left, right) => left.index - right.index)
+  .map((value) => value.id);
 
 export function GroupComposer({ mode, agentId, agents, members, disabled, error, onModeChange, onAgentChange, onSend }: {
   mode: GroupMode;
@@ -28,7 +29,7 @@ export function GroupComposer({ mode, agentId, agents, members, disabled, error,
   error: string;
   onModeChange: (mode: GroupMode) => void;
   onAgentChange: (agentId: string) => void;
-  onSend: (text: string, targetAgentId: string) => Promise<boolean>;
+  onSend: (text: string, targetAgentIds: string[]) => Promise<boolean>;
 }) {
   const [text, setText] = useState("");
   const [mention, setMention] = useState<MentionState | null>(null);
@@ -63,8 +64,9 @@ export function GroupComposer({ mode, agentId, agents, members, disabled, error,
 
   const submit = async () => {
     if (disabled || !text.trim()) return;
-    const targetAgentId = mentionedAgentId(text, agents) || (mode === "discussion" ? "manager" : agentId);
-    if (await onSend(text, targetAgentId)) {
+    const mentioned = mentionedAgentIds(text, agents);
+    const targetAgentIds = mentioned.length ? mentioned : [mode === "discussion" ? "manager" : agentId];
+    if (await onSend(text, targetAgentIds)) {
       setText("");
       setMention(null);
     }

@@ -24,7 +24,6 @@ const stateFromItem = (item) => {
 
 export const createExecutionTracker = ({ broadcast }) => {
   const statuses = new Map();
-  const messagePhases = new Map();
 
   const publish = (threadId, next) => {
     if (!threadId) return;
@@ -92,22 +91,23 @@ export const createExecutionTracker = ({ broadcast }) => {
       return;
     }
     if (method === "item/started") {
-      if (params.item?.type === "agentMessage") messagePhases.set(params.item.id, params.item.phase);
       const state = stateFromItem(params.item);
       if (state) publish(threadId, { ...state, detail: detailFromItem(params.item) });
       return;
     }
     if (method === "item/completed") {
-      if (["userMessage", "agentMessage", "imageGeneration"].includes(params.item?.type)) {
+      if (params.item?.type === "agentMessage" && params.item.phase === "commentary") {
+        const text = String(params.item.text || "").trim();
+        if (text) {
+          broadcast({
+            type: "assistant_commentary",
+            threadId,
+            itemId: params.item.id || "",
+            text,
+          });
+        }
+      } else if (["userMessage", "agentMessage", "imageGeneration"].includes(params.item?.type)) {
         broadcast({ type: "sessions_changed", threadId });
-      }
-      if (params.item?.type === "agentMessage") messagePhases.delete(params.item.id);
-      return;
-    }
-    if (method === "item/agentMessage/delta") {
-      const phase = messagePhases.get(params.itemId);
-      if (phase !== "commentary") {
-        broadcast({ type: "assistant_delta", ...params });
       }
       return;
     }
