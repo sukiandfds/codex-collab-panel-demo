@@ -18,10 +18,10 @@
 }
 
 .heading {
-  display: flex;
+  display: grid;
   min-width: 0;
-  align-items: baseline;
-  gap: 10px;
+  overflow: hidden;
+  gap: 1px;
 }
 
 .title,
@@ -37,6 +37,13 @@
   color: var(--color-text);
   font-size: 14px;
   font-weight: 600;
+}
+
+.metaRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
 }
 
 .meta {
@@ -76,6 +83,10 @@
 }
 
 @media (max-width: 760px) {
+  .topbar { position: relative; gap: 7px; padding-right: 80px; }
   .mobileOnly { display: grid; }
+  .titleIcon { display: none; }
   .meta { display: none; }
+  .heading { flex: 1; }
+  .spacer { display: none; }
 }

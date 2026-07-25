@@ -6,9 +6,11 @@ import { Topbar } from "./components/Topbar/Topbar";
 import { WindowBar } from "./components/WindowBar/WindowBar";
 import { ConversationView } from "./features/conversations/components/ConversationView";
 import { useProjectConversations } from "./features/conversations/hooks/useProjectConversations";
+import { useDeviceInfo } from "./features/device/hooks/useDeviceInfo";
 
 export function App() {
   const conversations = useProjectConversations();
+  const device = useDeviceInfo(conversations.connected);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const selectSession = useCallback((threadId: string) => {
     conversations.selectSession(threadId);
@@ -32,7 +34,7 @@ export function App() {
           onRefresh={conversations.refresh}
         />
       }
-      header={<Topbar project={conversations.project} session={conversations.session} onOpenSidebar={() => setSidebarOpen(true)} />}
+      header={<Topbar project={conversations.project} session={conversations.session} deviceName={device?.name} connected={conversations.connected} onOpenSidebar={() => setSidebarOpen(true)} />}
       conversation={
         <ConversationView
           session={conversations.session}

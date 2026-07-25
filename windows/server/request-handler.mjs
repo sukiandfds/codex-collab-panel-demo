@@ -26,7 +26,22 @@ const readJson = async (request, limit = 64 * 1024) => {
 
 const authorized = (request, token) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "127.0.0.1"}`);
-  return url.searchParams.get("token") === token;
+  if (url.searchParams.get("token") === token) return true;
+  const cookies = String(request.headers.cookie || "").split(";");
+  return cookies.some((cookie) => {
+    const [name, ...value] = cookie.trim().split("=");
+    const cookieValue = value.join("=");
+    return name === "codex_demo_token" && (cookieValue === token || cookieValue === encodeURIComponent(token));
+  });
+};
+
+const rememberAuthorizedDevice = (request, response, url, token) => {
+  if (url.searchParams.get("token") !== token) return;
+  const forwardedProto = String(request.headers["x-forwarded-proto"] || "").toLowerCase();
+  const secure = forwardedProto === "https" || Boolean(request.socket?.encrypted);
+  const attributes = [`codex_demo_token=${encodeURIComponent(token)}`, "Path=/", "HttpOnly", "SameSite=Strict", "Max-Age=2592000"];
+  if (secure) attributes.push("Secure");
+  response.setHeader("Set-Cookie", attributes.join("; "));
 };
 
 const paginationFrom = (url) => {
@@ -41,7 +56,7 @@ const paginationFrom = (url) => {
 };
 
 export const createRequestHandler = ({
-  token, project, projectRoot, observerPort, conversations, execution, media, realtime,
+  token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
   groupRoom, multiAgent, serveStatic,
 }) => {
   const readObserverStatus = async (threadId = "") => {
@@ -57,6 +72,7 @@ export const createRequestHandler = ({
 
   return async (request, response) => {
     const url = new URL(request.url || "/", `http://${request.headers.host || "127.0.0.1"}`);
+    rememberAuthorizedDevice(request, response, url, token);
     const protectedRoute = url.pathname.startsWith("/api/") || url.pathname === "/events";
     if (protectedRoute && !authorized(request, token)) {
       response.writeHead(401);
@@ -103,6 +119,10 @@ export const createRequestHandler = ({
       }
       if (url.pathname === "/api/project") {
         sendJson(response, { name: project, root: projectRoot, mode: "interactive" });
+        return;
+      }
+      if (url.pathname === "/api/device") {
+        sendJson(response, device);
         return;
       }
       if (url.pathname === "/api/uploads" && request.method === "POST") {

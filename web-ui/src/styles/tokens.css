@@ -39,3 +39,7 @@
   --duration-fast: 120ms;
   --ease-out: cubic-bezier(.2, .8, .2, 1);
 }
+
+@media (min-width: 761px) and (max-width: 1024px) {
+  :root { --sidebar-width: 244px; }
+}

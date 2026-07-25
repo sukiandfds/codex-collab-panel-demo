@@ -4,6 +4,7 @@ import path from "node:path";
 const mimeTypes = new Map([
   [".html", "text/html; charset=utf-8"], [".js", "text/javascript; charset=utf-8"],
   [".css", "text/css; charset=utf-8"], [".json", "application/json; charset=utf-8"],
+  [".webmanifest", "application/manifest+json; charset=utf-8"],
   [".svg", "image/svg+xml"], [".png", "image/png"], [".jpg", "image/jpeg"],
   [".jpeg", "image/jpeg"], [".webp", "image/webp"],
 ]);
@@ -18,9 +19,11 @@ export const createStaticFileServer = (webRoot) => async (url, response) => {
   }
   try {
     const content = await fs.readFile(file);
+    const fileName = path.basename(file).toLowerCase();
+    const needsRevalidation = file.endsWith(".html") || fileName === "sw.js" || fileName === "manifest.webmanifest";
     response.writeHead(200, {
       "Content-Type": mimeTypes.get(path.extname(file).toLowerCase()) || "application/octet-stream",
-      "Cache-Control": file.endsWith(".html") ? "no-cache" : "public, max-age=31536000, immutable",
+      "Cache-Control": needsRevalidation ? "no-cache" : "public, max-age=31536000, immutable",
     });
     response.end(content);
   } catch {

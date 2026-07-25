@@ -2,10 +2,23 @@
 
 > 本文是 `codex-collab-panel-demo` 的 AI 开发交接入口。任何 AI 助手准备分析、修改或运行本项目之前，应先完整阅读本文，再按需查看具体代码和开发日志。
 
-更新日期：2026-07-25
+更新日期：2026-07-26
 项目路径：`D:\codingproject\codex-collab-panel-demo`
 当前分支：`codex/publish-current-panel`
 当前阶段：以现有项目群页面为初步主入口的真实多 Agent 讨论 Demo；单人 Codex 页面保留为 Thread 查看和控制入口
+
+## 0. AI 功能开发记录入口
+
+本项目的开发记忆已经按功能规整。AI 助手开始任何开发前，必须按以下顺序读取：
+
+1. [`docs/feature-development/FEATURE_INDEX.md`](./docs/feature-development/FEATURE_INDEX.md)：定位功能编号、当前状态、最新版本和记录入口。
+2. 与当前任务直接相关的一个或多个 `docs/feature-development/features/FEAT-*.md`：了解原计划、实际实现、历史版本、特例问题和当前边界。
+3. [`docs/feature-development/PROCESS_ISSUES.md`](./docs/feature-development/PROCESS_ISSUES.md) 中状态为 `active` 的普适问题：直接复用正确路径和防再犯规则。
+4. 只有需要证据、复盘或定位旧实现时，才读取根目录中的日期日志和对应 Git 提交。
+
+完整字段、编号和维护方式见 [`docs/feature-development/README.md`](./docs/feature-development/README.md)。旧日期日志保留为原始证据，不再作为 AI 的首要阅读入口。
+
+每次功能开发、修复或技术路径变更结束前，必须更新对应 `FEAT-*.md` 的当前快照、问题状态和版本时间线；功能状态或版本变化时同步更新 `FEATURE_INDEX.md`。如果发现会影响其他功能的普适问题，还必须登记或更新 `PROCESS_ISSUES.md`。只写日期日志、不回写功能记录，视为记录未完成。
 
 ## 1. 最重要的维护边界
 
@@ -390,12 +403,17 @@ codex/publish-current-panel
 
 ## 17. 相关文档
 
+- `docs/feature-development/README.md`：AI 优先的功能开发记录规范、字段和强制更新时机。
+- `docs/feature-development/FEATURE_INDEX.md`：全部功能的当前状态、版本和记录入口。
+- `docs/feature-development/PROCESS_ISSUES.md`：跨功能复用的错误路径、正确路径和防再犯规则。
+- `docs/feature-development/features/`：每个功能从计划、实现、问题到多个版本的连续记录。
 - `PROJECT.md`：项目愿景、早期右侧面板和长期方向。
 - `DEVELOPMENT_BUG_LOG_2026-07-21.md`：入口、JSONL、启动、错误处理和开发效率问题的详细记录。
 - `DEVELOPMENT_LOG_2026-07-22.md`：真实数据、结构化渲染、性能、浏览器控制、运行时修复和 Desktop 同步边界。
 - `DEVELOPMENT_BUG_LOG_2026-07-22.md`：启动失败、15 秒含义、全局 npm 环境事故、修复闭环和 Desktop 不热刷新问题。
 - `DEVELOPMENT_LOG_2026-07-24.md`：真实群聊、多 Agent、`@` 提及、开发过程、当前交互问题和后续优先级。
 - `DEVELOPMENT_LOG_2026-07-25.md`：群聊主入口、共享上下文、有限轮次真实 Agent 讨论及当前边界。
+- `DEVELOPMENT_LOG_2026-07-26.md`：PWA、设备身份、移动/平板入口和 AI 功能开发记录体系的发布状态。
 - `VISION_NOTES.md`：原始设想、需求演变、商业愿景和顾虑。
 - `项目战略与多角色评审/05-多人协作与多Agent技术路径调研报告-2026-07-22.md`：竞品、Codex 能力、推荐 Connector 架构和阶段路线。
 

@@ -2,6 +2,7 @@
 param(
   [int]$Port = 9360,
   [string]$Token = "demo123",
+  [string]$DeviceName = $env:COMPUTERNAME,
   [switch]$Build
 )
 
@@ -32,6 +33,9 @@ if (-not (Test-Path -LiteralPath $serverScript)) {
 }
 if (-not $Token) {
   throw "Token cannot be empty."
+}
+if (-not $DeviceName) {
+  throw "DeviceName cannot be empty."
 }
 
 function Get-PortProcessId {
@@ -104,7 +108,8 @@ $arguments = @(
   "--project", "codex-collab-panel-demo",
   "--project-root", $projectRoot,
   "--web-root", $webRoot,
-  "--token", $Token
+  "--token", $Token,
+  "--device-name", $DeviceName
 )
 $quotedArguments = @()
 foreach ($argument in $arguments) {
@@ -153,5 +158,6 @@ if ($legacyPid) {
   Write-Output "[WARN] Legacy preview port 4173 is listening on PID $legacyPid. Do not use it."
 }
 Write-Output "[OK] Web demo started on PID $($process.Id)."
+Write-Output "[DEVICE] $DeviceName"
 Write-Output "[URL] $url"
 Write-Output "[INFO] PID file: $pidFile"

@@ -1,6 +1,8 @@
 const token = new URLSearchParams(window.location.search).get("token") || "";
 
-export const hasAccessToken = Boolean(token);
+// Installed PWAs reopen without the original query string; the server-issued
+// HttpOnly cookie carries access in that case.
+export const hasAccessToken = true;
 
 export const withAccessToken = (pathname: string) => {
   if (/^(?:https?:|data:|blob:)/iu.test(pathname)) return pathname;

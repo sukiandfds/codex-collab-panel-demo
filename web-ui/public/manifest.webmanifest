@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "Codex 协作",
+  "short_name": "Codex 协作",
+  "description": "从手机或平板查看项目对话并控制本地 Codex。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101010",
+  "theme_color": "#101010",
+  "orientation": "any",
+  "icons": [
+    { "src": "/icons/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "单人对话", "short_name": "对话", "url": "/" },
+    { "name": "项目群聊", "short_name": "群聊", "url": "/group.html" }
+  ]
+}

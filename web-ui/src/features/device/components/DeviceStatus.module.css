@@ -1,0 +1,38 @@
+.root {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-text-muted, #858585);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.root > svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  stroke-width: 1.7;
+}
+
+.name {
+  min-width: 0;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.root > i {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+}
+
+.online { background: #69cf8d; }
+.offline { background: #ca7d72; }
+
+@media (max-width: 760px) {
+  .root > svg { display: none; }
+  .name { max-width: 108px; }
+}

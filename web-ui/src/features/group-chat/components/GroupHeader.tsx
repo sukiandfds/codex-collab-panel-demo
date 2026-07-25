@@ -1,10 +1,13 @@
-import { Bot, Circle, MessageSquareText } from "lucide-react";
+import { MessageSquareText } from "lucide-react";
+import { ViewSwitcher } from "../../../components/ViewSwitcher/ViewSwitcher";
+import { DeviceStatus } from "../../device/components/DeviceStatus";
 import type { GroupAgent, GroupMember, StoredMember } from "../model/types";
 import styles from "../GroupChat.module.css";
 
-export function GroupHeader({ roomName, connected, members, agents, member, onEditMember }: {
+export function GroupHeader({ roomName, connected, deviceName, members, agents, member, onEditMember }: {
   roomName: string;
   connected: boolean;
+  deviceName?: string;
   members: GroupMember[];
   agents: GroupAgent[];
   member: StoredMember | null;
@@ -18,14 +21,11 @@ export function GroupHeader({ roomName, connected, members, agents, member, onEd
     <header className={styles.header}>
       <div className={styles.roomTitle}>
         <MessageSquareText aria-hidden="true" />
-        <div><strong>{roomName}</strong><span>{activityText}</span></div>
+        <div><strong>{roomName}</strong><span className={styles.activity}>{activityText}</span></div>
       </div>
       <div className={styles.headerActions}>
-        <span className={styles.connection} aria-label={connected ? "实时同步" : "正在重连"} title={connected ? "实时同步" : "正在重连"}>
-          <Circle className={connected ? styles.online : styles.offline} fill="currentColor" />
-          <span>{connected ? "实时同步" : "正在重连"}</span>
-        </span>
-        <a className={styles.iconLink} href={`/${window.location.search}`} title="返回单人 Codex 对话" aria-label="返回单人 Codex 对话"><Bot /></a>
+        <DeviceStatus name={deviceName} connected={connected} />
+        <ViewSwitcher current="group" />
         <button className={styles.memberButton} type="button" onClick={onEditMember}>{member?.name || "设置身份"}</button>
       </div>
     </header>

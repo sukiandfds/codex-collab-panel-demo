@@ -25,6 +25,8 @@ const project = getArg("--project", "codex-collab-panel-demo");
 const projectRoot = path.resolve(getArg("--project-root", process.cwd()));
 const webRoot = path.resolve(getArg("--web-root", path.join(process.cwd(), "web-ui", "dist")));
 const token = getArg("--token", randomBytes(12).toString("hex"));
+const deviceName = String(getArg("--device-name", os.hostname())).trim() || os.hostname();
+const device = { name: deviceName, startedAt: new Date().toISOString() };
 const sessionRoot = process.env.CODEX_SESSION_DIR || path.join(os.homedir(), ".codex", "sessions");
 const media = createMediaService({ uploadRoot: path.join(projectRoot, "runtime", "uploads") });
 await media.restoreUploads();
@@ -53,7 +55,7 @@ const multiAgent = createMultiAgentService({ projectRoot, room: groupRoom, broad
 
 const serveStatic = createStaticFileServer(webRoot);
 const requestHandler = createRequestHandler({
-  token, project, projectRoot, observerPort, conversations, execution, media, realtime,
+  token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
   groupRoom, multiAgent, serveStatic,
 });
 const server = http.createServer(requestHandler);
@@ -70,6 +72,7 @@ process.once("SIGTERM", close);
 
 server.listen(port, "0.0.0.0", () => {
   console.log(`[remote-room-demo] ${projectRoot}`);
+  console.log(`[remote-room-demo] device: ${deviceName}`);
   console.log(`[remote-room-demo] http://127.0.0.1:${port}/?token=${token}`);
   console.log(`[remote-room-demo] http://127.0.0.1:${port}/group.html?token=${token}`);
 });

@@ -7,10 +7,12 @@ import { MessageTimeline } from "./components/MessageTimeline";
 import { RoomSidebar } from "./components/RoomSidebar";
 import { useGroupRoom } from "./hooks/useGroupRoom";
 import type { GroupMode } from "./model/types";
+import { useDeviceInfo } from "../device/hooks/useDeviceInfo";
 import styles from "./GroupChat.module.css";
 
 export function GroupApp() {
   const group = useGroupRoom();
+  const device = useDeviceInfo(group.connected);
   const [mode, setMode] = useState<GroupMode>("discussion");
   const [agentId, setAgentId] = useState("manager");
   const [editingMember, setEditingMember] = useState(false);
@@ -27,7 +29,7 @@ export function GroupApp() {
     <div className={styles.shell}>
       <RoomSidebar project={snapshot.project} members={snapshot.members} />
       <main className={styles.main}>
-        <GroupHeader roomName={snapshot.room.name} connected={group.connected} members={snapshot.members} agents={snapshot.agents} member={group.member} onEditMember={() => setEditingMember(true)} />
+        <GroupHeader roomName={snapshot.room.name} connected={group.connected} deviceName={device?.name} members={snapshot.members} agents={snapshot.agents} member={group.member} onEditMember={() => setEditingMember(true)} />
         <MessageTimeline messages={snapshot.messages} agents={snapshot.agents} streaming={group.streaming} />
         <GroupComposer
           mode={mode}

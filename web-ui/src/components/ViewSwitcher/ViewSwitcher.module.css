@@ -1,0 +1,38 @@
+.root {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border-strong, #333);
+  border-radius: 7px;
+  background: var(--color-surface-soft, #171717);
+}
+
+.root a {
+  display: inline-flex;
+  height: 27px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 5px;
+  padding: 0 8px;
+  color: var(--color-text-muted, #818181);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.root a:hover { color: var(--color-text, #ededed); }
+.root .active { background: var(--color-surface-active, #303030); color: var(--color-text, #ededed); }
+.root svg { width: 14px; height: 14px; stroke-width: 1.8; }
+
+@media (max-width: 760px) {
+  .root {
+    position: fixed;
+    z-index: 30;
+    top: 8px;
+    right: 8px;
+    display: flex;
+  }
+  .root a { width: 30px; padding: 0; }
+  .root span { display: none; }
+}
