@@ -11,9 +11,9 @@ export const groupApi = {
     memberId: member.id,
     name: member.name,
   }, signal),
-  send: (member: StoredMember, mode: GroupMode, agentIds: string[], text: string, signal?: AbortSignal) => postJson(
+  send: (member: StoredMember, mode: GroupMode, agentIds: string[], text: string, attachmentIds: string[] = [], signal?: AbortSignal) => postJson(
     "/api/group/message",
-    { memberId: member.id, authorName: member.name, mode, agentIds, text },
+    { memberId: member.id, authorName: member.name, mode, agentIds, text, attachmentIds },
     signal,
   ),
   eventsUrl: () => withAccessToken("/events"),

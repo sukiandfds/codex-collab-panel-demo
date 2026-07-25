@@ -26,7 +26,8 @@ const projectRoot = path.resolve(getArg("--project-root", process.cwd()));
 const webRoot = path.resolve(getArg("--web-root", path.join(process.cwd(), "web-ui", "dist")));
 const token = getArg("--token", randomBytes(12).toString("hex"));
 const sessionRoot = process.env.CODEX_SESSION_DIR || path.join(os.homedir(), ".codex", "sessions");
-const media = createMediaService();
+const media = createMediaService({ uploadRoot: path.join(projectRoot, "runtime", "uploads") });
+await media.restoreUploads();
 const realtime = createRealtimeHub();
 const execution = createExecutionTracker({ broadcast: realtime.broadcast });
 const jsonlConversations = createJsonlConversationStore({

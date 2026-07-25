@@ -57,6 +57,7 @@
   border-radius: 8px;
   background: transparent;
   color: var(--color-text-secondary);
+  text-decoration: none;
 }
 
 .iconButton svg {

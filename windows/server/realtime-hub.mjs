@@ -8,9 +8,11 @@ export const createRealtimeHub = () => {
   const connect = (request, response) => {
     response.writeHead(200, {
       "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
     });
+    response.flushHeaders?.();
     clients.add(response);
     response.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
     request.on("close", () => clients.delete(response));

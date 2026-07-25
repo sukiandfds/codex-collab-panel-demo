@@ -41,17 +41,20 @@ export function App() {
           error={conversations.sessionError}
           listAvailable={!conversations.listError}
           streamingText={conversations.streamingText}
+          executionStatus={conversations.executionStatus}
           onLoadOlder={conversations.loadOlder}
         />
       }
       composer={
         <Composer
+          key={conversations.selectedId}
           connected={conversations.connected}
           selected={Boolean(conversations.selectedId)}
           sending={conversations.sending}
           status={conversations.executionStatus}
           commentary={conversations.commentaryText}
           onSend={conversations.sendMessage}
+          onInterrupt={conversations.interrupt}
         />
       }
     />

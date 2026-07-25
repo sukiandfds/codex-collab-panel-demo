@@ -80,7 +80,8 @@ export const createRequestHandler = ({
         const mode = body.mode === "development" ? "development" : "discussion";
         const member = groupRoom.touchMember(body.memberId, body.authorName);
         const text = String(body.text || "").trim();
-        if (!text) return sendJson(response, { error: "消息不能为空" }, 400);
+        const attachments = media.resolveMany(body.attachmentIds);
+        if (!text && !attachments.length) return sendJson(response, { error: "消息不能为空" }, 400);
         const requestedAgentIds = Array.isArray(body.agentIds)
           ? body.agentIds
           : [body.agentId];
@@ -93,9 +94,10 @@ export const createRequestHandler = ({
           type: "human", authorId: member.id, authorName: member.name,
           agentId: targetAgentIds[0], targetAgentIds,
           mode, text,
+          attachments: attachments.map(({ id, name, mimeType, url }) => ({ id, name, mimeType, url })),
         };
         const message = await groupRoom.addMessage(messageInput);
-        const execution = multiAgent.enqueueDiscussion({ agentIds: targetAgentIds, mode, requestText: text });
+        const execution = multiAgent.enqueueDiscussion({ agentIds: targetAgentIds, mode, requestText: text || "请查看附件并根据内容进行处理。", attachments });
         sendJson(response, { message, execution }, 202);
         return;
       }
@@ -103,14 +105,40 @@ export const createRequestHandler = ({
         sendJson(response, { name: project, root: projectRoot, mode: "interactive" });
         return;
       }
+      if (url.pathname === "/api/uploads" && request.method === "POST") {
+        const upload = await media.upload(request, {
+          name: url.searchParams.get("name") || "attachment",
+          mimeType: request.headers["content-type"] || "",
+        });
+        sendJson(response, upload, 201);
+        return;
+      }
       if (url.pathname === "/api/session/message" && request.method === "POST") {
         const body = await readJson(request);
         const threadId = String(body.threadId || "").trim();
         const text = String(body.text || "").trim();
-        if (!threadId || !text) return sendJson(response, { error: "threadId and text are required" }, 400);
+        const attachments = media.resolveMany(body.attachmentIds);
+        if (!threadId || (!text && !attachments.length)) return sendJson(response, { error: "threadId and message content are required" }, 400);
         if (text.length > 32000) return sendJson(response, { error: "message is too long" }, 413);
-        const result = await conversations.sendMessage(threadId, text);
-        sendJson(response, { threadId, turnId: result.turn?.id || "", status: result.turn?.status || "inProgress" }, 202);
+        const status = execution.getStatus(threadId);
+        if (status.active && !status.turnId) return sendJson(response, { error: "Codex 正在启动当前任务，请稍后再试" }, 409);
+        const result = status.active
+          ? await conversations.steerMessage(threadId, status.turnId, text, attachments)
+          : await conversations.sendMessage(threadId, text, attachments);
+        sendJson(response, {
+          threadId,
+          turnId: status.active ? status.turnId : result.turn?.id || "",
+          status: status.active ? "steered" : result.turn?.status || "inProgress",
+        }, 202);
+        return;
+      }
+      if (url.pathname === "/api/session/interrupt" && request.method === "POST") {
+        const body = await readJson(request);
+        const threadId = String(body.threadId || "").trim();
+        const status = execution.getStatus(threadId);
+        if (!threadId || !status.active || !status.turnId) return sendJson(response, { error: "当前没有可停止的任务" }, 409);
+        await conversations.interrupt(threadId, status.turnId);
+        sendJson(response, { threadId, turnId: status.turnId, status: "interrupting" }, 202);
         return;
       }
       if (url.pathname === "/api/execution-status") {

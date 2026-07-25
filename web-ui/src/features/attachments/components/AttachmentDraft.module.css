@@ -1,0 +1,23 @@
+.hiddenInput { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.attachButton { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border-radius: 50%; color: var(--color-text-secondary, #bbb); cursor: pointer; transition: background 120ms ease, color 120ms ease; }
+.attachButton:hover { background: rgba(255,255,255,.08); color: var(--color-text, #eee); }
+.attachButton svg { width: 16px; height: 16px; stroke-width: 1.8; }
+.disabled { opacity: .4; cursor: default; pointer-events: none; }
+.area { padding: 2px 11px 7px; }
+.list { display: flex; gap: 7px; overflow-x: auto; padding: 2px 0; scrollbar-width: thin; }
+.item { position: relative; display: grid; grid-template-columns: 38px minmax(0, 1fr); width: 176px; min-width: 176px; height: 48px; align-items: center; gap: 8px; padding: 5px 27px 5px 5px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: rgba(0,0,0,.17); }
+.item img, .fileIcon { width: 38px; height: 38px; border-radius: 5px; object-fit: cover; }
+.fileIcon { display: grid; place-items: center; background: rgba(255,255,255,.06); color: var(--color-text-muted, #888); }
+.fileIcon svg { width: 17px; height: 17px; }
+.meta { display: grid; min-width: 0; gap: 2px; }
+.meta strong, .meta small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta strong { color: var(--color-text, #eee); font-size: 11px; font-weight: 550; }
+.meta small { color: var(--color-text-muted, #888); font-size: 9px; }
+.item button { position: absolute; top: 4px; right: 4px; display: grid; width: 20px; height: 20px; place-items: center; border: 0; border-radius: 50%; background: rgba(0,0,0,.48); color: #ccc; cursor: pointer; }
+.item button:hover { background: rgba(0,0,0,.78); color: #fff; }
+.item button svg { width: 12px; height: 12px; }
+.error { padding: 5px 2px 0; color: #e59a91; font-size: 11px; }
+.uploading { display: flex; align-items: center; gap: 5px; padding: 5px 2px 0; color: var(--color-text-muted, #888); font-size: 11px; }
+.uploading svg { width: 13px; height: 13px; animation: attachment-spin 900ms linear infinite; }
+@keyframes attachment-spin { to { transform: rotate(360deg); } }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

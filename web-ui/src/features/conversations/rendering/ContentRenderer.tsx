@@ -15,7 +15,7 @@ function Block({ block }: { block: ContentBlock }) {
         remarkPlugins={[remarkGfm]}
         components={{
           a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer">{children}</a>,
-          img: ({ src, alt }) => <img src={src} alt={alt || ""} loading="lazy" />,
+          img: ({ src, alt }) => <img src={sourceUrl(src || "")} alt={alt || ""} loading="lazy" />,
         }}
       >
         {block.text}

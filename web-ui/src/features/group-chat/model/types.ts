@@ -1,3 +1,5 @@
+import type { MediaFile } from "../../conversations/model/types";
+
 export type GroupMode = "discussion" | "development";
 
 export interface GroupMember {
@@ -28,6 +30,7 @@ export interface GroupMessage {
   targetAgentIds?: string[];
   mode: GroupMode;
   text: string;
+  attachments?: MediaFile[];
   createdAt: string;
 }
 

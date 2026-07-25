@@ -1,0 +1,11 @@
+.attachments { display: grid; max-width: 100%; gap: 8px; margin-top: 8px; }
+.image { display: block; width: fit-content; max-width: min(100%, 520px); }
+.image img { display: block; max-width: 100%; max-height: 420px; border-radius: 7px; object-fit: contain; }
+.audio { width: min(100%, 460px); }
+.video { display: block; width: min(100%, 560px); max-height: 420px; border-radius: 7px; background: #000; }
+.file { display: flex; width: min(100%, 460px); min-height: 42px; align-items: center; gap: 9px; padding: 7px 8px 7px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: rgba(255,255,255,.035); }
+.file > svg { width: 17px; height: 17px; color: #888; }
+.file span { min-width: 0; flex: 1; overflow: hidden; color: #ccc; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.file a { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 5px; color: #aaa; }
+.file a:hover { background: rgba(255,255,255,.08); color: #eee; }
+.file a svg { width: 15px; height: 15px; }

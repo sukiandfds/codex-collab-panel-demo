@@ -13,12 +13,24 @@ export type ExecutionPhase =
   | "interrupted"
   | "systemError";
 
-export interface ExecutionStatus {
-  type: "execution_status";
-  threadId: string;
+export interface ExecutionActivity {
+  id: string;
   phase: ExecutionPhase;
   label: string;
   detail: string;
+  completed: boolean;
+  updatedAt: string;
+}
+
+export interface ExecutionStatus {
+  type: "execution_status";
+  threadId: string;
+  turnId: string;
+  phase: ExecutionPhase;
+  label: string;
+  detail: string;
+  commentary: string;
+  activities: ExecutionActivity[];
   active: boolean;
   startedAt: string | null;
   updatedAt: string | null;

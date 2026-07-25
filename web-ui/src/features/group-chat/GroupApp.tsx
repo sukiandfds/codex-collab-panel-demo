@@ -27,7 +27,7 @@ export function GroupApp() {
     <div className={styles.shell}>
       <RoomSidebar project={snapshot.project} members={snapshot.members} />
       <main className={styles.main}>
-        <GroupHeader roomName={snapshot.room.name} connected={group.connected} members={snapshot.members} member={group.member} onEditMember={() => setEditingMember(true)} />
+        <GroupHeader roomName={snapshot.room.name} connected={group.connected} members={snapshot.members} agents={snapshot.agents} member={group.member} onEditMember={() => setEditingMember(true)} />
         <MessageTimeline messages={snapshot.messages} agents={snapshot.agents} streaming={group.streaming} />
         <GroupComposer
           mode={mode}

@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { groupApi } from "../data/groupApi";
 import type { GroupEvent, GroupMode, GroupSnapshot, StoredMember } from "../model/types";
 
 const memberKey = "codex-collab-group-member";
+
+const createMemberId = () => globalThis.crypto?.randomUUID?.()
+  || `member-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 const readMember = (): StoredMember | null => {
   try {
@@ -21,6 +24,9 @@ export function useGroupRoom() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [streaming, setStreaming] = useState<Record<string, { itemId: string; text: string }>>({});
+  const streamingBuffer = useRef<Record<string, { itemId: string; text: string }>>({});
+  const streamingFrame = useRef(0);
+  const sendingRef = useRef(false);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -52,6 +58,9 @@ export function useGroupRoom() {
             ? current
             : current && { ...current, messages: [...current.messages, event.message] });
           if (event.message.agentId) {
+            const nextBuffer = { ...streamingBuffer.current };
+            delete nextBuffer[event.message.agentId];
+            streamingBuffer.current = nextBuffer;
             setStreaming((current) => {
               const next = { ...current };
               delete next[event.message.agentId!];
@@ -66,20 +75,27 @@ export function useGroupRoom() {
         } else if (event.type === "group_members_changed") {
           setSnapshot((current) => current && { ...current, members: event.members });
         } else if (event.type === "group_agent_delta") {
-          setStreaming((current) => {
-            const previous = current[event.agentId];
-            return {
-              ...current,
-              [event.agentId]: {
-                itemId: event.itemId,
-                text: previous?.itemId === event.itemId ? previous.text + event.delta : event.delta,
-              },
-            };
-          });
+          const previous = streamingBuffer.current[event.agentId];
+          streamingBuffer.current = {
+            ...streamingBuffer.current,
+            [event.agentId]: {
+              itemId: event.itemId,
+              text: previous?.itemId === event.itemId ? previous.text + event.delta : event.delta,
+            },
+          };
+          if (!streamingFrame.current) {
+            streamingFrame.current = window.requestAnimationFrame(() => {
+              streamingFrame.current = 0;
+              setStreaming(streamingBuffer.current);
+            });
+          }
         }
       } catch {}
     };
-    return () => events.close();
+    return () => {
+      events.close();
+      if (streamingFrame.current) window.cancelAnimationFrame(streamingFrame.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -95,27 +111,33 @@ export function useGroupRoom() {
   }, [member]);
 
   const join = useCallback(async (name: string) => {
-    const next = { id: member?.id || crypto.randomUUID(), name: name.trim() };
+    const next = { id: member?.id || createMemberId(), name: name.trim() };
     const joined = await groupApi.join(next);
-    localStorage.setItem(memberKey, JSON.stringify(joined));
     setMember(joined);
+    try {
+      localStorage.setItem(memberKey, JSON.stringify(joined));
+    } catch {
+      // Storage may be unavailable in private or restricted mobile browsers.
+    }
     return joined;
   }, [member?.id]);
 
-  const send = useCallback(async (mode: GroupMode, agentIds: string[], text: string) => {
-    if (!member || sending || !text.trim()) return false;
+  const send = useCallback(async (mode: GroupMode, agentIds: string[], text: string, attachmentIds: string[] = []) => {
+    if (!member || sendingRef.current || (!text.trim() && !attachmentIds.length)) return false;
+    sendingRef.current = true;
     setSending(true);
     setError("");
     try {
-      await groupApi.send(member, mode, agentIds, text.trim());
+      await groupApi.send(member, mode, agentIds, text.trim(), attachmentIds);
       return true;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
       return false;
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
-  }, [member, sending]);
+  }, [member]);
 
   return { snapshot, member, connected, loading, sending, error, streaming, join, send, refresh };
 }

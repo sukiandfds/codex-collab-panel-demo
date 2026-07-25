@@ -22,22 +22,56 @@ const stateFromItem = (item) => {
   }
 };
 
+const activityFromItem = (item, completed = false) => {
+  const state = stateFromItem(item);
+  if (!state || item?.type === "agentMessage") return null;
+  const labels = {
+    reasoning: completed ? "已完成分析" : "正在分析任务",
+    commandExecution: completed ? "已运行命令" : "正在运行命令",
+    fileChange: completed ? "已修改文件" : "正在修改文件",
+    mcpToolCall: completed ? "已调用工具" : "正在调用工具",
+    dynamicToolCall: completed ? "已调用工具" : "正在调用工具",
+    webSearch: completed ? "已搜索资料" : "正在搜索资料",
+  };
+  return {
+    id: item.id || `${item.type}-${Date.now()}`,
+    phase: state.phase,
+    label: labels[item.type] || state.label,
+    detail: detailFromItem(item),
+    completed,
+    updatedAt: new Date().toISOString(),
+  };
+};
+
 export const createExecutionTracker = ({ broadcast }) => {
   const statuses = new Map();
+  const messagePhases = new Map();
 
   const publish = (threadId, next) => {
     if (!threadId) return;
     const previous = statuses.get(threadId);
     const active = !terminalPhases.has(next.phase) && next.phase !== "idle";
+    const now = new Date().toISOString();
+    const beginsTurn = next.phase === "submitted" || (active && !previous?.active);
+    let activities = beginsTurn ? [] : previous?.activities || [];
+    if (next.activity) {
+      const index = activities.findIndex((activity) => activity.id === next.activity.id);
+      activities = index >= 0
+        ? activities.map((activity, activityIndex) => activityIndex === index ? next.activity : activity)
+        : [...activities, next.activity].slice(-12);
+    }
     const status = {
       type: "execution_status",
       threadId,
+      turnId: beginsTurn ? next.turnId || "" : next.turnId ?? previous?.turnId ?? "",
       phase: next.phase,
       label: next.label,
       detail: next.detail || "",
+      commentary: beginsTurn ? "" : previous?.commentary || "",
+      activities,
       active,
-      startedAt: active ? previous?.startedAt || new Date().toISOString() : previous?.startedAt || null,
-      updatedAt: new Date().toISOString(),
+      startedAt: active ? beginsTurn ? now : previous?.startedAt || now : previous?.startedAt || null,
+      updatedAt: now,
     };
     statuses.set(threadId, status);
     broadcast(status);
@@ -54,13 +88,44 @@ export const createExecutionTracker = ({ broadcast }) => {
     detail: error instanceof Error ? error.message : String(error),
   });
 
+  const completeActivity = (threadId, item) => {
+    const activity = activityFromItem(item, true);
+    const previous = statuses.get(threadId);
+    if (!activity || !previous) return;
+    const index = previous.activities.findIndex((value) => value.id === activity.id);
+    const activities = index >= 0
+      ? previous.activities.map((value, activityIndex) => activityIndex === index ? activity : value)
+      : [...previous.activities, activity].slice(-12);
+    const status = { ...previous, activities, updatedAt: activity.updatedAt };
+    statuses.set(threadId, status);
+    broadcast(status);
+  };
+
+  const addCommentaryActivity = (threadId, itemId, text) => {
+    const previous = statuses.get(threadId);
+    if (!previous) return;
+    const now = new Date().toISOString();
+    const activity = {
+      id: itemId || `commentary-${Date.now()}`,
+      phase: "working",
+      label: text,
+      detail: "",
+      completed: true,
+      updatedAt: now,
+    };
+    const activities = [...previous.activities.filter((value) => value.id !== activity.id), activity].slice(-12);
+    const status = { ...previous, commentary: text, activities, updatedAt: now };
+    statuses.set(threadId, status);
+    broadcast(status);
+  };
+
   const handleProtocolMessage = (message) => {
     const { method, params = {} } = message || {};
     const threadId = params.threadId;
     if (!threadId) return;
 
     if (method === "turn/started") {
-      publish(threadId, { phase: "working", label: "Codex 正在处理任务" });
+      publish(threadId, { phase: "working", label: "Codex 正在处理任务", turnId: params.turn?.id || "" });
       broadcast({ type: "sessions_changed", threadId });
       return;
     }
@@ -91,14 +156,20 @@ export const createExecutionTracker = ({ broadcast }) => {
       return;
     }
     if (method === "item/started") {
+      if (params.item?.type === "agentMessage") messagePhases.set(params.item.id, params.item.phase);
       const state = stateFromItem(params.item);
-      if (state) publish(threadId, { ...state, detail: detailFromItem(params.item) });
+      if (state) publish(threadId, {
+        ...state,
+        detail: detailFromItem(params.item),
+        activity: activityFromItem(params.item),
+      });
       return;
     }
     if (method === "item/completed") {
       if (params.item?.type === "agentMessage" && params.item.phase === "commentary") {
         const text = String(params.item.text || "").trim();
         if (text) {
+          addCommentaryActivity(threadId, params.item.id || "", text);
           broadcast({
             type: "assistant_commentary",
             threadId,
@@ -108,6 +179,15 @@ export const createExecutionTracker = ({ broadcast }) => {
         }
       } else if (["userMessage", "agentMessage", "imageGeneration"].includes(params.item?.type)) {
         broadcast({ type: "sessions_changed", threadId });
+      } else {
+        completeActivity(threadId, params.item);
+      }
+      if (params.item?.type === "agentMessage") messagePhases.delete(params.item.id);
+      return;
+    }
+    if (method === "item/agentMessage/delta") {
+      if (messagePhases.get(params.itemId) !== "commentary") {
+        broadcast({ type: "assistant_delta", ...params });
       }
       return;
     }
@@ -123,9 +203,12 @@ export const createExecutionTracker = ({ broadcast }) => {
   const getStatus = (threadId) => statuses.get(threadId) || {
     type: "execution_status",
     threadId,
+    turnId: "",
     phase: "idle",
     label: "Codex 已就绪",
     detail: "",
+    commentary: "",
+    activities: [],
     active: false,
     startedAt: null,
     updatedAt: null,

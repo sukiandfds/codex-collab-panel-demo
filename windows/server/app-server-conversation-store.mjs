@@ -4,6 +4,21 @@ import { createAppServerClient } from "./app-server-client.mjs";
 
 const sourceFromThread = (thread) => thread.source === "cli" && thread.cliVersion === "0.122.0" ? "happy" : "codex";
 
+export const inputFromAttachments = (text, attachments = []) => {
+  const input = [];
+  if (text) input.push({ type: "text", text, text_elements: [] });
+  for (const attachment of attachments) {
+    if (attachment.mimeType.startsWith("image/")) {
+      input.push({ type: "localImage", path: attachment.path });
+    } else if (attachment.mimeType.startsWith("audio/")) {
+      input.push({ type: "localAudio", path: attachment.path });
+    } else {
+      input.push({ type: "mention", name: attachment.name, path: attachment.path });
+    }
+  }
+  return input;
+};
+
 export const createAppServerConversationStore = ({ projectRoot, registerMedia, onProtocolMessage, onSubmitted, onFailed }) => {
   const client = createAppServerClient();
   const unsubscribe = client.subscribe(onProtocolMessage || (() => {}));
@@ -70,7 +85,7 @@ export const createAppServerConversationStore = ({ projectRoot, registerMedia, o
     };
   };
 
-  const sendMessage = async (threadId, text) => {
+  const sendMessage = async (threadId, text, attachments = []) => {
     const thread = threadCache.get(threadId) || (await client.request("thread/read", { threadId, includeTurns: false })).thread;
     if (!thread?.cwd || path.resolve(thread.cwd).toLowerCase() !== path.resolve(projectRoot).toLowerCase()) {
       throw new Error("This conversation does not belong to the current project.");
@@ -80,7 +95,7 @@ export const createAppServerConversationStore = ({ projectRoot, registerMedia, o
       await client.request("thread/resume", { threadId, persistExtendedHistory: true });
       return await client.request("turn/start", {
         threadId,
-        input: [{ type: "text", text, text_elements: [] }],
+        input: inputFromAttachments(text, attachments),
       });
     } catch (error) {
       onFailed?.(threadId, error);
@@ -88,10 +103,18 @@ export const createAppServerConversationStore = ({ projectRoot, registerMedia, o
     }
   };
 
+  const steerMessage = async (threadId, turnId, text, attachments = []) => client.request("turn/steer", {
+    threadId,
+    expectedTurnId: turnId,
+    input: inputFromAttachments(text, attachments),
+  });
+
+  const interrupt = async (threadId, turnId) => client.request("turn/interrupt", { threadId, turnId });
+
   const close = () => {
     unsubscribe();
     client.close();
   };
 
-  return { listSessions, findSession, sendMessage, close };
+  return { listSessions, findSession, sendMessage, steerMessage, interrupt, close };
 };

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createAppServerClient } from "./app-server-client.mjs";
+import { inputFromAttachments } from "./app-server-conversation-store.mjs";
 
 const terminalPhases = new Set(["completed", "failed", "interrupted", "systemError"]);
 const maxDiscussionTurns = 4;
@@ -183,7 +184,7 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast }) => {
     return threadId;
   };
 
-  const runAgent = async ({ agentId, mode, requestText, followUp }) => {
+  const runAgent = async ({ agentId, mode, requestText, followUp, attachments }) => {
     if (closed) throw new Error("多 Agent 服务已关闭");
     const agent = room.getAgent(agentId);
     if (!agent) throw Object.assign(new Error("Agent 不存在"), { statusCode: 404 });
@@ -208,7 +209,7 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast }) => {
     try {
       await client.request("turn/start", {
         threadId,
-        input: [{ type: "text", text: prompt, text_elements: [] }],
+        input: inputFromAttachments(prompt, attachments),
         cwd: projectRoot,
       });
       return await completion;
@@ -220,7 +221,7 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast }) => {
     }
   };
 
-  const runDiscussion = async ({ agentIds, mode, requestText }) => {
+  const runDiscussion = async ({ agentIds, mode, requestText, attachments }) => {
     const agents = room.snapshot().agents;
     const pending = cleanAgentIds(agentIds, agents);
     const runCounts = new Map();
@@ -240,7 +241,7 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast }) => {
 
       const followUp = turns > 0;
       try {
-        const result = await runAgent({ agentId, mode, requestText, followUp });
+        const result = await runAgent({ agentId, mode, requestText, followUp, attachments });
         turns += 1;
         runCounts.set(agentId, (runCounts.get(agentId) || 0) + 1);
         if (agentId !== "manager") needsManagerFollowUp = true;
@@ -268,7 +269,7 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast }) => {
     }
   };
 
-  const enqueueDiscussion = ({ agentIds, mode, requestText }) => {
+  const enqueueDiscussion = ({ agentIds, mode, requestText, attachments = [] }) => {
     const agents = room.snapshot().agents;
     const targets = cleanAgentIds(agentIds, agents);
     if (!targets.length) throw Object.assign(new Error("请选择一个可用 Agent"), { statusCode: 404 });
@@ -276,7 +277,7 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast }) => {
     void setStatus(targets[0], { phase: "queued", label: "已加入讨论队列", detail: "", active: true });
     workQueue = workQueue
       .catch(() => {})
-      .then(() => runDiscussion({ agentIds: targets, mode, requestText }))
+      .then(() => runDiscussion({ agentIds: targets, mode, requestText, attachments }))
       .catch((error) => console.warn(`[multi-agent] discussion ${jobId} failed: ${error.message}`));
     return { jobId, agentIds: targets, status: "queued" };
   };

@@ -38,6 +38,14 @@ const localPathFrom = (value) => {
   return value.startsWith("file://") ? decodeURIComponent(new URL(value).pathname.replace(/^\/(?:[A-Za-z]:)/u, (match) => match.slice(1))) : value;
 };
 
+const registerMarkdownMedia = (text, registerMedia) => text.replace(/!\[([^\]]*)\]\((<[^>]+>|[^)\n]+)\)/gu, (match, alt, rawSource) => {
+  const source = rawSource.trim().replace(/^<|>$/gu, "");
+  const localPath = localPathFrom(source);
+  if (!localPath) return match;
+  const media = registerMedia(localPath);
+  return media ? `![${alt}](${media.url})` : match;
+});
+
 const mediaBlock = (type, source, registerMedia, extra = {}) => {
   if (!source) return null;
   const localPath = localPathFrom(source);
@@ -51,7 +59,7 @@ const mediaBlock = (type, source, registerMedia, extra = {}) => {
 export const blocksFromContent = (value, registerMedia, depth = 0) => {
   if (depth > 6 || value === null || value === undefined) return [];
   if (typeof value === "string") {
-    const text = cleanText(value);
+    const text = registerMarkdownMedia(cleanText(value), registerMedia);
     const blocks = text ? [{ id: blockId("markdown", text), type: "markdown", text }] : [];
     return [...blocks, ...optionBlocksFrom(value)];
   }
@@ -77,7 +85,7 @@ export const blocksFromContent = (value, registerMedia, depth = 0) => {
     const block = mediaBlock("video", source, registerMedia);
     return block ? [block] : [];
   }
-  if (["file", "attachment", "inputfile"].includes(rawType)) {
+  if (["file", "attachment", "inputfile", "mention"].includes(rawType)) {
     const source = valueFrom(value, ["file_url", "fileUrl", "url", "path", "source"]);
     const block = mediaBlock("file", source, registerMedia, { name: value.name || path.basename(source || "file") });
     return block ? [block] : [];

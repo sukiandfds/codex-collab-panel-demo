@@ -27,7 +27,7 @@ export function useProjectConversations() {
       if (!quiet && !cached) setLoadingSession(true);
       setSessionError("");
     } else {
-      if (!cached?.hasMore || cached.nextBefore === null || cached.nextBefore === undefined) return;
+      if (!cached?.hasMore || cached.nextBefore === null || cached.nextBefore === undefined) return false;
       setLoadingOlder(true);
     }
     const controller = new AbortController();
@@ -39,8 +39,10 @@ export function useProjectConversations() {
         : detail;
       sessionCache.current.set(threadId, next);
       if (selectedIdRef.current === threadId) setSession(next);
+      return true;
     } catch (reason) {
       if (!controller.signal.aborted) setSessionError(reason instanceof Error ? reason.message : String(reason));
+      return false;
     } finally {
       if (!controller.signal.aborted) {
         setLoadingSession(false);
@@ -49,7 +51,7 @@ export function useProjectConversations() {
     }
   }, []);
 
-  const refreshSessions = useCallback(async (initial = false, changedThreadId?: string) => {
+  const refreshSessions = useCallback(async (initial = false, changedThreadId?: string, reloadSelected = true) => {
     if (initial) setLoadingList(true);
     setListError("");
     try {
@@ -68,7 +70,7 @@ export function useProjectConversations() {
       }
       selectedIdRef.current = nextId;
       setSelectedId(nextId);
-      if (!changedThreadId || changedThreadId === nextId) await loadSession(nextId, { quiet: !initial });
+      if (reloadSelected && (!changedThreadId || changedThreadId === nextId)) await loadSession(nextId, { quiet: !initial });
     } catch (reason) {
       setListError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -92,15 +94,25 @@ export function useProjectConversations() {
     return () => controller.abort();
   }, [refreshSessions]);
 
-  const onSessionsChanged = useCallback((threadId?: string) => {
-    if (threadId) sessionCache.current.delete(threadId);
-    void refreshSessions(false, threadId);
-  }, [refreshSessions]);
   const onMessageAccepted = useCallback(() => {
     if (selectedIdRef.current) void loadSession(selectedIdRef.current, { quiet: true });
   }, [loadSession]);
   const execution = useCodexExecution(selectedId, onMessageAccepted);
+  const onSessionsChanged = useCallback((threadId?: string) => {
+    if (threadId) sessionCache.current.delete(threadId);
+    const selected = selectedIdRef.current;
+    if (selected && (!threadId || threadId === selected)) {
+      void loadSession(selected, { quiet: true }).then((loaded) => {
+        if (loaded) execution.clearStreaming();
+      });
+    }
+    void refreshSessions(false, threadId, false);
+  }, [execution.clearStreaming, loadSession, refreshSessions]);
   const connected = useConversationEvents(onSessionsChanged, execution.handleEvent);
+
+  useEffect(() => {
+    if (connected && selectedId) void execution.refreshStatus();
+  }, [connected, execution.refreshStatus, selectedId]);
 
   useEffect(() => () => requestRef.current?.abort(), []);
 
@@ -116,9 +128,9 @@ export function useProjectConversations() {
     void loadSession(threadId);
   }, [loadSession]);
 
-  const loadOlder = useCallback(() => {
-    if (!selectedIdRef.current) return Promise.resolve();
-    return loadSession(selectedIdRef.current, { older: true });
+  const loadOlder = useCallback(async () => {
+    if (!selectedIdRef.current) return;
+    await loadSession(selectedIdRef.current, { older: true });
   }, [loadSession]);
 
   return {
@@ -129,6 +141,7 @@ export function useProjectConversations() {
     commentaryText: execution.commentaryText,
     sending: execution.sending,
     sendMessage: execution.sendMessage,
+    interrupt: execution.interrupt,
     refresh: () => refreshSessions(),
   };
 }

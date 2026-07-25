@@ -1,4 +1,4 @@
-import { Ellipsis, Folder, PanelLeft } from "lucide-react";
+import { Folder, MessageSquareText, PanelLeft } from "lucide-react";
 import type { ProjectInfo, SessionDetail } from "../../features/conversations/model/types";
 import styles from "./Topbar.module.css";
 
@@ -24,9 +24,9 @@ export function Topbar({ project, session, onOpenSidebar }: TopbarProps) {
         ) : null}
       </div>
       <span className={styles.spacer} />
-      <button className={styles.iconButton} type="button" aria-label="会话信息" title="当前会话信息">
-        <Ellipsis aria-hidden="true" />
-      </button>
+      <a className={styles.iconButton} href={`/group.html${window.location.search}`} aria-label="进入项目群" title="进入项目群">
+        <MessageSquareText aria-hidden="true" />
+      </a>
     </header>
   );
 }

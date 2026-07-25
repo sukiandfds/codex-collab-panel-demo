@@ -22,10 +22,9 @@
 }
 
 .iconButton,
-.windowControls button {
+.windowControls span {
   display: grid;
   place-items: center;
-  border: 0;
   background: transparent;
   color: inherit;
 }
@@ -51,10 +50,11 @@
   margin-left: 14px;
 }
 
-.menu button {
+.menu span {
+  display: grid;
   height: 30px;
+  place-items: center;
   padding: 0 10px;
-  border: 0;
   border-radius: 5px;
   background: transparent;
   color: var(--color-text-muted);
@@ -66,7 +66,7 @@
   flex: 1;
 }
 
-.windowControls button {
+.windowControls span {
   width: 54px;
   height: 100%;
 }
@@ -77,26 +77,6 @@
   stroke-width: 1.7;
 }
 
-@media (hover: hover) {
-  .iconButton:not(:disabled):hover,
-  .menu button:hover,
-  .windowControls button:hover {
-    background: rgba(255, 255, 255, .06);
-    color: var(--color-text-secondary);
-  }
-
-  .windowControls .close:hover {
-    background: #c42b1c;
-    color: white;
-  }
-}
-
 @media (max-width: 760px) {
-  .menu {
-    display: none;
-  }
-
-  .windowControls button {
-    width: 42px;
-  }
+  .windowBar { display: none; }
 }

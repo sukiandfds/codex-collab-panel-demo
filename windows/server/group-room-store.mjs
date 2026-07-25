@@ -98,9 +98,15 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     return member;
   };
 
-  const addMessage = async ({ type = "human", authorId, authorName, agentId = null, targetAgentIds = [], mode = "discussion", text }) => {
+  const addMessage = async ({ type = "human", authorId, authorName, agentId = null, targetAgentIds = [], mode = "discussion", text, attachments = [] }) => {
     const content = cleanText(text, 12000);
-    if (!content) throw Object.assign(new Error("消息不能为空"), { statusCode: 400 });
+    const files = (Array.isArray(attachments) ? attachments : []).slice(0, 6).map((file) => ({
+      id: cleanText(file.id, 80),
+      name: cleanText(file.name, 160),
+      mimeType: cleanText(file.mimeType, 120),
+      url: cleanText(file.url, 240),
+    })).filter((file) => file.id && file.name && file.url);
+    if (!content && !files.length) throw Object.assign(new Error("消息不能为空"), { statusCode: 400 });
     const targets = [...new Set((Array.isArray(targetAgentIds) ? targetAgentIds : [])
       .map((id) => cleanText(id, 80))
       .filter((id) => agents.has(id)))];
@@ -113,6 +119,7 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
       targetAgentIds: targets,
       mode,
       text: content,
+      attachments: files,
       createdAt: new Date().toISOString(),
     };
     messages.push(message);

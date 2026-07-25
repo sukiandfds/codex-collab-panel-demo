@@ -12,6 +12,8 @@ export const createConversationService = ({ primary, fallback }) => {
     listSessions: (...args) => withFallback("listSessions", ...args),
     findSession: (...args) => withFallback("findSession", ...args),
     sendMessage: (...args) => primary.sendMessage(...args),
+    steerMessage: (...args) => primary.steerMessage(...args),
+    interrupt: (...args) => primary.interrupt(...args),
     close: () => {
       primary.close();
       fallback.close();

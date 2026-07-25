@@ -9,22 +9,111 @@ const mimeTypes = new Map([
   [".mp3", "audio/mpeg"], [".wav", "audio/wav"], [".m4a", "audio/mp4"], [".ogg", "audio/ogg"],
   [".mp4", "video/mp4"], [".webm", "video/webm"], [".mov", "video/quicktime"],
   [".pdf", "application/pdf"], [".csv", "text/csv; charset=utf-8"], [".json", "application/json; charset=utf-8"],
+  [".txt", "text/plain; charset=utf-8"], [".md", "text/markdown; charset=utf-8"], [".xml", "application/xml; charset=utf-8"],
+  [".yaml", "application/yaml; charset=utf-8"], [".yml", "application/yaml; charset=utf-8"],
   [".html", "text/html; charset=utf-8"], [".htm", "text/html; charset=utf-8"],
+  [".doc", "application/msword"], [".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+  [".xls", "application/vnd.ms-excel"], [".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+  [".ppt", "application/vnd.ms-powerpoint"], [".pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+  [".zip", "application/zip"], [".7z", "application/x-7z-compressed"],
 ]);
 
 const inlineTypes = /^(?:image|audio|video)\//u;
+const maxUploadBytes = 20 * 1024 * 1024;
 
-export const createMediaService = () => {
+const publicMedia = ({ id, name, mimeType, url }) => ({ id, name, mimeType, url });
+const storedUploadName = (value) => {
+  const marker = value.indexOf("__");
+  return marker >= 0 ? value.slice(marker + 2) : value;
+};
+const safeUploadName = (value) => {
+  const name = path.basename(String(value || "attachment"))
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/gu, "_")
+    .trim()
+    .slice(-120);
+  return name || "attachment";
+};
+
+const readUpload = async (request) => {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > maxUploadBytes) {
+      const error = new Error("附件不能超过 20 MB");
+      error.statusCode = 413;
+      throw error;
+    }
+    chunks.push(chunk);
+  }
+  if (!size) {
+    const error = new Error("附件内容为空");
+    error.statusCode = 400;
+    throw error;
+  }
+  return Buffer.concat(chunks);
+};
+
+export const createMediaService = ({ uploadRoot } = {}) => {
   const entries = new Map();
 
-  const register = (file) => {
+  const register = (file, overrides = {}) => {
     const resolved = path.resolve(file);
     const id = createHash("sha256").update(resolved.toLowerCase()).digest("hex").slice(0, 32);
-    const mimeType = mimeTypes.get(path.extname(resolved).toLowerCase()) || "application/octet-stream";
-    const value = { id, path: resolved, name: path.basename(resolved), mimeType, url: `/api/media/${id}` };
+    const inferredType = mimeTypes.get(path.extname(resolved).toLowerCase());
+    const declaredType = /^[\w.+-]+\/[\w.+-]+(?:;\s*charset=[\w-]+)?$/iu.test(overrides.mimeType || "")
+      ? overrides.mimeType
+      : "";
+    const value = {
+      id,
+      path: resolved,
+      name: overrides.name || path.basename(resolved),
+      mimeType: inferredType || declaredType || "application/octet-stream",
+      url: `/api/media/${id}`,
+    };
     entries.set(id, value);
-    return { id, name: value.name, mimeType, url: value.url };
+    return publicMedia(value);
   };
+
+  const restoreUploads = async () => {
+    if (!uploadRoot) return;
+    try {
+      const files = await fsp.readdir(uploadRoot, { withFileTypes: true });
+      for (const file of files) {
+        if (!file.isFile()) continue;
+        register(path.join(uploadRoot, file.name), { name: storedUploadName(file.name) });
+      }
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  };
+
+  const upload = async (request, { name, mimeType }) => {
+    if (!uploadRoot) throw new Error("附件上传服务未配置");
+    const displayName = safeUploadName(name);
+    const body = await readUpload(request);
+    await fsp.mkdir(uploadRoot, { recursive: true });
+    const contentHash = createHash("sha256").update(body).digest("hex");
+    const storedName = `${contentHash}__${displayName}`;
+    const file = path.join(uploadRoot, storedName);
+    try {
+      await fsp.writeFile(file, body, { flag: "wx" });
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+    }
+    return register(file, { name: displayName, mimeType });
+  };
+
+  const resolveMany = (ids) => [...new Set(Array.isArray(ids) ? ids : [])]
+    .slice(0, 6)
+    .map((id) => {
+      const key = String(id || "");
+      const entry = entries.get(key);
+      const available = Boolean(entry && fs.existsSync(entry.path));
+      if (entry && !available) entries.delete(key);
+      return available ? entry : null;
+    })
+    .filter(Boolean);
 
   const serve = async (request, response, id, download = false) => {
     const entry = entries.get(id);
@@ -38,6 +127,7 @@ export const createMediaService = () => {
       stat = await fsp.stat(entry.path);
       if (!stat.isFile()) throw new Error("not a file");
     } catch {
+      entries.delete(id);
       response.writeHead(404);
       response.end("Media file is unavailable");
       return;
@@ -80,5 +170,5 @@ export const createMediaService = () => {
     fs.createReadStream(entry.path, { start, end }).pipe(response);
   };
 
-  return { register, serve };
+  return { register, restoreUploads, upload, resolveMany, serve };
 };

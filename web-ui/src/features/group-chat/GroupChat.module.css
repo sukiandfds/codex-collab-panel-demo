@@ -116,9 +116,14 @@
 .memberButton { max-width: 120px; padding: 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; font-size: 12px; }
 .iconLink:hover, .memberButton:hover { background: #242424; color: #f1f1f1; }
 
-.timeline { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 28px max(22px, calc((100% - 760px) / 2)) 40px; }
+.timelineShell { position: relative; min-width: 0; min-height: 0; }
+.timeline { width: 100%; height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 28px max(22px, calc((100% - 760px) / 2)) 40px; }
 .timeline::-webkit-scrollbar { width: 10px; }
 .timeline::-webkit-scrollbar-thumb { border: 3px solid #101010; border-radius: 8px; background: #3b3b3b; }
+.jumpToLatest { position: absolute; z-index: 7; right: 50%; bottom: 10px; transform: translateX(50%); }
+.dateDivider { display: flex; align-items: center; gap: 10px; margin: 0 0 22px; color: #707070; font-size: 10px; }
+.dateDivider::before, .dateDivider::after { height: 1px; flex: 1; background: #272727; content: ""; }
+.dateDivider span { flex: 0 0 auto; }
 .emptyRoom { display: grid; min-height: 100%; place-content: center; justify-items: center; gap: 8px; color: #747474; text-align: center; }
 .emptyRoom svg { width: 25px; height: 25px; }
 .emptyRoom strong { color: #aaa; font-size: 13px; }
@@ -154,6 +159,7 @@
 .markdown a { color: #a8d47d; }
 .markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
 .markdown th, .markdown td { padding: 6px 8px; border: 1px solid #353535; text-align: left; }
+.streamingText { margin: 0; color: #d4d4d4; font-size: 13px; line-height: 1.68; white-space: pre-wrap; overflow-wrap: anywhere; }
 .cursor { display: inline-block; width: 5px; height: 14px; margin-left: 3px; vertical-align: -2px; background: #b9e769; animation: blink 1s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 
@@ -161,7 +167,7 @@
 .errorText { margin: 0 4px 7px; color: #d58c83; font-size: 11px; }
 .composer { border: 1px solid #383838; border-radius: 8px; background: #1c1c1c; box-shadow: 0 8px 26px rgb(0 0 0 / 22%); }
 .composer:focus-within { border-color: #545454; }
-.composer textarea { display: block; width: 100%; min-height: 60px; resize: none; border: 0; outline: 0; padding: 12px 13px 6px; background: transparent; color: #ededed; font-size: 13px; line-height: 1.5; }
+.composer textarea { display: block; width: 100%; min-height: 60px; max-height: 150px; overflow-y: auto; resize: none; border: 0; outline: 0; padding: 12px 13px 6px; background: transparent; color: #ededed; font-size: 13px; line-height: 1.5; }
 .composer textarea::placeholder { color: #707070; }
 .composerFooter { display: flex; min-width: 0; align-items: center; gap: 8px; min-height: 40px; padding: 3px 8px 8px; }
 .modeSwitch { display: flex; padding: 2px; border: 1px solid #303030; border-radius: 6px; background: #161616; }
@@ -224,6 +230,7 @@
 .dialog h2 { margin: 17px 0 6px; color: #eee; font-size: 17px; }
 .dialog p { margin: 0 0 18px; color: #888; font-size: 12px; }
 .dialog input { width: 100%; height: 40px; border: 1px solid #383838; border-radius: 6px; outline: 0; padding: 0 10px; background: #131313; color: #eee; font-size: 13px; }
+.dialogError { margin-top: 9px; color: #e59a91; font-size: 12px; line-height: 1.45; }
 .dialog button { width: 100%; height: 38px; margin-top: 12px; border: 0; border-radius: 6px; background: #e7e7e7; color: #171717; cursor: pointer; font-size: 12px; font-weight: 600; }
 .dialog button:disabled { opacity: .45; cursor: default; }
 .loading { display: grid; width: 100%; height: 100%; place-items: center; background: #101010; color: #868686; font-size: 13px; }
@@ -238,13 +245,14 @@
   .main { width: 100%; height: 100%; grid-template-rows: 54px minmax(0, 1fr) auto; }
   .agentPanel { display: none; }
   .header { padding: 0 12px; }
-  .connection { display: none; }
+  .connection { min-width: 16px; justify-content: center; }
+  .connection > span { display: none; }
   .memberButton { max-width: 80px; }
   .timeline { padding: 20px 14px 28px; }
   .message { grid-template-columns: 28px minmax(0, 1fr); gap: 9px; margin-bottom: 20px; }
   .messageAvatar { width: 28px; height: 28px; }
   .composerArea { padding: 0 10px max(10px, env(safe-area-inset-bottom)); }
-  .mentionMenu { right: 10px; left: 10px; }
+  .mentionMenu { right: 10px; left: 10px; max-height: min(232px, 40dvh); }
   .composerFooter { flex-wrap: wrap; }
   .composerFooter select { order: 3; width: 100%; max-width: none; }
   .modeHint { display: none; }

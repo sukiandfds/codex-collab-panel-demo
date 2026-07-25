@@ -1,5 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, Bot, MessagesSquare } from "lucide-react";
+import { AttachmentButton, AttachmentPreviews } from "../../attachments/components/AttachmentDraft";
+import { useAttachmentDraft } from "../../attachments/hooks/useAttachmentDraft";
 import type { GroupAgent, GroupMember, GroupMode } from "../model/types";
 import { MentionMenu, type MentionOption } from "./MentionMenu";
 import styles from "../GroupChat.module.css";
@@ -29,12 +31,14 @@ export function GroupComposer({ mode, agentId, agents, members, disabled, error,
   error: string;
   onModeChange: (mode: GroupMode) => void;
   onAgentChange: (agentId: string) => void;
-  onSend: (text: string, targetAgentIds: string[]) => Promise<boolean>;
+  onSend: (text: string, targetAgentIds: string[], attachmentIds?: string[]) => Promise<boolean>;
 }) {
   const [text, setText] = useState("");
+  const draft = useAttachmentDraft();
   const [mention, setMention] = useState<MentionState | null>(null);
   const [activeMention, setActiveMention] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const submittingRef = useRef(false);
   const mentionOptions = useMemo<MentionOption[]>(() => {
     const query = mention?.query.toLocaleLowerCase() || "";
     const options: MentionOption[] = [
@@ -63,21 +67,41 @@ export function GroupComposer({ mode, agentId, agents, members, disabled, error,
   };
 
   const submit = async () => {
-    if (disabled || !text.trim()) return;
+    if (submittingRef.current || disabled || draft.uploading || (!text.trim() && !draft.attachments.length)) return;
+    submittingRef.current = true;
     const mentioned = mentionedAgentIds(text, agents);
     const targetAgentIds = mentioned.length ? mentioned : [mode === "discussion" ? "manager" : agentId];
-    if (await onSend(text, targetAgentIds)) {
-      setText("");
-      setMention(null);
-    }
+    try {
+      const uploaded = await draft.uploadAll();
+      if (await onSend(text, targetAgentIds, uploaded.map((attachment) => attachment.id))) {
+        setText("");
+        setMention(null);
+        draft.clear();
+      }
+    } catch {}
+    finally { submittingRef.current = false; }
   };
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`;
+  }, [text]);
   return (
     <div className={styles.composerArea}>
       {error ? <div className={styles.errorText}>{error}</div> : null}
       {mention ? (
         <MentionMenu options={mentionOptions} activeIndex={activeMention} onActiveChange={setActiveMention} onSelect={insertMention} />
       ) : null}
-      <div className={styles.composer}>
+      <div
+        className={styles.composer}
+        onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }}
+        onDrop={(event) => {
+          if (!event.dataTransfer.files.length) return;
+          event.preventDefault();
+          draft.addFiles(event.dataTransfer.files);
+        }}
+      >
         <textarea
           ref={textareaRef}
           value={text}
@@ -86,6 +110,11 @@ export function GroupComposer({ mode, agentId, agents, members, disabled, error,
           onChange={(event) => {
             setText(event.target.value);
             updateMention(event.target.value, event.target.selectionStart);
+          }}
+          onPaste={(event) => {
+            if (!event.clipboardData.files.length) return;
+            event.preventDefault();
+            draft.addFiles(event.clipboardData.files);
           }}
           onClick={(event) => updateMention(event.currentTarget.value, event.currentTarget.selectionStart)}
           onKeyDown={(event) => {
@@ -115,7 +144,9 @@ export function GroupComposer({ mode, agentId, agents, members, disabled, error,
           }}
           disabled={disabled}
         />
+        <AttachmentPreviews attachments={draft.attachments} error={draft.error} uploading={draft.uploading} onRemove={draft.removeFile} />
         <div className={styles.composerFooter}>
+          <AttachmentButton disabled={disabled || draft.uploading} onFiles={draft.addFiles} />
           <div className={styles.modeSwitch}>
             <button className={mode === "discussion" ? styles.activeMode : ""} type="button" onClick={() => onModeChange("discussion")}><MessagesSquare />商讨</button>
             <button className={mode === "development" ? styles.activeMode : ""} type="button" onClick={() => onModeChange("development")}><Bot />开发</button>
@@ -126,7 +157,7 @@ export function GroupComposer({ mode, agentId, agents, members, disabled, error,
             </select>
           ) : <span className={styles.modeHint}>项目经理 Agent</span>}
           <span className={styles.composerSpacer} />
-          <button className={styles.sendButton} type="button" title="发送" aria-label="发送" disabled={disabled || !text.trim()} onClick={() => void submit()}><ArrowUp /></button>
+          <button className={styles.sendButton} type="button" title="发送" aria-label="发送" disabled={disabled || draft.uploading || (!text.trim() && !draft.attachments.length)} onClick={() => void submit()}><ArrowUp /></button>
         </div>
       </div>
     </div>

@@ -9,12 +9,23 @@ export function MemberDialog({ initialName, open, onSubmit }: {
 }) {
   const [name, setName] = useState(initialName);
   const [saving, setSaving] = useState(false);
-  useEffect(() => setName(initialName), [initialName, open]);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    setName(initialName);
+    setError("");
+  }, [initialName, open]);
   if (!open) return null;
   const submit = async () => {
     if (!name.trim() || saving) return;
     setSaving(true);
-    try { await onSubmit(name); } finally { setSaving(false); }
+    setError("");
+    try {
+      await onSubmit(name);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "进入项目群失败，请稍后重试");
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <div className={styles.dialogBackdrop} role="presentation">
@@ -22,7 +33,23 @@ export function MemberDialog({ initialName, open, onSubmit }: {
         <span className={styles.dialogIcon}><Users /></span>
         <h2 id="member-title">进入项目群</h2>
         <p>设置您在这个浏览器中的成员名称。</p>
-        <input value={name} maxLength={24} autoFocus placeholder="成员名称" onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void submit(); }} />
+        <input
+          value={name}
+          maxLength={24}
+          autoFocus
+          placeholder="成员名称"
+          onChange={(event) => {
+            setName(event.target.value);
+            if (error) setError("");
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              void submit();
+            }
+          }}
+        />
+        {error ? <div className={styles.dialogError} role="alert">{error}</div> : null}
         <button type="button" disabled={!name.trim() || saving} onClick={() => void submit()}>{saving ? "正在进入" : "进入项目群"}</button>
       </div>
     </div>

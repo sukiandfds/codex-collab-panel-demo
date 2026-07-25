@@ -86,3 +86,95 @@
 3. 同时 `@研究 Agent` 和 `@审查 Agent`，确认两位 Agent 按顺序给出真实意见。
 
 体验确认后，下一轮优先处理消息下方的接收、排队和失败反馈，再考虑打断、补充指令、图片发送和持久化任务队列。不要先扩展 Agent 数量、组织层级或完整企业权限。
+
+## 7. 晚间补充：单人页与群聊体验问题修复
+
+### 7.1 修复目标
+
+本轮根据桌面端和 `390 x 844` 手机尺寸的真实页面点检，集中处理已经能够在现有架构内解决的体验问题，不重做整体 UI，也不引入账号系统或新的服务端框架。
+
+用户侧目标是：
+
+- 手机打开单人页后直接进入真实对话，不再看到无效的桌面窗口控制栏；
+- 能从单人页直接进入项目群，不需要记忆 `group.html`；
+- 手机群聊能判断连接是否正常，并看到是否有 Agent 正在工作；
+- 用户查看历史消息时，如果有新内容到达，可以明确返回最新位置；
+- 群聊历史具备日期层级，`@` 菜单不再占满手机可视区域；
+- 大文件发送时能看到上传状态；
+- 对话中的本地 Markdown 图片可以通过现有安全媒体接口正常显示。
+
+### 7.2 已完成内容
+
+#### 单人 Codex 页面
+
+- 在手机断点下隐藏桌面窗口栏，并同步收回原本占用的顶部网格空间。
+- 桌面窗口栏中的无功能按钮改为纯视觉元素，不再向浏览器和辅助技术伪装成可执行按钮。
+- 移除侧栏中已经过时的“当前页面为只读模式”说明，改为“支持发送指令和附件”。
+- 将右上角无功能的会话信息按钮替换为真实项目群入口，并保留当前 URL token。
+- 增加独立的 `JumpToLatest` 共享组件。用户离开底部后收到新消息、流式回复或执行状态时，页面显示“新消息”按钮。
+
+#### 群聊页面
+
+- 手机端保留实时连接圆点，不再完全隐藏连接状态。
+- 群聊标题下方在 Agent 工作时显示 Agent 名称和当前阶段；多个 Agent 同时工作时显示数量摘要。
+- 群聊也接入共享的“新消息”按钮。
+- 消息跨日期时显示日期分隔线；当天显示“今天”，历史日期显示月、日和星期。
+- 手机 `@` 菜单最大高度改为 `min(232px, 40dvh)`，会随软键盘压缩后的动态视口继续收缩。
+- 保持原有 Agent、成员、键盘上下选择和附件功能不变。
+
+#### 附件与内容渲染
+
+- 单人和群聊附件发送期间显示“正在上传附件…”，同时保留失败提示和附件重试缓存。
+- Markdown 中的本地图片路径由服务端登记到已有 `media-service`，转换为 `/api/media/<id>` 地址。
+- Markdown 图片请求由前端统一附加访问 token，不开放任意本地文件查询接口。
+- 群聊页面增加空 favicon 声明，消除浏览器自动请求 `/favicon.ico` 产生的无意义 404。
+
+### 7.3 组件与边界
+
+新增共享 UI 组件：
+
+- `web-ui/src/components/JumpToLatest/JumpToLatest.tsx`
+- `web-ui/src/components/JumpToLatest/JumpToLatest.module.css`
+
+主要修改范围：
+
+- `web-ui/src/components/AppShell/`
+- `web-ui/src/components/Topbar/`
+- `web-ui/src/components/WindowBar/`
+- `web-ui/src/features/attachments/`
+- `web-ui/src/features/conversations/components/`
+- `web-ui/src/features/conversations/rendering/ContentRenderer.tsx`
+- `web-ui/src/features/group-chat/`
+- `windows/server/content-blocks.mjs`
+
+没有修改：
+
+- Codex JSONL；
+- 群聊消息历史；
+- Agent Thread 结构；
+- 账号、权限和认证体系；
+- Codex Desktop 客户端；
+- 项目依赖和包管理配置。
+
+### 7.4 验证结果
+
+- `pnpm build:ui` 通过。
+- 现有定向测试 `13/13` 通过。
+- `node --check windows/server/content-blocks.mjs` 通过。
+- `git diff --check` 通过，仅有既有 LF/CRLF 提示。
+- 单人页和群聊页均返回 HTTP 200。
+- 桌面尺寸 `1440 x 900`、手机尺寸 `390 x 844` 无横向溢出。
+- 手机单人页不再显示桌面窗口栏，项目群链接指向 `/group.html?token=demo123`。
+- 手机群聊能看到实时连接圆点、日期分隔和高度 222px 的 `@` 菜单。
+- 两张本地 Markdown 测试截图均通过 `/api/media/...` 加载，`naturalWidth` 为 390，控制台无错误。
+- 服务最终运行在 `9360`，PID 为 `32700`。
+
+本轮没有发送真实 Codex 任务或群聊消息，没有提交或推送 Git。
+
+### 7.5 仍未解决的架构问题
+
+1. 手机和电脑浏览器仍使用各自的 `localStorage` 成员身份，没有账号级跨设备身份。
+2. 网页调用 app-server 写入 Thread 后，Codex Desktop 当前打开的页面仍不会热刷新外部追加内容。
+3. 单人页面和群聊页面仍使用不同的运行状态模型；本轮只统一了部分共享 UI，没有虚构统一的数据层。
+4. “新消息”提示的真实 SSE 到达路径没有通过发送测试消息做端到端验证，本轮只完成代码、构建和渲染检查。
+5. 附件真实上传过程目前只有阶段提示，没有字节级百分比。
