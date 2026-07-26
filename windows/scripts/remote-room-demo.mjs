@@ -8,6 +8,7 @@ import { createConversationService } from "../server/conversation-service.mjs";
 import { createMediaService } from "../server/media-service.mjs";
 import { createRealtimeHub } from "../server/realtime-hub.mjs";
 import { createExecutionTracker } from "../server/execution-tracker.mjs";
+import { createContextManagementService } from "../server/context-management-service.mjs";
 import { createRequestHandler } from "../server/request-handler.mjs";
 import { createStaticFileServer } from "../server/static-files.mjs";
 import { createGroupRoomStore } from "../server/group-room-store.mjs";
@@ -32,6 +33,7 @@ const media = createMediaService({ uploadRoot: path.join(projectRoot, "runtime",
 await media.restoreUploads();
 const realtime = createRealtimeHub();
 const execution = createExecutionTracker({ broadcast: realtime.broadcast });
+let contextManagement;
 const jsonlConversations = createJsonlConversationStore({
   sessionRoot,
   projectRoot,
@@ -41,11 +43,21 @@ const jsonlConversations = createJsonlConversationStore({
 const appServerConversations = createAppServerConversationStore({
   projectRoot,
   registerMedia: media.register,
-  onProtocolMessage: execution.handleProtocolMessage,
+  onProtocolMessage: (message) => {
+    execution.handleProtocolMessage(message);
+    contextManagement?.handleProtocolMessage(message);
+  },
   onSubmitted: execution.markSubmitted,
   onFailed: execution.markFailed,
 });
 const conversations = createConversationService({ primary: appServerConversations, fallback: jsonlConversations });
+contextManagement = await createContextManagementService({
+  stateFile: path.join(projectRoot, "runtime", "context-settings.json"),
+  broadcast: realtime.broadcast,
+  getExecutionStatus: execution.getStatus,
+  getRuntimeContext: conversations.getRuntimeContext,
+  compactContext: conversations.compactContext,
+});
 const groupRoom = await createGroupRoomStore({
   stateFile: path.join(projectRoot, "runtime", "group-room.json"),
   project,
@@ -56,13 +68,14 @@ const multiAgent = createMultiAgentService({ projectRoot, room: groupRoom, broad
 const serveStatic = createStaticFileServer(webRoot);
 const requestHandler = createRequestHandler({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
-  groupRoom, multiAgent, serveStatic,
+  contextManagement, groupRoom, multiAgent, serveStatic,
 });
 const server = http.createServer(requestHandler);
 
 const close = () => {
   realtime.close();
   conversations.close();
+  void contextManagement.close();
   multiAgent.close();
   void groupRoom.close();
   server.close();

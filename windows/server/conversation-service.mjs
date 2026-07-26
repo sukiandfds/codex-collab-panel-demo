@@ -14,6 +14,8 @@ export const createConversationService = ({ primary, fallback }) => {
     sendMessage: (...args) => primary.sendMessage(...args),
     steerMessage: (...args) => primary.steerMessage(...args),
     interrupt: (...args) => primary.interrupt(...args),
+    getRuntimeContext: (...args) => primary.getRuntimeContext(...args),
+    compactContext: (...args) => primary.compactContext(...args),
     close: () => {
       primary.close();
       fallback.close();

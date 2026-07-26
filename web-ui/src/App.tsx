@@ -55,8 +55,11 @@ export function App() {
           sending={conversations.sending}
           status={conversations.executionStatus}
           commentary={conversations.commentaryText}
+          contextStatus={conversations.contextStatus}
           onSend={conversations.sendMessage}
           onInterrupt={conversations.interrupt}
+          onCompactContext={conversations.compactContext}
+          onAutoCompactThresholdChange={conversations.setAutoCompactThreshold}
         />
       }
     />

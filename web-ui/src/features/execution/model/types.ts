@@ -56,4 +56,5 @@ export interface SessionsChangedEvent {
   threadId?: string;
 }
 
-export type ProjectEvent = ExecutionStatus | AssistantDeltaEvent | AssistantCommentaryEvent | SessionsChangedEvent | { type: "connected" };
+export type ProjectEvent = ExecutionStatus | AssistantDeltaEvent | AssistantCommentaryEvent | SessionsChangedEvent | ContextStatus | { type: "connected" };
+import type { ContextStatus } from "../../context-management/model/types";

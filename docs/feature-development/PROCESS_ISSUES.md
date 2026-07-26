@@ -1,7 +1,7 @@
 ---
 document_type: reusable_process_issues
 schema_version: 1
-last_updated: 2026-07-25 23:58 +08:00
+last_updated: 2026-07-26 01:40 +08:00
 audience: ai_assistants_and_maintainers
 ---
 
@@ -25,6 +25,7 @@ audience: ai_assistants_and_maintainers
 | `PROC-010` | `active` | 工具链 | 没先锁定 `pnpm`、可用浏览器和 Playwright 来源 | 先读项目脚本和本机现有运行时，不自动安装依赖 | `AI_ASSISTANT_READ_FIRST.md#1212-构建工具链未先锁定`、`DEVELOPMENT_PROCESS_BLOCKERS_2026-07-25.md#blocker-007` |
 | `PROC-011` | `active` | 架构/状态 | 把同一 Thread、同一 SSE 或相似 UI 误当成统一运行实例 | 先确认事件生产者、连接实例、状态所有权和恢复机制 | `DEVELOPMENT_PROCESS_BLOCKERS_2026-07-25.md#blocker-009`、`#blocker-010` |
 | `PROC-012` | `active` | PowerShell/编码 | PowerShell 行为、Unicode、退出码或 GUI 进程状态判断错误 | 使用 Windows PowerShell 5 兼容语法；以产物和接口验证，不只看退出码 | `AI_ASSISTANT_READ_FIRST.md#1210-PowerShell-兼容性和编码问题` |
+| `PROC-013` | `active` | 沟通/记忆 | 用户反复明确的偏好没有及时写入操作手册，导致后续助手再次违反并增加用户阅读和沟通负担 | 严肃且重复出现的偏好立即写入 `AI_ASSISTANT_READ_FIRST.md` 或本台账；方向讨论确认后再归档为产品决定 | 本次 2026-07-26 反馈 |
 
 ## 详细记录
 
@@ -171,6 +172,18 @@ audience: ai_assistants_and_maintainers
 - 防再犯触发器：出现中文乱码、Unexpected token、参数被截断或“服务可访问但命令失败”时，先检查 shell 版本、编码和分层退出状态。
 - 再次发生：2026-07-25，使用 `rg ... docs/feature-development/features/*.md` 时 PowerShell 没有展开通配符，`rg` 把它当成非法路径。Windows 下应传目录并使用 `-g '*.md'` 过滤。
 - 证据：`AI_ASSISTANT_READ_FIRST.md#1210-powershell-兼容性和编码问题`、`DEVELOPMENT_PROCESS_BLOCKERS_2026-07-25.md#2-blocker-001端口检查使用了错误的-windows-指令`。
+
+### PROC-013：明确用户偏好未及时写入操作手册
+
+- 发现时间：2026-07-26
+- 分类：普适
+- 状态：active
+- 现象：用户多次要求降低阅读负担、记住长期偏好，但助手仍然输出过长内容，并在后续工作中再次让用户重复说明。
+- 根因：把用户偏好当作当前对话上下文，没有在第一次明确反馈后写入可被后续 AI 读取的长期记录。
+- 错误路径：先解释或继续规划，等产品方向确认后才考虑是否记录沟通约束。
+- 正确路径：明确且严肃的偏好一旦出现，立即记录到 `AI_ASSISTANT_READ_FIRST.md` 或本台账；产品方向、架构方案和远期设想仍保持讨论态，确认后再写入定案文件。
+- 防再犯触发器：用户使用“很多次”“一直”“必须”“严肃”“不要再”等表达时，先检查并更新长期记录，再继续回复或开发。
+- 影响：增加用户重复表达、阅读和沟通成本，降低助手行为的一致性。
 
 ## 维护规则
 

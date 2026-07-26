@@ -85,14 +85,20 @@ export const createAppServerConversationStore = ({ projectRoot, registerMedia, o
     };
   };
 
-  const sendMessage = async (threadId, text, attachments = []) => {
-    const thread = threadCache.get(threadId) || (await client.request("thread/read", { threadId, includeTurns: false })).thread;
+  const resumeThread = async (threadId) => {
+    const thread = threadCache.get(threadId)
+      || (await client.request("thread/read", { threadId, includeTurns: false })).thread;
     if (!thread?.cwd || path.resolve(thread.cwd).toLowerCase() !== path.resolve(projectRoot).toLowerCase()) {
       throw new Error("This conversation does not belong to the current project.");
     }
+    threadCache.set(thread.id, thread);
+    return client.request("thread/resume", { threadId, persistExtendedHistory: true });
+  };
+
+  const sendMessage = async (threadId, text, attachments = []) => {
     onSubmitted?.(threadId);
     try {
-      await client.request("thread/resume", { threadId, persistExtendedHistory: true });
+      await resumeThread(threadId);
       return await client.request("turn/start", {
         threadId,
         input: inputFromAttachments(text, attachments),
@@ -111,10 +117,23 @@ export const createAppServerConversationStore = ({ projectRoot, registerMedia, o
 
   const interrupt = async (threadId, turnId) => client.request("turn/interrupt", { threadId, turnId });
 
+  const getRuntimeContext = async (threadId) => {
+    const result = await resumeThread(threadId);
+    return { model: result.model || "", modelProvider: result.modelProvider || "" };
+  };
+
+  const compactContext = async (threadId) => {
+    await resumeThread(threadId);
+    return client.request("thread/compact/start", { threadId });
+  };
+
   const close = () => {
     unsubscribe();
     client.close();
   };
 
-  return { listSessions, findSession, sendMessage, steerMessage, interrupt, close };
+  return {
+    listSessions, findSession, sendMessage, steerMessage, interrupt,
+    getRuntimeContext, compactContext, close,
+  };
 };

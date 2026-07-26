@@ -6,6 +6,20 @@ const UI_DIRECTIVES = [
   /<oai-mem-citation>[\s\S]*?<\/oai-mem-citation>/giu,
 ];
 
+const stripCodexDirectives = (value) => {
+  let fence = "";
+  return String(value || "").split("\n").filter((line) => {
+    const fenceMatch = /^\s*(`{3,}|~{3,})/u.exec(line);
+    if (fenceMatch) {
+      const marker = fenceMatch[1][0];
+      fence = fence === marker ? "" : fence || marker;
+      return true;
+    }
+    if (fence) return true;
+    return !/^\s*::[a-z][a-z0-9-]*\{.*\}\s*$/iu.test(line);
+  }).join("\n");
+};
+
 const optionBlocksFrom = (value) => {
   const text = String(value || "");
   const blocks = [];
@@ -21,7 +35,7 @@ const optionBlocksFrom = (value) => {
 const cleanText = (value) => {
   let text = String(value || "").replace(/\r\n/g, "\n");
   for (const pattern of UI_DIRECTIVES) text = text.replace(pattern, "");
-  return text.trim();
+  return stripCodexDirectives(text).trim();
 };
 
 const blockId = (type, value) => createHash("sha1").update(`${type}:${value}`).digest("hex").slice(0, 16);

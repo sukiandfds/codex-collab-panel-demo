@@ -57,7 +57,7 @@ const paginationFrom = (url) => {
 
 export const createRequestHandler = ({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
-  groupRoom, multiAgent, serveStatic,
+  contextManagement, groupRoom, multiAgent, serveStatic,
 }) => {
   const readObserverStatus = async (threadId = "") => {
     try {
@@ -159,6 +159,27 @@ export const createRequestHandler = ({
         if (!threadId || !status.active || !status.turnId) return sendJson(response, { error: "当前没有可停止的任务" }, 409);
         await conversations.interrupt(threadId, status.turnId);
         sendJson(response, { threadId, turnId: status.turnId, status: "interrupting" }, 202);
+        return;
+      }
+      if (url.pathname === "/api/session/context" && request.method === "GET") {
+        const threadId = url.searchParams.get("threadId") || "";
+        if (!threadId) return sendJson(response, { error: "threadId is required" }, 400);
+        sendJson(response, await contextManagement.load(threadId));
+        return;
+      }
+      if (url.pathname === "/api/session/context/settings" && request.method === "POST") {
+        const body = await readJson(request);
+        const threadId = String(body.threadId || "").trim();
+        if (!threadId) return sendJson(response, { error: "threadId is required" }, 400);
+        const threshold = body.autoCompactThreshold === null ? null : Number(body.autoCompactThreshold);
+        sendJson(response, await contextManagement.setThreshold(threadId, threshold));
+        return;
+      }
+      if (url.pathname === "/api/session/context/compact" && request.method === "POST") {
+        const body = await readJson(request);
+        const threadId = String(body.threadId || "").trim();
+        if (!threadId) return sendJson(response, { error: "threadId is required" }, 400);
+        sendJson(response, await contextManagement.requestCompaction(threadId), 202);
         return;
       }
       if (url.pathname === "/api/execution-status") {

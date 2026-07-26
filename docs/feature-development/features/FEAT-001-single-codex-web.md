@@ -2,8 +2,8 @@
 feature_id: FEAT-001
 title: 单人 Codex Web 对话与控制
 status: implemented_pending_review
-current_version: v0.4.0
-last_updated: 2026-07-25 22:49 +08:00
+current_version: v0.5.0
+last_updated: 2026-07-27 00:18 +08:00
 owners: [conversations, execution, web_ui]
 key_paths:
   - web-ui/src/features/conversations
@@ -11,6 +11,8 @@ key_paths:
   - windows/server/conversation-service.mjs
   - windows/server/app-server-conversation-store.mjs
   - windows/server/execution-tracker.mjs
+  - windows/server/context-management-service.mjs
+  - web-ui/src/features/context-management
 ---
 
 # FEAT-001：单人 Codex Web 对话与控制
@@ -21,6 +23,7 @@ key_paths:
 - Web 发起的任务使用 Codex app-server；任务运行中可以追加引导并停止。
 - 助手增量、中文状态和执行活动通过 SSE 到达页面，不使用固定频率轮询刷新整个会话目录。
 - 手机页面使用窄屏布局；电脑和 iPad 保留侧栏与主对话布局。
+- 输入框底部显示真实模型和实时上下文占用；支持手动压缩及按对话设置自动压缩阈值。
 - 当前状态为“已实现，等待用户持续体验确认”，不是完整替代 Codex Desktop。
 
 ## 用户可见结果
@@ -73,6 +76,8 @@ Codex app-server protocol
 | `FEAT-001-I03` | 特例 | active | Web 消息不在 Desktop 当前页面实时出现 | 独立客户端连接与 UI 状态不共享；转交 `FEAT-005`，不能在 React 层伪修复 |
 | `FEAT-001-I04` | 特例 | resolved | 运行中不能输入、状态不一致、计时跨 Turn | 前端禁用输入且 tracker 没按 Turn 重置；已接入 steer、服务端状态和按 Turn 时间 |
 | `FEAT-001-I05` | 普适 | active | 接入真实内容时曾误改 UI 和组件边界 | 见 `PROC-001`，后续内容/功能修改不得顺带重做 UI |
+| `FEAT-001-I06` | 特例 | resolved | 输入框聚焦时出现浏览器蓝色外框 | Composer 自身缺少完整的原生 focus/appearance 清理；已限制在输入组件内修复 |
+| `FEAT-001-I07` | 特例 | resolved | Web 缺少 Desktop 的上下文占用与压缩能力 | 已接入 app-server 的真实 token usage、当前模型、`thread/compact/start` 和完成事件；不按消息数量估算 |
 
 ## 版本时间线
 
@@ -112,6 +117,14 @@ Codex app-server protocol
 - 验证：`pnpm build:ui`、定向测试和真实服务接口通过。
 - 用户可见变化：手机可继续控制任务并看到更明确的实时状态与助手回复。
 - Git：`5a8ad71`。
+
+### 2026-07-27 00:18 +08:00 | v0.5.0 | implemented_pending_review
+
+- 计划：补齐 Desktop 风格的模型和上下文管理，并修复输入框蓝色外框。
+- 实际：发送按钮左侧显示真实模型、实时上下文占用、压缩按钮和自动阈值；运行中触发时排队到当前 Turn 结束。
+- 边界：压缩使用 Codex app-server 原生能力，不修改 JSONL；当前模型只显示，不允许 Web 切换。
+- 验证：上下文服务定向测试 2 条通过，原执行测试 3 条通过，`pnpm build:ui` 通过。
+- 用户可见变化：无需猜测剩余上下文，达到阈值可自动压缩，也能随时点击手动压缩。
 
 ## 下一步
 

@@ -1,9 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { conversationApi } from "../data/conversationApi";
 import { hasAccessToken } from "../data/http";
-import type { ProjectInfo, SessionDetail, SessionSummary } from "../model/types";
+import type { ContentBlock, MediaFile, ProjectInfo, SessionDetail, SessionMessage, SessionSummary } from "../model/types";
 import { useConversationEvents } from "../realtime/useConversationEvents";
 import { useCodexExecution } from "../../execution/hooks/useCodexExecution";
+import { useContextManagement } from "../../context-management/hooks/useContextManagement";
+import type { ProjectEvent } from "../../execution/model/types";
+
+let nextOptimisticMessageId = 1;
+
+const optimisticBlocks = (messageId: string, text: string, attachments: MediaFile[]): ContentBlock[] => {
+  const blocks: ContentBlock[] = text
+    ? [{ id: `${messageId}-text`, type: "markdown", text }]
+    : [];
+  for (const file of attachments) {
+    const common = { id: `${messageId}-${file.id}`, source: file.url, file };
+    if (file.mimeType.startsWith("image/")) blocks.push({ ...common, type: "image", alt: file.name });
+    else if (file.mimeType.startsWith("audio/")) blocks.push({ ...common, type: "audio" });
+    else if (file.mimeType.startsWith("video/")) blocks.push({ ...common, type: "video" });
+    else blocks.push({ ...common, type: "file", name: file.name });
+  }
+  return blocks;
+};
 
 export function useProjectConversations() {
   const [project, setProject] = useState<ProjectInfo | null>(null);
@@ -98,6 +116,37 @@ export function useProjectConversations() {
     if (selectedIdRef.current) void loadSession(selectedIdRef.current, { quiet: true });
   }, [loadSession]);
   const execution = useCodexExecution(selectedId, onMessageAccepted);
+  const contextManagement = useContextManagement(selectedId);
+  const sendMessage = useCallback(async (text: string, attachments: MediaFile[] = []) => {
+    const threadId = selectedIdRef.current;
+    const messageText = text.trim();
+    if (!threadId || (!messageText && !attachments.length)) return false;
+
+    const messageId = `optimistic-${Date.now().toString(36)}-${nextOptimisticMessageId++}`;
+    const optimisticMessage: SessionMessage = {
+      id: messageId,
+      role: "user",
+      text: messageText,
+      blocks: optimisticBlocks(messageId, messageText, attachments),
+    };
+    setSession((current) => {
+      if (!current || current.threadId !== threadId) return current;
+      const next = { ...current, messages: [...current.messages, optimisticMessage] };
+      sessionCache.current.set(threadId, next);
+      return next;
+    });
+
+    const sent = await execution.sendMessage(messageText, attachments.map((attachment) => attachment.id));
+    if (!sent) {
+      setSession((current) => {
+        if (!current || current.threadId !== threadId) return current;
+        const next = { ...current, messages: current.messages.filter((message) => message.id !== messageId) };
+        sessionCache.current.set(threadId, next);
+        return next;
+      });
+    }
+    return sent;
+  }, [execution.sendMessage]);
   const onSessionsChanged = useCallback((threadId?: string) => {
     if (threadId) sessionCache.current.delete(threadId);
     const selected = selectedIdRef.current;
@@ -108,7 +157,11 @@ export function useProjectConversations() {
     }
     void refreshSessions(false, threadId, false);
   }, [execution.clearStreaming, loadSession, refreshSessions]);
-  const connected = useConversationEvents(onSessionsChanged, execution.handleEvent);
+  const handleEvent = useCallback((event: ProjectEvent) => {
+    execution.handleEvent(event);
+    if (event.type === "context_status") contextManagement.handleEvent(event);
+  }, [contextManagement.handleEvent, execution.handleEvent]);
+  const connected = useConversationEvents(onSessionsChanged, handleEvent);
 
   useEffect(() => {
     if (connected && selectedId) void execution.refreshStatus();
@@ -139,9 +192,12 @@ export function useProjectConversations() {
     executionStatus: execution.status,
     streamingText: execution.streamingText,
     commentaryText: execution.commentaryText,
+    contextStatus: contextManagement.status,
     sending: execution.sending,
-    sendMessage: execution.sendMessage,
+    sendMessage,
     interrupt: execution.interrupt,
+    compactContext: contextManagement.compact,
+    setAutoCompactThreshold: contextManagement.setThreshold,
     refresh: () => refreshSessions(),
   };
 }

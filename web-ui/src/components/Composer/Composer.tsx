@@ -4,6 +4,9 @@ import { AttachmentButton, AttachmentPreviews } from "../../features/attachments
 import { useAttachmentDraft } from "../../features/attachments/hooks/useAttachmentDraft";
 import { ExecutionStatus } from "../../features/execution/components/ExecutionStatus";
 import type { ExecutionStatus as ExecutionStatusValue } from "../../features/execution/model/types";
+import type { MediaFile } from "../../features/conversations/model/types";
+import { ContextControl } from "../../features/context-management/components/ContextControl";
+import type { ContextStatus } from "../../features/context-management/model/types";
 import styles from "./Composer.module.css";
 
 interface ComposerProps {
@@ -12,11 +15,17 @@ interface ComposerProps {
   sending: boolean;
   status: ExecutionStatusValue;
   commentary: string;
-  onSend: (text: string, attachmentIds?: string[]) => Promise<boolean>;
+  contextStatus: ContextStatus;
+  onSend: (text: string, attachments?: MediaFile[]) => Promise<boolean>;
   onInterrupt: () => Promise<boolean>;
+  onCompactContext: () => Promise<boolean>;
+  onAutoCompactThresholdChange: (threshold: number | null) => Promise<boolean>;
 }
 
-export function Composer({ connected, selected, sending, status, commentary, onSend, onInterrupt }: ComposerProps) {
+export function Composer({
+  connected, selected, sending, status, commentary, contextStatus,
+  onSend, onInterrupt, onCompactContext, onAutoCompactThresholdChange,
+}: ComposerProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submittingRef = useRef(false);
@@ -27,13 +36,18 @@ export function Composer({ connected, selected, sending, status, commentary, onS
   const submit = async () => {
     if (sendDisabled || submittingRef.current) return;
     submittingRef.current = true;
+    const submittedText = text;
     try {
       const uploaded = await draft.uploadAll();
-      if (await onSend(text, uploaded.map((attachment) => attachment.id))) {
-        setText("");
+      setText("");
+      if (await onSend(submittedText, uploaded)) {
         draft.clear();
+      } else {
+        setText((current) => current || submittedText);
       }
-    } catch {}
+    } catch {
+      setText((current) => current || submittedText);
+    }
     finally { submittingRef.current = false; }
   };
 
@@ -82,6 +96,12 @@ export function Composer({ connected, selected, sending, status, commentary, onS
           <AttachmentButton disabled={inputDisabled} onFiles={draft.addFiles} />
           <ExecutionStatus connected={connected} status={status} commentary={commentary} />
           <span className={styles.spacer} />
+          <ContextControl
+            status={contextStatus}
+            disabled={!connected || !selected}
+            onCompact={onCompactContext}
+            onThresholdChange={onAutoCompactThresholdChange}
+          />
           <button
             className={styles.sendButton}
             type="button"
