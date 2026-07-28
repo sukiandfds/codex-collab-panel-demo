@@ -1,9 +1,9 @@
 ---
 feature_id: FEAT-005
-title: Desktop/Web 连续性与统一控制权
+title: Desktop/Web 连续性与同任务提示
 status: discovery
-current_version: v0.3.0
-last_updated: 2026-07-27 20:36 +08:00
+current_version: v0.4.0
+last_updated: 2026-07-28 15:47 +08:00
 owners: [connector, task_state, cross_device_continuity]
 key_paths:
   - windows/server/app-server-client.mjs
@@ -13,7 +13,7 @@ key_paths:
   - DEVELOPMENT_BUG_LOG_2026-07-24_DESKTOP_WEB_SYNC.md
 ---
 
-# FEAT-005：Desktop/Web 连续性与统一控制权
+# FEAT-005：Desktop/Web 连续性与同任务提示
 
 ## 当前快照
 
@@ -22,15 +22,16 @@ key_paths:
 - “引用同一个 Thread”只表示持久化任务可能相同，不表示 Desktop 与 Web 共享同一个运行实例、事件订阅或实时 UI 状态。
 - Desktop 完全关闭后重新打开任务，能否在当前 Codex 版本中稳定恢复全部 Web 新消息，仍待真实验证。
 - 当前没有统一 Connector、控制权租约、跨端事件序号和断线恢复协议。
+- 用户的最低要求不是立刻实现双向同步，而是：Web 打开任务时，如果 Codex Desktop 正在同一任务内工作，Web 应明确提示。暂不要求 Desktop 反向提示 Web 正在执行。
 - 本机 Codex `0.146.0-alpha.3.1` 已包含 app-server daemon、proxy 和 remote-control 协议入口，但 daemon 生命周期实测仅支持 Unix，当前 Windows 不能直接用它让 Desktop 与 Web 共享同一个受管理实例。
 
 ## 用户可见结果
 
-当前用户可以在手机/Web 中独立继续真实 Codex 工作，但回到已经打开的 Desktop 页面时，不应期待它自动出现 Web 的最新消息。问题解决前，同一 Thread 同一时间只使用一个发送入口；切换设备前等待当前 Turn 完成并核对最新上下文。
+当前用户在原电脑前正常使用 Codex Desktop，离开电脑后使用手机/Web 补充。回到已经打开的 Desktop 页面时，不应期待它自动出现 Web 的最新消息；Web 也暂时不会提示 Desktop 是否正在同一 Thread 工作，因此存在重复发起或互相干扰风险。
 
 ## 目标与边界
 
-目标：让用户在 Desktop、电脑浏览器和手机之间切换时，可以承接同一任务的最新指令、执行状态和必要上下文，同时避免两个客户端并发控制造成消息顺序或审批状态冲突。
+目标：Desktop 保持正常本机使用，Web 作为远程补充。第一阶段只要求 Web 能识别或可靠推断“Desktop 正在同一任务内执行”，并在用户发送前提示，避免两个入口误操作同一任务。
 
 当前 discovery 阶段不承诺：
 
@@ -65,7 +66,7 @@ Web SSE 只分发 Web 所连接 app-server 的 Notification；已经打开的 De
 
 ### 阶段 B：轻量控制权与交接
 
-在统一连接前，为每个 Thread 约束单一发送入口；记录当前控制端、Turn 状态和简短交接摘要。交接只包含目标、最新决定、执行结果、待确认事项和下一步。
+先验证现有 app-server、任务文件或其他可用事件能否区分 Desktop 正在执行的 Thread。Web 打开该 Thread 时显示明确提示，并在发送前再次确认；不要求本阶段修改 Desktop UI，也不先建设完整控制权系统。
 
 ### 阶段 C：统一 Connector
 
@@ -86,6 +87,7 @@ Web SSE 只分发 Web 所连接 app-server 的 Notification；已经打开的 De
 | `FEAT-005-I03` | 普适 | active | 曾把相同 Thread、相似页面或同一 SSE 概念误当成统一运行状态 | 关联 `PROC-011`；先确认事件生产者、连接实例、状态所有权和恢复机制 |
 | `FEAT-005-I04` | 特例 | active | 新版 Codex daemon 暂时不能直接解决 Windows 双端同步 | 本机命令返回 daemon 生命周期仅支持 Unix；保留协议适配层，不能把存在命令误写成 Windows 已可用 |
 | `FEAT-005-I05` | 特例 | resolved | Desktop 冷启动后能否承接 Web 已持久化的对话内容此前没有实测结论 | 用户已实测：完全关闭并重新打开 Codex Desktop 后，可以看到 Web 端发送的对话；这只证明冷启动读取持久化 Thread，不代表已打开页面会热刷新 |
+| `FEAT-005-I06` | 特例 | planned | Web 无法提示 Codex Desktop 是否正在同一 Thread 内工作，用户可能从 Web 重复发起或干扰当前任务 | 先确认可用检测信号；能可靠识别时在 Web 显示“桌面端正在此任务工作”。暂不要求 Desktop 反向显示 Web 状态 |
 
 ## 禁止的伪修复
 
@@ -122,9 +124,15 @@ Web SSE 只分发 Web 所连接 app-server 的 Notification；已经打开的 De
 - 结论：冷启动承接已验证可用；已打开的 Desktop 页面仍不会因 Web 外部事件自动热刷新，`FEAT-005-I01` 保持 active。
 - 影响：短期可以用“离开电脑时使用 Web，回到电脑后重开对应任务”的方式承接，不把它描述成实时双端同步。
 
+### 2026-07-28 15:47 +08:00 | v0.4.0 | discovery
+
+- 用户确认 Desktop 是本机正常入口，Web 是远程补充，不存在“只使用 Web”的要求。
+- 第一阶段收缩为 Web 单向提示：如果 Desktop 正在同一任务工作，Web 必须提示；暂不要求 Desktop 反向提示 Web。
+- 新增 `FEAT-005-I06`。本轮只更新需求，没有修改代码。
+
 ## 下一步
 
 - 冷启动恢复已得到一次用户实测结论；后续再验证多轮和异常中断场景，不扩大本轮开发。
-- 需要继续做双端连续性时，先提供轻量“接管/释放/重新打开任务”交接流程。
+- 第一优先验证能否可靠识别 Desktop 正在执行的 Thread，并只在 Web 增加同任务提示。
 - 若后续多轮或异常中断暴露冷启动恢复不可靠，电脑与手机先统一使用 Web/PWA；原生 Desktop 实时同步等待可验证的 Windows 集成入口。
 - 统一 Connector 继续明确事件 ID、控制权、重连和补偿，但不把 Unix-only daemon 写成 Windows 现成方案。
