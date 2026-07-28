@@ -1,3 +1,6 @@
+import type { RealtimeConnectedEvent } from "../../../shared/model/realtime";
+import type { ContextStatus } from "../../context-management/model/types";
+
 export type ExecutionPhase =
   | "idle"
   | "submitted"
@@ -64,5 +67,4 @@ export interface HeartbeatEvent {
   at: string;
 }
 
-export type ProjectEvent = ExecutionStatus | AssistantDeltaEvent | AssistantCommentaryEvent | SessionsChangedEvent | ContextStatus | HeartbeatEvent | { type: "connected"; eventId?: number };
-import type { ContextStatus } from "../../context-management/model/types";
+export type ProjectEvent = ExecutionStatus | AssistantDeltaEvent | AssistantCommentaryEvent | SessionsChangedEvent | ContextStatus | HeartbeatEvent | RealtimeConnectedEvent;

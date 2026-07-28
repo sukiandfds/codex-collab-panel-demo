@@ -1,4 +1,5 @@
 export const createRealtimeHub = () => {
+  const historyLimit = 200;
   const clients = new Set();
   const activeThreads = new Set();
   const history = [];
@@ -46,13 +47,32 @@ export const createRealtimeHub = () => {
     clients.add(response);
     // A small initial body can be buffered by mobile and tunnel proxies.
     write(response, `: ${" ".repeat(4096)}\n\nretry: 2000\n\n`);
-    const lastEventId = Number(request.headers?.["last-event-id"] || 0);
-    if (Number.isSafeInteger(lastEventId) && lastEventId > 0) {
+    const requestUrl = new URL(request.url || "/events", "http://127.0.0.1");
+    const requestedValue = request.headers?.["last-event-id"]
+      || requestUrl.searchParams.get("lastEventId")
+      || "0";
+    const parsedEventId = Number(requestedValue);
+    const lastEventId = Number.isSafeInteger(parsedEventId) && parsedEventId > 0 ? parsedEventId : 0;
+    const latestEventId = nextEventId - 1;
+    const oldestEventId = history[0]?.id ?? nextEventId;
+    const gap = lastEventId > 0
+      && (lastEventId > latestEventId || lastEventId < oldestEventId - 1);
+    let replayed = 0;
+    if (lastEventId > 0 && lastEventId <= latestEventId) {
       for (const event of history) {
-        if (event.id > lastEventId) writeEvent(response, event.value, event.id);
+        if (event.id <= lastEventId) continue;
+        writeEvent(response, event.value, event.id);
+        replayed += 1;
       }
     }
-    writeEvent(response, { type: "connected", eventId: nextEventId - 1 });
+    writeEvent(response, {
+      type: "connected",
+      eventId: latestEventId,
+      requestedEventId: lastEventId,
+      oldestEventId,
+      replayed,
+      gap,
+    });
     request.on("close", () => clients.delete(response));
   };
 
@@ -63,7 +83,7 @@ export const createRealtimeHub = () => {
     }
     const event = { id: nextEventId++, value };
     history.push(event);
-    if (history.length > 200) history.shift();
+    if (history.length > historyLimit) history.shift();
     for (const client of clients) writeEvent(client, event.value, event.id);
   };
 

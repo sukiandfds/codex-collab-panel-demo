@@ -1,23 +1,43 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig({
-  plugins: [react()],
-  build: {
-    rollupOptions: {
-      input: { main: "index.html", group: "group.html" },
-    },
+const createVersionAssetPlugin = (buildId: string, builtAt: string): Plugin => ({
+  name: "codex-collab-version-asset",
+  apply: "build",
+  generateBundle() {
+    this.emitFile({
+      type: "asset",
+      fileName: "version.json",
+      source: `${JSON.stringify({ buildId, builtAt }, null, 2)}\n`,
+    });
   },
-  server: {
-    proxy: {
-      "/api": "http://127.0.0.1:9360",
-      "/events": "http://127.0.0.1:9360",
+});
+
+export default defineConfig(({ command }) => {
+  const builtAt = new Date().toISOString();
+  const buildId = command === "build" ? `web-${Date.now().toString(36)}` : "development";
+
+  return {
+    plugins: [react(), createVersionAssetPlugin(buildId, builtAt)],
+    define: {
+      __APP_BUILD_ID__: JSON.stringify(buildId),
     },
-  },
-  preview: {
-    proxy: {
-      "/api": "http://127.0.0.1:9360",
-      "/events": "http://127.0.0.1:9360",
+    build: {
+      rollupOptions: {
+        input: { main: "index.html", group: "group.html" },
+      },
     },
-  },
+    server: {
+      proxy: {
+        "/api": "http://127.0.0.1:9360",
+        "/events": "http://127.0.0.1:9360",
+      },
+    },
+    preview: {
+      proxy: {
+        "/api": "http://127.0.0.1:9360",
+        "/events": "http://127.0.0.1:9360",
+      },
+    },
+  };
 });

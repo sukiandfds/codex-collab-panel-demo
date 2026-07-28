@@ -1,12 +1,14 @@
 ---
 feature_id: FEAT-009
 title: 原开发电脑远程运行、开发与应急恢复
-status: planned
-current_version: v0.3.0
-last_updated: 2026-07-28 15:47 +08:00
+status: in_progress
+current_version: v0.4.0
+last_updated: 2026-07-28 17:43 +08:00
 owners: [remote_runtime, service_control, user_experience]
 key_paths:
   - windows/scripts/start-web-demo.ps1
+  - windows/scripts/check-dev-environment.ps1
+  - windows/scripts/readiness
   - windows/scripts/remote-room-demo.mjs
   - web-ui/src
 related_features: [FEAT-001, FEAT-004, FEAT-005, FEAT-006]
@@ -22,6 +24,7 @@ related_features: [FEAT-001, FEAT-004, FEAT-005, FEAT-006]
 - `9360` 停止后，现有网页也随之不可用，无法在同一页面点击启动。
 - 当前可用兜底是回到原电脑处理，或使用向日葵等远程桌面工具。
 - 普通代码修改、项目依赖、测试、构建和 Git 通常可在普通用户权限下完成；真实 Windows UAC 一旦出现，网页无法操作安全桌面。
+- 已提供完全只读的普通用户开发环境检查器，检查项目/用户目录 ACL、Node、pnpm、Git、PowerShell、端口和常见 UAC 风险；它不安装、不修复、不启停进程，也不触发提权。
 
 ## 用户实际需要
 
@@ -104,7 +107,7 @@ OpenClaw 式体验的关键不是绕过 UAC，而是把运行环境、依赖和�
 | `FEAT-009-I02` | 普适 | active | 此前把电脑重启、自动回滚和大型 Supervisor 一起加入，超出了实际需求 | 当前只关注项目进程被关闭和必要后端更新，不提前扩展电脑重启与复杂发布系统 |
 | `FEAT-009-I03` | 特例 | active | “正在修改”曾被拆成独立产品需求，但它本来就是 Codex 过程事件的一部分 | 统一转入 `FEAT-001-I08`，修复真实事件持续同步 |
 | `FEAT-009-I04` | 普适 | active | “可能需要提权就提前拒绝”会阻碍正常开发 | 先自动使用项目级、用户级或 WSL2 替代；只有真正系统级操作才暂停并报告维护需求 |
-| `FEAT-009-I05` | 特例 | planned | 当前没有验证一整套普通用户开发工具链是否会在真实任务中触发 UAC | 用真实项目完成修改、依赖、测试、构建、Git 和必要重启的端到端验证，记录仍会触发 UAC 的具体步骤 |
+| `FEAT-009-I05` | 特例 | mitigated | 当前没有验证一整套普通用户开发工具链是否会在真实任务中触发 UAC | 已实现静态只读检查并在当前电脑得到 19 项、0 blocked、1 warning；仍需在原开发电脑运行检查器并完成真实修改、依赖、测试、构建、Git 和必要重启的端到端验证 |
 
 ## 版本时间线
 
@@ -126,9 +129,18 @@ OpenClaw 式体验的关键不是绕过 UAC，而是把运行环境、依赖和�
 - 文件修改和构建过程归回 `FEAT-001` 的 Codex 过程同步，不作为独立需求。
 - 本轮只更新需求文档，没有修改代码、服务或系统配置。
 
+### 2026-07-28 17:43 +08:00 | v0.4.0 | in_progress
+
+- 计划：先完成不触发 UAC、也不改变电脑状态的环境核对工具，把真正需要原电脑验证的部分留到晚上。
+- 实际：新增只读检查入口与模块化检查逻辑，覆盖项目/用户路径 ACL、Node、pnpm、Git、PowerShell、端口和常见系统级风险；不执行开发工具命令，不写探针文件，不安装依赖，不启停服务或进程。
+- 结构：主模块仅负责装载，检查逻辑拆为 `common/path/tool/host/report`，避免重新形成超长脚本文件。
+- 验证：PowerShell 定向测试通过，全部相关脚本解析错误为 0；当前电脑只读实跑为 19 项、0 blocked、1 warning（pnpm 版本与仓库声明不同）。
+- 用户可见变化：晚上可在原开发电脑普通 PowerShell 中运行一次，直接看到哪些日常开发条件已满足、哪些仍可能触发本机维护；脚本不会替用户修改电脑。
+- Git：与本次实现同一提交。
+
 ## 下一步
 
-1. 先修复 `FEAT-001-I08` 的真实长任务过程停更，否则网页远程开发不可依赖。
+1. 在原开发电脑验证 `FEAT-001-I08` 的真实长任务、断网重连和页面恢复；代码级补偿已经完成。
 2. 只读确认：如果 `9360` 停止，现有 Tunnel 或其他常驻入口能否承载一个最小“启动项目”按钮；不能则明确向日葵兜底。
-3. 用普通用户权限跑一遍真实修改、安装项目依赖、测试、构建、Git 和后端重启，列出实际会触发 UAC 的步骤。
+3. 先运行 `windows/scripts/check-dev-environment.ps1`，再用普通用户权限跑一遍真实修改、项目依赖、测试、构建、Git 和后端重启，列出实际仍会触发 UAC 的步骤。
 4. 用户确认最小方案后再开发，不先安装服务、不修改 Windows 配置。

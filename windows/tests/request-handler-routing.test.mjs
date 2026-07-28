@@ -26,6 +26,7 @@ const createFixture = () => {
     multiAgent: {},
     artifacts: { list: () => [{ id: "artifact" }] },
     webOutputs: {},
+    readWebVersion: async () => ({ buildId: "web-test", builtAt: "2026-07-28T00:00:00.000Z" }),
     serveStatic,
   });
 };
@@ -48,6 +49,10 @@ test("dispatches feature routes and preserves static fallback", async () => {
     assert.deepEqual(await (await request("/api/models")).json(), [{ id: "model" }]);
     assert.equal((await (await request("/api/group/snapshot")).json()).room.id, "room");
     assert.deepEqual(await (await request("/api/artifacts")).json(), [{ id: "artifact" }]);
+    assert.deepEqual(await (await request("/api/version")).json(), {
+      buildId: "web-test",
+      builtAt: "2026-07-28T00:00:00.000Z",
+    });
     assert.equal(await (await request("/page")).text(), "static");
   });
 });

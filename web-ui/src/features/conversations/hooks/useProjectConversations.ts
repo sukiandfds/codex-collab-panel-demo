@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MediaFile } from "../../../shared/model/media";
+import type { RealtimeRecoveryReason } from "../../../shared/model/realtime";
 import { useContextManagement } from "../../context-management/hooks/useContextManagement";
 import { useCodexExecution } from "../../execution/hooks/useCodexExecution";
 import type { ProjectEvent } from "../../execution/model/types";
@@ -68,12 +69,12 @@ export function useProjectConversations() {
     return sent;
   }, [execution.sendMessage, selection.selectedIdRef, selection.updateCurrentSession]);
 
-  const onSessionsChanged = useCallback((threadId?: string) => {
+  const onSessionsChanged = useCallback((threadId?: string, clearStreaming = true) => {
     if (threadId) selection.invalidate(threadId);
     const selected = selection.selectedIdRef.current;
     if (selected && (!threadId || threadId === selected)) {
       void selection.loadSession(selected, { quiet: true }).then((loaded) => {
-        if (loaded) execution.clearStreaming();
+        if (loaded && clearStreaming) execution.clearStreaming();
       });
     }
     void catalog.refreshSessions(false, threadId, false);
@@ -83,14 +84,17 @@ export function useProjectConversations() {
     execution.handleEvent(event);
     if (event.type === "context_status") contextManagement.handleEvent(event);
   }, [contextManagement.handleEvent, execution.handleEvent]);
-  const recoverRealtime = useCallback(() => {
-    onSessionsChanged();
-    void execution.refreshStatus();
+  const recoverRealtime = useCallback((reason: RealtimeRecoveryReason) => {
+    void execution.refreshStatus().then((latest) => {
+      if (reason === "stale-execution" && latest?.active) return;
+      onSessionsChanged(undefined, latest ? !latest.active : false);
+    });
   }, [execution.refreshStatus, onSessionsChanged]);
   const connected = useConversationEvents(
     onSessionsChanged,
     handleEvent,
     recoverRealtime,
+    selection.selectedId,
     execution.status.active,
     execution.status.phase === "submitted",
   );

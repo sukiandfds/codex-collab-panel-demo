@@ -11,6 +11,7 @@ import { createExecutionTracker } from "../server/execution-tracker.mjs";
 import { createContextManagementService } from "../server/context-management-service.mjs";
 import { createRequestHandler } from "../server/request-handler.mjs";
 import { createStaticFileServer } from "../server/static-files.mjs";
+import { createWebVersionReader } from "../server/web-version.mjs";
 import { createGroupRoomStore } from "../server/group-room-store.mjs";
 import { createMultiAgentService } from "../server/multi-agent-service.mjs";
 import { createArtifactService } from "../server/artifact-service.mjs";
@@ -86,9 +87,10 @@ const multiAgent = createMultiAgentService({
 });
 
 const serveStatic = createStaticFileServer(webRoot);
+const readWebVersion = createWebVersionReader(webRoot);
 const requestHandler = createRequestHandler({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
-  contextManagement, groupRoom, multiAgent, artifacts, webOutputs, serveStatic,
+  contextManagement, groupRoom, multiAgent, artifacts, webOutputs, readWebVersion, serveStatic,
 });
 const server = http.createServer(requestHandler);
 

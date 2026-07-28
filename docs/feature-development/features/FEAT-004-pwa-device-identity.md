@@ -2,14 +2,15 @@
 feature_id: FEAT-004
 title: PWA、设备身份与移动/平板入口
 status: implemented_pending_review
-current_version: v0.1.0
-last_updated: 2026-07-26 00:22 +08:00
+current_version: v0.2.0
+last_updated: 2026-07-28 17:43 +08:00
 owners: [pwa, device_identity, responsive_entry]
 key_paths:
   - web-ui/public/manifest.webmanifest
   - web-ui/public/sw.js
   - web-ui/public/icons
   - web-ui/src/pwa
+  - web-ui/src/features/app-update
   - web-ui/src/features/device
   - web-ui/src/components/ViewSwitcher
   - windows/server/request-handler.mjs
@@ -22,9 +23,11 @@ key_paths:
 
 - Web Demo 已包含 PWA Manifest、Service Worker、`192x192`、`512x512` 和 Apple Touch 图标。
 - 用户通过一次带 `?token=` 的入口完成授权后，服务端会写入 HttpOnly Cookie；安装后的主屏幕应用不必依赖启动 URL 保留查询参数。
-- 页面显示当前连接电脑的设备名和在线状态。设备名默认使用 Windows 主机名，可通过 `start-web-demo.ps1 -DeviceName` 修改。
+- 页面显示当前连接电脑的设备名和网页实时连接状态。设备名默认使用 Windows 主机名，可通过 `start-web-demo.ps1 -DeviceName` 修改；该状态不再被表述为电脑本身在线或离线。
 - 单人 Codex 与项目群聊之间有共享切换入口；iPad 宽度使用接近电脑端的双栏布局。
-- 当前代码已经完成基本构建和 Node 语法检查，等待用户在真实手机与 iPad 上体验。
+- 新构建发布后，已打开的单人页和群聊页会提示“网页已更新”；不会自动刷新或打断正在执行的任务，用户点击后才切换新版。
+- 顶部状态改为“网页已同步/网页重连中”，不再把实时连接状态误写成原电脑在线或离线。
+- 当前代码已经完成生产构建和自动测试，等待用户在真实手机、PWA 与 iPad 上体验更新流程。
 
 ## 用户可见结果
 
@@ -103,8 +106,18 @@ index.html / group.html
 - 用户可见变化：相较上一条记录无新增行为，本条仅确认当前实现已具备提交条件并进入待体验状态。
 - Git：实现与本记录在同一次提交中发布。
 
+### 2026-07-28 17:43 +08:00 | v0.2.0 | implemented_pending_review
+
+- 计划：让网页修改并重新构建后，当前浏览器能明确知道有新版本，同时不打断正在执行的 Codex 任务。
+- 实际：构建生成唯一版本号和 `version.json`；网页定时、聚焦和网络恢复时检查版本；新版 Service Worker 先等待，用户点击“刷新网页”后才激活并刷新。
+- UI：更新提示同时覆盖单人页和群聊页，层级低于侧栏与弹窗；设备状态文案只描述网页同步，不再误报电脑离线。
+- 验证：Service Worker、版本读取和路由测试包含在全量 Node 测试 `42/42` 中；TypeScript 与 Vite 生产构建通过，产物包含 `version.json`。
+- 用户可见变化：前端构建完成后，现有网页自动出现一个克制的刷新提示；不需要猜测何时重开页面，也不会被强制刷新。
+- Git：与本次实现同一提交。
+
 ## 下一步
 
 - 用户先在真实手机和 iPad 上确认安装入口、布局和切换体验。
+- 在原开发电脑验证一次真实 PWA 更新：旧页面保持任务不中断，提示出现后点击刷新并重新连接当前任务。
 - 需要公网访问时按 [`FEAT-006`](./FEAT-006-stable-remote-access.md) 配置固定 Named Tunnel、固定域名和正式鉴权，不再使用随机 Quick Tunnel 作为长期入口。
 - 需要多台电脑时，再设计稳定设备 ID、显示名、最后在线时间和设备选择，不仅依赖主机名。

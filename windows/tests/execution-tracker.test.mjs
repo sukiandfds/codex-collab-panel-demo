@@ -90,6 +90,35 @@ test("does not overwrite a confirmed turn when only submit confirmation fails", 
   assert.equal(status.active, true);
 });
 
+test("keeps an authoritative terminal snapshot for clients that missed the final event", () => {
+  const tracker = createExecutionTracker({ broadcast: () => {} });
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-1" } },
+  });
+  tracker.handleProtocolMessage({
+    method: "item/started",
+    params: { threadId: "thread-1", item: { id: "answer-1", type: "agentMessage", phase: "final_answer" } },
+  });
+  tracker.handleProtocolMessage({
+    method: "item/agentMessage/delta",
+    params: { threadId: "thread-1", itemId: "answer-1", delta: "最终回复" },
+  });
+  tracker.handleProtocolMessage({
+    method: "turn/completed",
+    params: { threadId: "thread-1", turn: { id: "turn-1", status: "completed" } },
+  });
+
+  const snapshot = tracker.getStatus("thread-1");
+  assert.equal(snapshot.turnId, "turn-1");
+  assert.equal(snapshot.phase, "completed");
+  assert.equal(snapshot.active, false);
+  assert.equal(snapshot.streamingItemId, "");
+  assert.equal(snapshot.streamingText, "");
+  assert.equal(typeof snapshot.updatedAt, "string");
+});
+
 test("keeps one meaningful reasoning summary and drops empty analysis rows", () => {
   const tracker = createExecutionTracker({ broadcast: () => {} });
   tracker.markSubmitted("thread-1");
