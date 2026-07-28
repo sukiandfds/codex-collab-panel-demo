@@ -1,7 +1,17 @@
 const terminalPhases = new Set(["completed", "failed", "interrupted", "systemError"]);
+const maxActivities = 4;
+
+const commandDetail = (item) => {
+  const actionCommand = Array.isArray(item?.commandActions)
+    ? item.commandActions.map((action) => action?.command).find(Boolean)
+    : "";
+  const raw = String(actionCommand || item?.command || "").split(/\r?\n/u)[0].trim();
+  const wrapped = raw.match(/\s-(?:command|c)\s+(.+)$/iu)?.[1]?.trim() || raw;
+  return wrapped.replace(/^(?:"|')|(?:"|')$/gu, "").replace(/\\"/gu, '"').slice(0, 180);
+};
 
 const detailFromItem = (item) => {
-  if (item?.type === "commandExecution") return String(item.command || "").split(/\r?\n/u)[0].slice(0, 140);
+  if (item?.type === "commandExecution") return commandDetail(item);
   if (item?.type === "fileChange") return `${item.changes?.length || 0} 个文件变更`;
   if (item?.type === "mcpToolCall") return [item.server, item.tool].filter(Boolean).join(" / ");
   if (item?.type === "dynamicToolCall") return item.tool || "";
@@ -25,19 +35,21 @@ const stateFromItem = (item) => {
 const activityFromItem = (item, completed = false) => {
   const state = stateFromItem(item);
   if (!state || item?.type === "agentMessage") return null;
+  const detail = detailFromItem(item);
+  if (item.type === "reasoning" && !detail) return null;
   const labels = {
-    reasoning: completed ? "已完成分析" : "正在分析任务",
-    commandExecution: completed ? "已运行命令" : "正在运行命令",
+    reasoning: completed ? "分析完成" : "正在分析任务",
+    commandExecution: completed ? "命令已完成" : "正在运行命令",
     fileChange: completed ? "已修改文件" : "正在修改文件",
     mcpToolCall: completed ? "已调用工具" : "正在调用工具",
     dynamicToolCall: completed ? "已调用工具" : "正在调用工具",
     webSearch: completed ? "已搜索资料" : "正在搜索资料",
   };
   return {
-    id: item.id || `${item.type}-${Date.now()}`,
+    id: item.type === "reasoning" ? "reasoning-current" : item.id || `${item.type}-${Date.now()}`,
     phase: state.phase,
     label: labels[item.type] || state.label,
-    detail: detailFromItem(item),
+    detail,
     completed,
     updatedAt: new Date().toISOString(),
   };
@@ -46,6 +58,7 @@ const activityFromItem = (item, completed = false) => {
 export const createExecutionTracker = ({ broadcast }) => {
   const statuses = new Map();
   const messagePhases = new Map();
+  const reasoningBuffers = new Map();
 
   const publish = (threadId, next) => {
     if (!threadId) return;
@@ -58,7 +71,7 @@ export const createExecutionTracker = ({ broadcast }) => {
       const index = activities.findIndex((activity) => activity.id === next.activity.id);
       activities = index >= 0
         ? activities.map((activity, activityIndex) => activityIndex === index ? next.activity : activity)
-        : [...activities, next.activity].slice(-12);
+        : [...activities, next.activity].slice(-maxActivities);
     }
     const status = {
       type: "execution_status",
@@ -68,6 +81,8 @@ export const createExecutionTracker = ({ broadcast }) => {
       label: next.label,
       detail: next.detail || "",
       commentary: beginsTurn ? "" : previous?.commentary || "",
+      streamingItemId: beginsTurn || !active ? "" : previous?.streamingItemId || "",
+      streamingText: beginsTurn || !active ? "" : previous?.streamingText || "",
       activities,
       active,
       startedAt: active ? beginsTurn ? now : previous?.startedAt || now : previous?.startedAt || null,
@@ -82,20 +97,30 @@ export const createExecutionTracker = ({ broadcast }) => {
     label: "指令已发送，正在连接 Codex",
   });
 
-  const markFailed = (threadId, error) => publish(threadId, {
-    phase: "failed",
-    label: "Codex 启动任务失败",
-    detail: error instanceof Error ? error.message : String(error),
-  });
+  const markFailed = (threadId, error) => {
+    const current = statuses.get(threadId);
+    if (current?.turnId && current.phase !== "submitted") return;
+    publish(threadId, {
+      phase: "failed",
+      label: "Codex 启动任务失败",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  };
 
   const completeActivity = (threadId, item) => {
-    const activity = activityFromItem(item, true);
     const previous = statuses.get(threadId);
-    if (!activity || !previous) return;
+    if (!previous) return;
+    const existingReasoning = item?.type === "reasoning"
+      ? previous.activities.find((value) => value.id === "reasoning-current")
+      : null;
+    const activity = existingReasoning?.detail
+      ? { ...existingReasoning, label: "分析完成", completed: true, updatedAt: new Date().toISOString() }
+      : activityFromItem(item, true);
+    if (!activity) return;
     const index = previous.activities.findIndex((value) => value.id === activity.id);
     const activities = index >= 0
       ? previous.activities.map((value, activityIndex) => activityIndex === index ? activity : value)
-      : [...previous.activities, activity].slice(-12);
+      : [...previous.activities, activity].slice(-maxActivities);
     const status = { ...previous, activities, updatedAt: activity.updatedAt };
     statuses.set(threadId, status);
     broadcast(status);
@@ -113,10 +138,35 @@ export const createExecutionTracker = ({ broadcast }) => {
       completed: true,
       updatedAt: now,
     };
-    const activities = [...previous.activities.filter((value) => value.id !== activity.id), activity].slice(-12);
+    const activities = [...previous.activities.filter((value) => value.id !== activity.id), activity].slice(-maxActivities);
     const status = { ...previous, commentary: text, activities, updatedAt: now };
     statuses.set(threadId, status);
     broadcast(status);
+  };
+
+  const addReasoningSummary = (threadId, itemId, delta) => {
+    const addition = String(delta || "");
+    if (!addition || !threadId) return;
+    const previousBuffer = reasoningBuffers.get(threadId);
+    const text = `${previousBuffer?.itemId === itemId ? previousBuffer.text : ""}${addition}`
+      .replace(/\s+/gu, " ")
+      .trim()
+      .slice(0, 600);
+    reasoningBuffers.set(threadId, { itemId, text });
+    if (!text) return;
+    publish(threadId, {
+      phase: "working",
+      label: "Codex 正在分析任务",
+      detail: text,
+      activity: {
+        id: "reasoning-current",
+        phase: "working",
+        label: "正在分析任务",
+        detail: text,
+        completed: false,
+        updatedAt: new Date().toISOString(),
+      },
+    });
   };
 
   const handleProtocolMessage = (message) => {
@@ -125,11 +175,13 @@ export const createExecutionTracker = ({ broadcast }) => {
     if (!threadId) return;
 
     if (method === "turn/started") {
+      reasoningBuffers.delete(threadId);
       publish(threadId, { phase: "working", label: "Codex 正在处理任务", turnId: params.turn?.id || "" });
       broadcast({ type: "sessions_changed", threadId });
       return;
     }
     if (method === "turn/completed") {
+      reasoningBuffers.delete(threadId);
       const phase = params.turn?.status || "completed";
       const failed = phase === "failed";
       publish(threadId, {
@@ -185,8 +237,24 @@ export const createExecutionTracker = ({ broadcast }) => {
       if (params.item?.type === "agentMessage") messagePhases.delete(params.item.id);
       return;
     }
+    if (method === "item/reasoning/summaryTextDelta") {
+      addReasoningSummary(threadId, params.itemId || "reasoning", params.delta);
+      return;
+    }
     if (method === "item/agentMessage/delta") {
       if (messagePhases.get(params.itemId) !== "commentary") {
+        const previous = statuses.get(threadId);
+        if (previous) {
+          const streamingText = previous.streamingItemId === params.itemId
+            ? previous.streamingText + String(params.delta || "")
+            : String(params.delta || "");
+          statuses.set(threadId, {
+            ...previous,
+            streamingItemId: params.itemId || "",
+            streamingText,
+            updatedAt: new Date().toISOString(),
+          });
+        }
         broadcast({ type: "assistant_delta", ...params });
       }
       return;
@@ -208,6 +276,8 @@ export const createExecutionTracker = ({ broadcast }) => {
     label: "Codex 已就绪",
     detail: "",
     commentary: "",
+    streamingItemId: "",
+    streamingText: "",
     activities: [],
     active: false,
     startedAt: null,

@@ -55,6 +55,11 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
   const agents = new Map(agentDefinitions.map((definition) => [definition.id, initialAgent(definition, savedAgents.get(definition.id))]));
   const messages = (Array.isArray(stored.messages) ? stored.messages : [])
     .filter((message) => message?.id && message?.text && message?.createdAt)
+    .map((message) => ({
+      ...message,
+      artifactIds: [...new Set((Array.isArray(message.artifactIds) ? message.artifactIds : [])
+        .map((id) => cleanText(id, 80)).filter(Boolean))],
+    }))
     .slice(-300);
   const members = new Map();
   let writeQueue = Promise.resolve();
@@ -120,6 +125,7 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
       mode,
       text: content,
       attachments: files,
+      artifactIds: [],
       createdAt: new Date().toISOString(),
     };
     messages.push(message);
@@ -130,6 +136,19 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
   };
 
   const getAgent = (agentId) => agents.get(agentId) || null;
+  const getMessage = (messageId) => messages.find((message) => message.id === messageId) || null;
+
+  const attachArtifact = async (messageId, artifactId) => {
+    const message = getMessage(cleanText(messageId, 80));
+    if (!message) throw Object.assign(new Error("群消息不存在"), { statusCode: 404 });
+    const id = cleanText(artifactId, 80);
+    if (!id) throw Object.assign(new Error("artifactId 不能为空"), { statusCode: 400 });
+    if (message.artifactIds.includes(id)) return message;
+    message.artifactIds.push(id);
+    await persist();
+    broadcast({ type: "group_message_updated", message: { ...message } });
+    return message;
+  };
 
   const updateAgent = async (agentId, patch) => {
     const current = agents.get(agentId);
@@ -143,5 +162,5 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
   };
 
   await persist();
-  return { snapshot, touchMember, addMessage, getAgent, updateAgent, close: () => writeQueue };
+  return { snapshot, touchMember, addMessage, getAgent, getMessage, attachArtifact, updateAgent, close: () => writeQueue };
 };

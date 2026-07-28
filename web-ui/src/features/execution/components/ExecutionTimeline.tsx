@@ -34,7 +34,7 @@ export function ExecutionTimeline({ status }: { status: ExecutionStatus }) {
   }, [status.active]);
 
   if (!status.active && !status.activities.length) return null;
-  const activities = status.activities || [];
+  const activities = (status.activities || []).slice(-4);
   const endTime = status.active ? now : Date.parse(status.updatedAt || "") || now;
   const elapsed = elapsedText(status.startedAt, endTime);
 
@@ -57,7 +57,11 @@ export function ExecutionTimeline({ status }: { status: ExecutionStatus }) {
                 <span className={styles.activityIcon}>{activity.completed ? <Check aria-hidden="true" /> : <Icon aria-hidden="true" />}</span>
                 <div>
                   <span>{activity.label}</span>
-                  {activity.detail ? <code>{activity.detail}</code> : null}
+                  {activity.detail
+                    ? activity.phase === "working"
+                      ? <span>{activity.detail}</span>
+                      : <code>{activity.detail}</code>
+                    : null}
                 </div>
               </div>
             );

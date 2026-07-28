@@ -1,4 +1,5 @@
 import type { MediaFile } from "../../conversations/model/types";
+import type { ArtifactRealtimeEvent } from "../../artifacts/model/types";
 
 export type GroupMode = "discussion" | "development";
 
@@ -31,6 +32,7 @@ export interface GroupMessage {
   mode: GroupMode;
   text: string;
   attachments?: MediaFile[];
+  artifactIds?: string[];
   createdAt: string;
 }
 
@@ -50,6 +52,8 @@ export interface StoredMember {
 export type GroupEvent =
   | { type: "connected" }
   | { type: "group_message_created"; message: GroupMessage }
+  | { type: "group_message_updated"; message: GroupMessage }
   | { type: "group_agent_updated"; agent: GroupAgent }
   | { type: "group_members_changed"; members: GroupMember[] }
-  | { type: "group_agent_delta"; agentId: string; itemId: string; delta: string };
+  | { type: "group_agent_delta"; agentId: string; itemId: string; delta: string }
+  | ArtifactRealtimeEvent;

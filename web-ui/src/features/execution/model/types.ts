@@ -30,6 +30,8 @@ export interface ExecutionStatus {
   label: string;
   detail: string;
   commentary: string;
+  streamingItemId?: string;
+  streamingText?: string;
   activities: ExecutionActivity[];
   active: boolean;
   startedAt: string | null;
@@ -56,5 +58,11 @@ export interface SessionsChangedEvent {
   threadId?: string;
 }
 
-export type ProjectEvent = ExecutionStatus | AssistantDeltaEvent | AssistantCommentaryEvent | SessionsChangedEvent | ContextStatus | { type: "connected" };
+export interface HeartbeatEvent {
+  type: "heartbeat";
+  active: boolean;
+  at: string;
+}
+
+export type ProjectEvent = ExecutionStatus | AssistantDeltaEvent | AssistantCommentaryEvent | SessionsChangedEvent | ContextStatus | HeartbeatEvent | { type: "connected"; eventId?: number };
 import type { ContextStatus } from "../../context-management/model/types";

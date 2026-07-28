@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AgentRoster } from "./components/AgentRoster";
 import { GroupComposer } from "./components/GroupComposer";
 import { GroupHeader } from "./components/GroupHeader";
@@ -8,6 +8,7 @@ import { RoomSidebar } from "./components/RoomSidebar";
 import { useGroupRoom } from "./hooks/useGroupRoom";
 import type { GroupMode } from "./model/types";
 import { useDeviceInfo } from "../device/hooks/useDeviceInfo";
+import { useArtifacts } from "../artifacts/hooks/useArtifacts";
 import styles from "./GroupChat.module.css";
 
 export function GroupApp() {
@@ -17,6 +18,8 @@ export function GroupApp() {
   const [agentId, setAgentId] = useState("manager");
   const [editingMember, setEditingMember] = useState(false);
   const snapshot = group.snapshot;
+  const artifactIds = useMemo(() => snapshot?.messages.flatMap((message) => message.artifactIds || []) || [], [snapshot?.messages]);
+  const artifactState = useArtifacts(artifactIds, group.artifactEvent);
   const join = async (name: string) => {
     await group.join(name);
     setEditingMember(false);
@@ -30,7 +33,17 @@ export function GroupApp() {
       <RoomSidebar project={snapshot.project} members={snapshot.members} />
       <main className={styles.main}>
         <GroupHeader roomName={snapshot.room.name} connected={group.connected} deviceName={device?.name} members={snapshot.members} agents={snapshot.agents} member={group.member} onEditMember={() => setEditingMember(true)} />
-        <MessageTimeline messages={snapshot.messages} agents={snapshot.agents} streaming={group.streaming} />
+        <MessageTimeline
+          messages={snapshot.messages}
+          agents={snapshot.agents}
+          streaming={group.streaming}
+          artifacts={artifactState.artifacts}
+          artifactLoadErrors={artifactState.loadErrors}
+          reviewingArtifactIds={artifactState.reviewingIds}
+          reviewerName={group.member?.name || "当前成员"}
+          onRetryArtifact={artifactState.loadOne}
+          onReviewArtifact={artifactState.review}
+        />
         <GroupComposer
           mode={mode}
           agentId={agentId}

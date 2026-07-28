@@ -57,7 +57,7 @@ const paginationFrom = (url) => {
 
 export const createRequestHandler = ({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
-  contextManagement, groupRoom, multiAgent, serveStatic,
+  contextManagement, groupRoom, multiAgent, artifacts, webOutputs, serveStatic,
 }) => {
   const readObserverStatus = async (threadId = "") => {
     try {
@@ -81,6 +81,13 @@ export const createRequestHandler = ({
     }
 
     try {
+      const previewMatch = /^\/artifact-preview\/([^/]+)$/u.exec(url.pathname);
+      if (previewMatch && request.method === "GET") {
+        const preview = await webOutputs.readPreview(decodeURIComponent(previewMatch[1]));
+        response.writeHead(200, preview.headers);
+        response.end(preview.content);
+        return;
+      }
       if (url.pathname === "/api/group/snapshot") {
         sendJson(response, groupRoom.snapshot());
         return;
@@ -93,7 +100,7 @@ export const createRequestHandler = ({
       }
       if (url.pathname === "/api/group/message" && request.method === "POST") {
         const body = await readJson(request);
-        const mode = body.mode === "development" ? "development" : "discussion";
+        let mode = body.mode === "development" ? "development" : "discussion";
         const member = groupRoom.touchMember(body.memberId, body.authorName);
         const text = String(body.text || "").trim();
         const attachments = media.resolveMany(body.attachmentIds);
@@ -106,6 +113,10 @@ export const createRequestHandler = ({
           .map((agentId) => String(agentId || "").trim())
           .filter((agentId) => availableAgentIds.has(agentId)))];
         if (!targetAgentIds.length) targetAgentIds.push("manager");
+        if (webOutputs.isRequest(text)) {
+          targetAgentIds.splice(0, targetAgentIds.length, "developer");
+          mode = "development";
+        }
         const messageInput = {
           type: "human", authorId: member.id, authorName: member.name,
           agentId: targetAgentIds[0], targetAgentIds,
@@ -113,12 +124,22 @@ export const createRequestHandler = ({
           attachments: attachments.map(({ id, name, mimeType, url }) => ({ id, name, mimeType, url })),
         };
         const message = await groupRoom.addMessage(messageInput);
-        const execution = multiAgent.enqueueDiscussion({ agentIds: targetAgentIds, mode, requestText: text || "请查看附件并根据内容进行处理。", attachments });
+        const execution = await multiAgent.enqueueDiscussion({
+          agentIds: targetAgentIds,
+          mode,
+          requestText: text || "请查看附件并根据内容进行处理。",
+          attachments,
+          sourceMessageId: message.id,
+        });
         sendJson(response, { message, execution }, 202);
         return;
       }
       if (url.pathname === "/api/project") {
         sendJson(response, { name: project, root: projectRoot, mode: "interactive" });
+        return;
+      }
+      if (url.pathname === "/api/models" && request.method === "GET") {
+        sendJson(response, await conversations.listModels());
         return;
       }
       if (url.pathname === "/api/device") {
@@ -133,6 +154,59 @@ export const createRequestHandler = ({
         sendJson(response, upload, 201);
         return;
       }
+      if (url.pathname === "/api/artifacts/publish" && request.method === "POST") {
+        const body = await readJson(request);
+        const agent = groupRoom.getAgent(String(body.createdByAgent || "").trim());
+        if (!agent) return sendJson(response, { error: "创建交付物的 Agent 不存在" }, 404);
+        const messageId = String(body.messageId || "").trim();
+        if (messageId && !groupRoom.getMessage(messageId)) return sendJson(response, { error: "关联的群消息不存在" }, 404);
+        const artifact = await artifacts.publish({
+          artifactId: body.artifactId,
+          taskId: body.taskId,
+          messageId,
+          createdByAgent: agent.id,
+          createdByName: agent.name,
+          mediaId: body.mediaId,
+          relativePath: body.relativePath,
+        });
+        if (messageId) await groupRoom.attachArtifact(messageId, artifact.id);
+        sendJson(response, artifact, 201);
+        return;
+      }
+      if (url.pathname === "/api/artifacts" && request.method === "GET") {
+        sendJson(response, artifacts.list({
+          messageId: url.searchParams.get("messageId") || "",
+          taskId: url.searchParams.get("taskId") || "",
+        }));
+        return;
+      }
+      const artifactHtmlMatch = /^\/api\/artifacts\/([^/]+)\/open-html$/u.exec(url.pathname);
+      if (artifactHtmlMatch && request.method === "GET") {
+        const previewPath = await webOutputs.previewForArtifact(decodeURIComponent(artifactHtmlMatch[1]));
+        response.writeHead(302, {
+          Location: previewPath,
+          "Cache-Control": "no-store",
+          "Referrer-Policy": "no-referrer",
+        });
+        response.end();
+        return;
+      }
+      const artifactReviewMatch = /^\/api\/artifacts\/([^/]+)\/review$/u.exec(url.pathname);
+      if (artifactReviewMatch && request.method === "POST") {
+        const body = await readJson(request);
+        sendJson(response, await artifacts.review(
+          decodeURIComponent(artifactReviewMatch[1]),
+          body.decision,
+          body.note,
+          body.reviewedBy,
+        ));
+        return;
+      }
+      const artifactMatch = /^\/api\/artifacts\/([^/]+)$/u.exec(url.pathname);
+      if (artifactMatch && request.method === "GET") {
+        sendJson(response, artifacts.get(decodeURIComponent(artifactMatch[1])));
+        return;
+      }
       if (url.pathname === "/api/session/message" && request.method === "POST") {
         const body = await readJson(request);
         const threadId = String(body.threadId || "").trim();
@@ -142,14 +216,36 @@ export const createRequestHandler = ({
         if (text.length > 32000) return sendJson(response, { error: "message is too long" }, 413);
         const status = execution.getStatus(threadId);
         if (status.active && !status.turnId) return sendJson(response, { error: "Codex 正在启动当前任务，请稍后再试" }, 409);
-        const result = status.active
-          ? await conversations.steerMessage(threadId, status.turnId, text, attachments)
-          : await conversations.sendMessage(threadId, text, attachments);
+        let result;
+        try {
+          result = status.active
+            ? await conversations.steerMessage(threadId, status.turnId, text, attachments)
+            : await conversations.sendMessage(threadId, text, attachments);
+        } catch (error) {
+          const recovered = execution.getStatus(threadId);
+          if (status.active || !recovered.turnId || recovered.turnId === status.turnId) throw error;
+          sendJson(response, {
+            threadId,
+            turnId: recovered.turnId,
+            status: "inProgress",
+            recovered: true,
+          }, 202);
+          return;
+        }
         sendJson(response, {
           threadId,
           turnId: status.active ? status.turnId : result.turn?.id || "",
           status: status.active ? "steered" : result.turn?.status || "inProgress",
         }, 202);
+        return;
+      }
+      if (url.pathname === "/api/session/model" && request.method === "POST") {
+        const body = await readJson(request);
+        const threadId = String(body.threadId || "").trim();
+        const model = String(body.model || "").trim();
+        if (!threadId || !model) return sendJson(response, { error: "threadId and model are required" }, 400);
+        if (execution.getStatus(threadId).active) return sendJson(response, { error: "当前任务运行中，请在完成后切换模型" }, 409);
+        sendJson(response, await conversations.updateModel(threadId, model));
         return;
       }
       if (url.pathname === "/api/session/interrupt" && request.method === "POST") {
@@ -191,6 +287,11 @@ export const createRequestHandler = ({
       if (url.pathname === "/api/sessions") {
         const sessions = await conversations.listSessions(url.searchParams.get("source") || "all");
         sendJson(response, sessions.map(({ messages, file, ...summary }) => summary));
+        return;
+      }
+      if (url.pathname === "/api/session" && request.method === "POST") {
+        const body = await readJson(request);
+        sendJson(response, await conversations.createSession(String(body.model || "").trim()), 201);
         return;
       }
       if (url.pathname === "/api/session") {

@@ -7,6 +7,8 @@ import type { ExecutionStatus as ExecutionStatusValue } from "../../features/exe
 import type { MediaFile } from "../../features/conversations/model/types";
 import { ContextControl } from "../../features/context-management/components/ContextControl";
 import type { ContextStatus } from "../../features/context-management/model/types";
+import { ModelSelect } from "../../features/models/components/ModelSelect";
+import type { CodexModel } from "../../features/models/model/types";
 import styles from "./Composer.module.css";
 
 interface ComposerProps {
@@ -16,21 +18,27 @@ interface ComposerProps {
   status: ExecutionStatusValue;
   commentary: string;
   contextStatus: ContextStatus;
+  models: CodexModel[];
+  modelsLoading: boolean;
+  modelChanging: boolean;
+  modelError: string;
   onSend: (text: string, attachments?: MediaFile[]) => Promise<boolean>;
   onInterrupt: () => Promise<boolean>;
   onCompactContext: () => Promise<boolean>;
   onAutoCompactThresholdChange: (threshold: number | null) => Promise<boolean>;
+  onModelChange: (model: string) => Promise<boolean>;
 }
 
 export function Composer({
   connected, selected, sending, status, commentary, contextStatus,
-  onSend, onInterrupt, onCompactContext, onAutoCompactThresholdChange,
+  models, modelsLoading, modelChanging, modelError,
+  onSend, onInterrupt, onCompactContext, onAutoCompactThresholdChange, onModelChange,
 }: ComposerProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submittingRef = useRef(false);
   const draft = useAttachmentDraft();
-  const inputDisabled = !connected || !selected || sending || draft.uploading;
+  const inputDisabled = !selected || sending || draft.uploading;
   const hasContent = Boolean(text.trim() || draft.attachments.length);
   const sendDisabled = inputDisabled || !hasContent;
   const submit = async () => {
@@ -96,6 +104,15 @@ export function Composer({
           <AttachmentButton disabled={inputDisabled} onFiles={draft.addFiles} />
           <ExecutionStatus connected={connected} status={status} commentary={commentary} />
           <span className={styles.spacer} />
+          <ModelSelect
+            currentModel={contextStatus.model}
+            models={models}
+            loading={modelsLoading}
+            changing={modelChanging}
+            error={modelError}
+            disabled={!connected || !selected || status.active}
+            onChange={onModelChange}
+          />
           <ContextControl
             status={contextStatus}
             disabled={!connected || !selected}

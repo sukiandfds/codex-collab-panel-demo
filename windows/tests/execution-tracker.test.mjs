@@ -31,6 +31,7 @@ test("streams final answers but keeps commentary updates complete", () => {
   assert.equal(events.some((event) => event.type === "assistant_delta" && event.itemId === "commentary-1"), false);
   assert.equal(events.some((event) => event.type === "assistant_commentary" && event.text === "已经完成分析"), true);
   assert.equal(events.some((event) => event.type === "assistant_delta" && event.itemId === "answer-1"), true);
+  assert.equal(tracker.getStatus("thread-1").streamingText, "最终回复");
   assert.equal(tracker.getStatus("thread-1").commentary, "已经完成分析");
   assert.equal(tracker.getStatus("thread-1").activities.at(-1).label, "已经完成分析");
 });
@@ -54,7 +55,7 @@ test("tracks the active turn id and completed tool activity", () => {
   const status = tracker.getStatus("thread-1");
   assert.equal(status.turnId, "turn-1");
   assert.deepEqual(status.activities.map(({ label, detail, completed }) => ({ label, detail, completed })), [
-    { label: "已运行命令", detail: "pnpm build:ui", completed: true },
+    { label: "命令已完成", detail: "pnpm build:ui", completed: true },
   ]);
 });
 
@@ -70,4 +71,65 @@ test("resets startedAt for a new turn", async () => {
   tracker.markSubmitted("thread-1");
 
   assert.notEqual(tracker.getStatus("thread-1").startedAt, firstStartedAt);
+});
+
+test("does not overwrite a confirmed turn when only submit confirmation fails", () => {
+  const events = [];
+  const tracker = createExecutionTracker({ broadcast: (event) => events.push(event) });
+
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-new" } },
+  });
+  tracker.markFailed("thread-1", new Error("turn/start timed out"));
+
+  const status = tracker.getStatus("thread-1");
+  assert.equal(status.turnId, "turn-new");
+  assert.equal(status.phase, "working");
+  assert.equal(status.active, true);
+});
+
+test("keeps one meaningful reasoning summary and drops empty analysis rows", () => {
+  const tracker = createExecutionTracker({ broadcast: () => {} });
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "item/started",
+    params: { threadId: "thread-1", item: { id: "reasoning-1", type: "reasoning" } },
+  });
+  assert.equal(tracker.getStatus("thread-1").activities.length, 0);
+
+  tracker.handleProtocolMessage({
+    method: "item/reasoning/summaryTextDelta",
+    params: { threadId: "thread-1", itemId: "reasoning-1", delta: "正在检查会话加载逻辑" },
+  });
+  tracker.handleProtocolMessage({
+    method: "item/completed",
+    params: { threadId: "thread-1", item: { id: "reasoning-1", type: "reasoning" } },
+  });
+
+  const activities = tracker.getStatus("thread-1").activities;
+  assert.equal(activities.length, 1);
+  assert.deepEqual(
+    { label: activities[0].label, detail: activities[0].detail, completed: activities[0].completed },
+    { label: "分析完成", detail: "正在检查会话加载逻辑", completed: true },
+  );
+});
+
+test("shows the inner PowerShell command instead of the launcher path", () => {
+  const tracker = createExecutionTracker({ broadcast: () => {} });
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "item/completed",
+    params: {
+      threadId: "thread-1",
+      item: {
+        id: "command-1",
+        type: "commandExecution",
+        command: '"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "pnpm build:ui"',
+      },
+    },
+  });
+
+  assert.equal(tracker.getStatus("thread-1").activities[0].detail, "pnpm build:ui");
 });

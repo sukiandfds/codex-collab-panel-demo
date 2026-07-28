@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { groupApi } from "../data/groupApi";
 import type { GroupEvent, GroupMode, GroupSnapshot, StoredMember } from "../model/types";
+import type { ArtifactRealtimeEvent } from "../../artifacts/model/types";
 
 const memberKey = "codex-collab-group-member";
 
@@ -24,6 +25,7 @@ export function useGroupRoom() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [streaming, setStreaming] = useState<Record<string, { itemId: string; text: string }>>({});
+  const [artifactEvent, setArtifactEvent] = useState<ArtifactRealtimeEvent | null>(null);
   const streamingBuffer = useRef<Record<string, { itemId: string; text: string }>>({});
   const streamingFrame = useRef(0);
   const sendingRef = useRef(false);
@@ -67,6 +69,11 @@ export function useGroupRoom() {
               return next;
             });
           }
+        } else if (event.type === "group_message_updated") {
+          setSnapshot((current) => current && {
+            ...current,
+            messages: current.messages.map((item) => item.id === event.message.id ? event.message : item),
+          });
         } else if (event.type === "group_agent_updated") {
           setSnapshot((current) => current && {
             ...current,
@@ -89,7 +96,7 @@ export function useGroupRoom() {
               setStreaming(streamingBuffer.current);
             });
           }
-        }
+        } else if (event.type === "artifact.ready" || event.type === "artifact.reviewed") setArtifactEvent(event);
       } catch {}
     };
     return () => {
@@ -139,5 +146,5 @@ export function useGroupRoom() {
     }
   }, [member]);
 
-  return { snapshot, member, connected, loading, sending, error, streaming, join, send, refresh };
+  return { snapshot, member, connected, loading, sending, error, streaming, artifactEvent, join, send, refresh };
 }

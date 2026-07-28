@@ -20,9 +20,6 @@ export function ContextControl({ status, disabled, onCompact, onThresholdChange 
 
   return (
     <div className={styles.controls}>
-      <span className={styles.model} title={`当前模型：${status.model || "正在读取"}`}>
-        {status.model || "读取模型"}
-      </span>
       <select
         className={styles.threshold}
         aria-label="自动压缩阈值"

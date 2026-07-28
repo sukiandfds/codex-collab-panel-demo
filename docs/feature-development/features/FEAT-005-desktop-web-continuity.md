@@ -2,8 +2,8 @@
 feature_id: FEAT-005
 title: Desktop/Web 连续性与统一控制权
 status: discovery
-current_version: v0.2.0
-last_updated: 2026-07-27 00:43 +08:00
+current_version: v0.3.0
+last_updated: 2026-07-27 20:36 +08:00
 owners: [connector, task_state, cross_device_continuity]
 key_paths:
   - windows/server/app-server-client.mjs
@@ -61,7 +61,7 @@ Web SSE 只分发 Web 所连接 app-server 的 Notification；已经打开的 De
 
 ### 阶段 A：验证恢复边界
 
-完全关闭 Desktop，在手机完成一轮真实对话，再启动 Desktop 打开同一任务，对照 Web API 核对消息、回复和顺序。先确认冷启动能否恢复，再决定短期交接方式。
+一次用户实测已确认：完全关闭 Desktop、通过 Web 继续对话后，再启动 Desktop 可以读到这些持久化内容。后续只需在正式投入双端连续性开发前补测多轮和异常中断，不再把冷启动能力视为未知。
 
 ### 阶段 B：轻量控制权与交接
 
@@ -85,6 +85,7 @@ Web SSE 只分发 Web 所连接 app-server 的 Notification；已经打开的 De
 | `FEAT-005-I02` | 特例 | active | Desktop 与 Web 并发写同一 Thread 时，Turn 顺序和控制归属不明确 | 当前缺少单一控制权、事件序号和恢复协议；正式并发前必须先建立这些约束 |
 | `FEAT-005-I03` | 普适 | active | 曾把相同 Thread、相似页面或同一 SSE 概念误当成统一运行状态 | 关联 `PROC-011`；先确认事件生产者、连接实例、状态所有权和恢复机制 |
 | `FEAT-005-I04` | 特例 | active | 新版 Codex daemon 暂时不能直接解决 Windows 双端同步 | 本机命令返回 daemon 生命周期仅支持 Unix；保留协议适配层，不能把存在命令误写成 Windows 已可用 |
+| `FEAT-005-I05` | 特例 | resolved | Desktop 冷启动后能否承接 Web 已持久化的对话内容此前没有实测结论 | 用户已实测：完全关闭并重新打开 Codex Desktop 后，可以看到 Web 端发送的对话；这只证明冷启动读取持久化 Thread，不代表已打开页面会热刷新 |
 
 ## 禁止的伪修复
 
@@ -115,9 +116,15 @@ Web SSE 只分发 Web 所连接 app-server 的 Notification；已经打开的 De
 - 验证：本机 `codex app-server daemon version` 返回 `codex app-server daemon lifecycle is only supported on Unix platforms`。
 - 用户可见变化：本轮只更新技术判断和开发边界，没有修改页面或同步行为。
 
+### 2026-07-27 20:36 +08:00 | v0.3.0 | discovery
+
+- 用户实测：关闭 Codex Desktop 后重新打开，可以看到此前通过 Web 发送的对话内容。
+- 结论：冷启动承接已验证可用；已打开的 Desktop 页面仍不会因 Web 外部事件自动热刷新，`FEAT-005-I01` 保持 active。
+- 影响：短期可以用“离开电脑时使用 Web，回到电脑后重开对应任务”的方式承接，不把它描述成实时双端同步。
+
 ## 下一步
 
-- 先做一次最小 Desktop 冷启动恢复实测，不在结果未知时直接设计大规模同步层。
-- 若冷启动可稳定恢复，先提供轻量“接管/释放/重新打开任务”交接流程。
-- 若冷启动不能可靠恢复，电脑与手机先统一使用 Web/PWA；原生 Desktop 实时同步等待可验证的 Windows 集成入口。
+- 冷启动恢复已得到一次用户实测结论；后续再验证多轮和异常中断场景，不扩大本轮开发。
+- 需要继续做双端连续性时，先提供轻量“接管/释放/重新打开任务”交接流程。
+- 若后续多轮或异常中断暴露冷启动恢复不可靠，电脑与手机先统一使用 Web/PWA；原生 Desktop 实时同步等待可验证的 Windows 集成入口。
 - 统一 Connector 继续明确事件 ID、控制权、重连和补偿，但不把 Unix-only daemon 写成 Windows 现成方案。

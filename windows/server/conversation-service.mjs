@@ -10,10 +10,13 @@ export const createConversationService = ({ primary, fallback }) => {
 
   return {
     listSessions: (...args) => withFallback("listSessions", ...args),
+    createSession: (...args) => primary.createSession(...args),
     findSession: (...args) => withFallback("findSession", ...args),
     sendMessage: (...args) => primary.sendMessage(...args),
     steerMessage: (...args) => primary.steerMessage(...args),
     interrupt: (...args) => primary.interrupt(...args),
+    listModels: (...args) => primary.listModels(...args),
+    updateModel: (...args) => primary.updateModel(...args),
     getRuntimeContext: (...args) => primary.getRuntimeContext(...args),
     compactContext: (...args) => primary.compactContext(...args),
     close: () => {

@@ -13,6 +13,8 @@ import { createRequestHandler } from "../server/request-handler.mjs";
 import { createStaticFileServer } from "../server/static-files.mjs";
 import { createGroupRoomStore } from "../server/group-room-store.mjs";
 import { createMultiAgentService } from "../server/multi-agent-service.mjs";
+import { createArtifactService } from "../server/artifact-service.mjs";
+import { createWebOutputService } from "../server/web-output-service.mjs";
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -63,12 +65,30 @@ const groupRoom = await createGroupRoomStore({
   project,
   broadcast: realtime.broadcast,
 });
-const multiAgent = createMultiAgentService({ projectRoot, room: groupRoom, broadcast: realtime.broadcast });
+const artifacts = await createArtifactService({
+  stateFile: path.join(projectRoot, "runtime", "artifacts.json"),
+  allowedRoot: path.join(projectRoot, "runtime", "agent-artifacts"),
+  projectId: project,
+  media,
+  broadcast: realtime.broadcast,
+});
+const webOutputs = createWebOutputService({
+  projectRoot,
+  originBaseUrl: `http://127.0.0.1:${port}`,
+  artifacts,
+  media,
+});
+const multiAgent = createMultiAgentService({
+  projectRoot,
+  room: groupRoom,
+  broadcast: realtime.broadcast,
+  webOutputs,
+});
 
 const serveStatic = createStaticFileServer(webRoot);
 const requestHandler = createRequestHandler({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
-  contextManagement, groupRoom, multiAgent, serveStatic,
+  contextManagement, groupRoom, multiAgent, artifacts, webOutputs, serveStatic,
 });
 const server = http.createServer(requestHandler);
 
@@ -77,6 +97,8 @@ const close = () => {
   conversations.close();
   void contextManagement.close();
   multiAgent.close();
+  webOutputs.close();
+  void artifacts.close();
   void groupRoom.close();
   server.close();
 };

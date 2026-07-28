@@ -20,6 +20,7 @@ function Message({ message, streaming = false }: { message: SessionMessage; stre
 interface ConversationViewProps {
   session: SessionDetail | null;
   loading: boolean;
+  syncing: boolean;
   loadingOlder: boolean;
   error: string;
   listAvailable: boolean;
@@ -32,7 +33,7 @@ type ConversationItem =
   | { id: string; type: "message"; message: SessionMessage; streaming: boolean }
   | { id: string; type: "execution" };
 
-export function ConversationView({ session, loading, loadingOlder, error, listAvailable, streamingText, executionStatus, onLoadOlder }: ConversationViewProps) {
+export function ConversationView({ session, loading, syncing, loadingOlder, error, listAvailable, streamingText, executionStatus, onLoadOlder }: ConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingOlderRef = useRef(false);
   const stickToBottomRef = useRef(true);
@@ -130,6 +131,9 @@ export function ConversationView({ session, loading, loadingOlder, error, listAv
       <div className={styles.scrollArea} ref={scrollRef}>
         <section className={styles.conversation} aria-label="真实项目对话" aria-live="polite">
         {loading ? <div className={styles.loading}>正在读取对话…</div> : null}
+        {!loading && session && (error || syncing) ? (
+          <div className={styles.older}>{error || "正在同步最新内容…"}</div>
+        ) : null}
         {loadingOlder ? <div className={styles.older}>正在加载更早消息…</div> : null}
         {!loading && error && !session ? <div className={styles.state}>{error}</div> : null}
         {!loading && !error && !session && listAvailable ? <div className={styles.state}>当前项目暂无可显示对话</div> : null}

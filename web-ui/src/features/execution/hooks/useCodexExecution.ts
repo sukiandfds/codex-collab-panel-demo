@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { executionApi } from "../data/executionApi";
 import type { ExecutionStatus, ProjectEvent } from "../model/types";
 
+const SEND_CONFIRM_TIMEOUT_MS = 20000;
+
 const idleStatus = (threadId: string): ExecutionStatus => ({
   type: "execution_status",
   threadId,
@@ -10,6 +12,8 @@ const idleStatus = (threadId: string): ExecutionStatus => ({
   label: "Codex 已就绪",
   detail: "",
   commentary: "",
+  streamingItemId: "",
+  streamingText: "",
   activities: [],
   active: false,
   startedAt: null,
@@ -22,13 +26,13 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
   const [commentaryText, setCommentaryText] = useState("");
   const streamingItemId = useRef("");
   const streamingBuffer = useRef("");
-  const streamingFrame = useRef(0);
+  const streamingTimer = useRef(0);
   const sendingRef = useRef(false);
   const [sending, setSending] = useState(false);
 
   const clearStreaming = useCallback(() => {
-    if (streamingFrame.current) window.cancelAnimationFrame(streamingFrame.current);
-    streamingFrame.current = 0;
+    window.clearTimeout(streamingTimer.current);
+    streamingTimer.current = 0;
     streamingBuffer.current = "";
     streamingItemId.current = "";
     setStreamingText("");
@@ -37,22 +41,31 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
   const applyStatus = useCallback((next: ExecutionStatus) => {
     setStatus({ ...next, turnId: next.turnId || "", activities: next.activities || [] });
     setCommentaryText(next.commentary || "");
+    if (next.streamingText !== undefined) {
+      window.clearTimeout(streamingTimer.current);
+      streamingTimer.current = 0;
+      streamingItemId.current = next.streamingItemId || "";
+      streamingBuffer.current = next.streamingText;
+      setStreamingText(next.streamingText);
+    }
   }, []);
 
   const refreshStatus = useCallback(async (signal?: AbortSignal) => {
-    if (!threadId) return;
+    if (!threadId) return null;
     try {
-      applyStatus(await executionApi.status(threadId, signal));
+      const next = await executionApi.status(threadId, signal);
+      applyStatus(next);
+      return next;
     } catch {
-      if (!signal?.aborted) applyStatus(idleStatus(threadId));
+      return null;
     }
   }, [applyStatus, threadId]);
 
   useEffect(() => {
     clearStreaming();
     setCommentaryText("");
+    setStatus(idleStatus(threadId));
     if (!threadId) {
-      setStatus(idleStatus(""));
       return;
     }
     const controller = new AbortController();
@@ -61,7 +74,7 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
   }, [clearStreaming, refreshStatus, threadId]);
 
   useEffect(() => () => {
-    if (streamingFrame.current) window.cancelAnimationFrame(streamingFrame.current);
+    window.clearTimeout(streamingTimer.current);
   }, []);
 
   const handleEvent = useCallback((event: ProjectEvent) => {
@@ -82,11 +95,11 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
       if (streamingItemId.current !== event.itemId) streamingBuffer.current = event.delta;
       else streamingBuffer.current += event.delta;
       streamingItemId.current = event.itemId;
-      if (!streamingFrame.current) {
-        streamingFrame.current = window.requestAnimationFrame(() => {
-          streamingFrame.current = 0;
+      if (!streamingTimer.current) {
+        streamingTimer.current = window.setTimeout(() => {
+          streamingTimer.current = 0;
           setStreamingText(streamingBuffer.current);
-        });
+        }, 100);
       }
       return;
     }
@@ -98,26 +111,31 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
     sendingRef.current = true;
     setSending(true);
     const steering = status.active;
+    const previousTurnId = status.turnId;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), SEND_CONFIRM_TIMEOUT_MS);
     if (!steering) {
       clearStreaming();
       setCommentaryText("");
-      setStatus({
-        ...idleStatus(threadId),
-        phase: "submitted",
-        label: "指令正在发送",
-        commentary: "",
-        activities: [],
-        active: true,
-        startedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
     }
     try {
-      await executionApi.sendMessage(threadId, message, attachmentIds);
+      await executionApi.sendMessage(threadId, message, attachmentIds, controller.signal);
       onMessageAccepted();
+      void refreshStatus();
       return true;
     } catch (reason) {
-      const detail = reason instanceof Error ? reason.message : String(reason);
+      const recovered = await refreshStatus();
+      const acceptedAfterFailure = !steering
+        && Boolean(recovered?.turnId)
+        && recovered?.turnId !== previousTurnId
+        && !["failed", "systemError"].includes(recovered?.phase || "");
+      if (acceptedAfterFailure) {
+        onMessageAccepted();
+        return true;
+      }
+      const detail = controller.signal.aborted
+        ? "发送确认超时，未重复提交；请确认任务状态后重试"
+        : reason instanceof Error ? reason.message : String(reason);
       if (steering) {
         setStatus((current) => ({ ...current, detail }));
       } else {
@@ -131,10 +149,11 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
       }
       return false;
     } finally {
+      window.clearTimeout(timeout);
       sendingRef.current = false;
       setSending(false);
     }
-  }, [clearStreaming, onMessageAccepted, status.active, threadId]);
+  }, [clearStreaming, onMessageAccepted, refreshStatus, status.active, threadId]);
 
   const interrupt = useCallback(async () => {
     if (!threadId || !status.active || sendingRef.current) return false;

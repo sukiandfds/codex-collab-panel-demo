@@ -18,21 +18,31 @@ const emptyStatus = (threadId: string): ContextStatus => ({
 export function useContextManagement(threadId: string) {
   const [status, setStatus] = useState<ContextStatus>(() => emptyStatus(threadId));
 
-  useEffect(() => {
-    setStatus(emptyStatus(threadId));
-    if (!threadId) return;
-    const controller = new AbortController();
-    void contextApi.status(threadId, controller.signal).then(setStatus).catch((reason) => {
-      if (!controller.signal.aborted) {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
+    if (!threadId) return null;
+    try {
+      const next = await contextApi.status(threadId, signal);
+      setStatus(next);
+      return next;
+    } catch (reason) {
+      if (!signal?.aborted) {
         setStatus((current) => ({
           ...current,
           phase: "failed",
           message: reason instanceof Error ? reason.message : String(reason),
         }));
       }
-    });
-    return () => controller.abort();
+      return null;
+    }
   }, [threadId]);
+
+  useEffect(() => {
+    setStatus(emptyStatus(threadId));
+    if (!threadId) return;
+    const controller = new AbortController();
+    void refresh(controller.signal);
+    return () => controller.abort();
+  }, [refresh, threadId]);
 
   const handleEvent = useCallback((event: ContextStatus) => {
     if (event.type === "context_status" && event.threadId === threadId) setStatus(event);
@@ -68,5 +78,5 @@ export function useContextManagement(threadId: string) {
     }
   }, [threadId]);
 
-  return { status, handleEvent, compact, setThreshold };
+  return { status, handleEvent, compact, setThreshold, refresh };
 }

@@ -4,6 +4,8 @@ import remarkGfm from "remark-gfm";
 import { Bot } from "lucide-react";
 import { JumpToLatest } from "../../../components/JumpToLatest/JumpToLatest";
 import { AttachmentDisplay } from "../../attachments/components/AttachmentDisplay";
+import { ArtifactCollection } from "../../artifacts/components/ArtifactCollection";
+import type { Artifact, ArtifactReviewDecision } from "../../artifacts/model/types";
 import type { GroupAgent, GroupMessage } from "../model/types";
 import styles from "../GroupChat.module.css";
 
@@ -15,10 +17,26 @@ const dayText = (value: string) => {
   return new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(date);
 };
 
-export function MessageTimeline({ messages, agents, streaming }: {
+export function MessageTimeline({
+  messages,
+  agents,
+  streaming,
+  artifacts,
+  artifactLoadErrors,
+  reviewingArtifactIds,
+  reviewerName,
+  onRetryArtifact,
+  onReviewArtifact,
+}: {
   messages: GroupMessage[];
   agents: GroupAgent[];
   streaming: Record<string, { itemId: string; text: string }>;
+  artifacts: Record<string, Artifact>;
+  artifactLoadErrors: Record<string, boolean>;
+  reviewingArtifactIds: Set<string>;
+  reviewerName: string;
+  onRetryArtifact: (artifactId: string) => Promise<void>;
+  onReviewArtifact: (artifactId: string, decision: ArtifactReviewDecision, note: string, reviewedBy: string) => Promise<void>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -61,6 +79,15 @@ export function MessageTimeline({ messages, agents, streaming }: {
                 <div className={styles.messageMeta}><strong>{message.authorName}</strong><span>{timeText(message.createdAt)}</span>{message.mode === "development" ? <em>开发</em> : null}</div>
                 {message.type === "agent" ? <div className={styles.markdown}><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text}</ReactMarkdown></div> : message.text ? <p>{message.text}</p> : null}
                 <AttachmentDisplay files={message.attachments || []} />
+                <ArtifactCollection
+                  artifactIds={message.artifactIds || []}
+                  artifacts={artifacts}
+                  loadErrors={artifactLoadErrors}
+                  reviewingIds={reviewingArtifactIds}
+                  reviewerName={reviewerName}
+                  onRetry={onRetryArtifact}
+                  onReview={onReviewArtifact}
+                />
               </div>
             </article>
           </Fragment>

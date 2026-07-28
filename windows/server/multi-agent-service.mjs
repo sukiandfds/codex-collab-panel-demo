@@ -50,7 +50,7 @@ const transcriptText = (messages) => {
   return transcript.join("\n\n");
 };
 
-export const buildDiscussionPrompt = ({ agent, mode, requestText, snapshot, followUp }) => {
+export const buildDiscussionPrompt = ({ agent, mode, requestText, snapshot, followUp, outputInstructions = "" }) => {
   const agentNames = snapshot.agents.map((item) => `@${item.name}`).join("、");
   const modeRule = mode === "development"
     ? "这是开发模式。只有发起人的要求明确授权修改时才执行代码或文件操作，并保持最小改动。"
@@ -61,7 +61,7 @@ export const buildDiscussionPrompt = ({ agent, mode, requestText, snapshot, foll
     ? "其他 Agent 已经给出意见。请结合他们的内容进行对齐，指出分歧并形成当前可执行结论。"
     : "请从你的专业职责出发回应本轮要求。";
 
-  return [
+  const lines = [
     "你正在参与一个公开的项目群讨论。你的回复会以你的 Agent 身份直接显示在群消息中。",
     `当前身份：${agent.name}（${agent.responsibility}）`,
     modeRule,
@@ -75,10 +75,12 @@ export const buildDiscussionPrompt = ({ agent, mode, requestText, snapshot, foll
     "",
     "最近群聊记录：",
     transcript || "（暂无更早记录）",
-  ].join("\n");
+  ];
+  if (outputInstructions) lines.push("", "本轮成果输出约束：", outputInstructions);
+  return lines.join("\n");
 };
 
-export const createMultiAgentService = ({ projectRoot, room, broadcast }) => {
+export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutputs }) => {
   const client = createAppServerClient();
   const threadAgents = new Map();
   const activeModes = new Map();
@@ -111,8 +113,8 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast }) => {
       detail: errorMessage,
     });
     Promise.resolve(run.messageWrite)
-      .catch(() => {})
-      .then(() => run.resolve({ status, text: run.finalText }));
+      .then((message) => run.resolve({ status, text: run.finalText, message: message || null }))
+      .catch(() => run.resolve({ status, text: run.finalText, message: null }));
   };
 
   const handleProtocolMessage = (message) => {
@@ -184,14 +186,17 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast }) => {
     return threadId;
   };
 
-  const runAgent = async ({ agentId, mode, requestText, followUp, attachments }) => {
+  const runAgent = async ({ agentId, mode, requestText, followUp, attachments, outputJob }) => {
     if (closed) throw new Error("多 Agent 服务已关闭");
     const agent = room.getAgent(agentId);
     if (!agent) throw Object.assign(new Error("Agent 不存在"), { statusCode: 404 });
 
     await setStatus(agentId, { phase: "submitted", label: "已接收群聊任务", detail: "正在连接 Codex", active: true });
     const threadId = await ensureThread(agent);
-    const prompt = buildDiscussionPrompt({ agent, mode, requestText, snapshot: room.snapshot(), followUp });
+    const outputInstructions = outputJob && outputJob.agentId === agentId
+      ? webOutputs.buildAgentInstructions(outputJob)
+      : "";
+    const prompt = buildDiscussionPrompt({ agent, mode, requestText, snapshot: room.snapshot(), followUp, outputInstructions });
     activeModes.set(agentId, mode);
 
     let resolveRun;
@@ -221,7 +226,7 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast }) => {
     }
   };
 
-  const runDiscussion = async ({ agentIds, mode, requestText, attachments }) => {
+  const runDiscussion = async ({ agentIds, mode, requestText, attachments, outputJob }) => {
     const agents = room.snapshot().agents;
     const pending = cleanAgentIds(agentIds, agents);
     const runCounts = new Map();
@@ -241,9 +246,47 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast }) => {
 
       const followUp = turns > 0;
       try {
-        const result = await runAgent({ agentId, mode, requestText, followUp, attachments });
+        const result = await runAgent({ agentId, mode, requestText, followUp, attachments, outputJob });
         turns += 1;
         runCounts.set(agentId, (runCounts.get(agentId) || 0) + 1);
+        if (outputJob && outputJob.agentId === agentId) {
+          if (!result.message?.id) {
+            webOutputs.abandonJob(outputJob.jobId);
+            await room.addMessage({
+              type: "system", authorId: "system", authorName: "系统", agentId, mode,
+              text: "网页成果处理失败：Agent 未生成可关联的最终群消息。",
+            });
+            finishStatus(agentId, { phase: "failed", label: "网页成果处理失败", detail: "缺少最终群消息" });
+            return;
+          }
+          await setStatus(agentId, { phase: "working", label: "正在生成网页与 PDF", detail: "正在验证并发布成果", active: true });
+          try {
+            const output = await webOutputs.completeJob({
+              job: outputJob,
+              finalMessageId: result.message.id,
+              createdByAgent: agentId,
+              createdByName: room.getAgent(agentId)?.name || agentId,
+            });
+            for (const artifact of output.artifacts) await room.attachArtifact(result.message.id, artifact.id);
+            if (output.pdfError) {
+              await room.addMessage({
+                type: "system", authorId: "system", authorName: "系统", agentId, mode,
+                text: `HTML 已保留，PDF 生成失败：${output.pdfError}`,
+              });
+              finishStatus(agentId, { phase: "failed", label: "HTML 已生成，PDF 失败", detail: output.pdfError });
+            } else {
+              finishStatus(agentId, { phase: "completed", label: "网页与 PDF 已生成", detail: "成果已附到群消息" });
+            }
+          } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error);
+            await room.addMessage({
+              type: "system", authorId: "system", authorName: "系统", agentId, mode,
+              text: `网页成果处理失败：${detail}`,
+            });
+            finishStatus(agentId, { phase: "failed", label: "网页成果处理失败", detail });
+          }
+          return;
+        }
         if (agentId !== "manager") needsManagerFollowUp = true;
 
         for (const mentionedId of mentionedAgentIds(result.text, room.snapshot().agents)) {
@@ -255,6 +298,7 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast }) => {
           }
         }
       } catch (error) {
+        if (outputJob) webOutputs.abandonJob(outputJob.jobId);
         turns += 1;
         runCounts.set(agentId, (runCounts.get(agentId) || 0) + 1);
         await room.addMessage({
@@ -269,15 +313,20 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast }) => {
     }
   };
 
-  const enqueueDiscussion = ({ agentIds, mode, requestText, attachments = [] }) => {
+  const enqueueDiscussion = async ({ agentIds, mode, requestText, attachments = [], sourceMessageId = "" }) => {
     const agents = room.snapshot().agents;
-    const targets = cleanAgentIds(agentIds, agents);
+    let targets = cleanAgentIds(agentIds, agents);
     if (!targets.length) throw Object.assign(new Error("请选择一个可用 Agent"), { statusCode: 404 });
-    const jobId = randomUUID();
+    const outputJob = webOutputs?.isRequest(requestText)
+      ? await webOutputs.createJob({ sourceMessageId, agentId: "developer" })
+      : null;
+    if (outputJob) targets = ["developer"];
+    const executionMode = outputJob ? "development" : mode;
+    const jobId = outputJob?.jobId || randomUUID();
     void setStatus(targets[0], { phase: "queued", label: "已加入讨论队列", detail: "", active: true });
     workQueue = workQueue
       .catch(() => {})
-      .then(() => runDiscussion({ agentIds: targets, mode, requestText, attachments }))
+      .then(() => runDiscussion({ agentIds: targets, mode: executionMode, requestText, attachments, outputJob }))
       .catch((error) => console.warn(`[multi-agent] discussion ${jobId} failed: ${error.message}`));
     return { jobId, agentIds: targets, status: "queued" };
   };

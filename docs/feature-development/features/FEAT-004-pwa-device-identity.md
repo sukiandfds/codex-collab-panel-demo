@@ -106,5 +106,5 @@ index.html / group.html
 ## 下一步
 
 - 用户先在真实手机和 iPad 上确认安装入口、布局和切换体验。
-- 需要公网访问时，单独选择 HTTPS Tunnel 与正式鉴权方案，不把 Demo Token 当成账号系统。
+- 需要公网访问时按 [`FEAT-006`](./FEAT-006-stable-remote-access.md) 配置固定 Named Tunnel、固定域名和正式鉴权，不再使用随机 Quick Tunnel 作为长期入口。
 - 需要多台电脑时，再设计稳定设备 ID、显示名、最后在线时间和设备选择，不仅依赖主机名。

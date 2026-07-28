@@ -1,0 +1,19 @@
+.select {
+  max-width: 126px;
+  height: 26px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 11px;
+  text-overflow: ellipsis;
+}
+
+.select:not(:disabled) { cursor: pointer; }
+.select:disabled { opacity: .65; }
+.select option { background: var(--color-composer); color: var(--color-text); }
+
+@media (max-width: 760px) {
+  .select { max-width: 92px; }
+}

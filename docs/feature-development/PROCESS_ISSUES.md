@@ -1,7 +1,7 @@
 ---
 document_type: reusable_process_issues
 schema_version: 1
-last_updated: 2026-07-26 01:40 +08:00
+last_updated: 2026-07-28 01:02 +08:00
 audience: ai_assistants_and_maintainers
 ---
 
@@ -26,6 +26,9 @@ audience: ai_assistants_and_maintainers
 | `PROC-011` | `active` | 架构/状态 | 把同一 Thread、同一 SSE 或相似 UI 误当成统一运行实例 | 先确认事件生产者、连接实例、状态所有权和恢复机制 | `DEVELOPMENT_PROCESS_BLOCKERS_2026-07-25.md#blocker-009`、`#blocker-010` |
 | `PROC-012` | `active` | PowerShell/编码 | PowerShell 行为、Unicode、退出码或 GUI 进程状态判断错误 | 使用 Windows PowerShell 5 兼容语法；以产物和接口验证，不只看退出码 | `AI_ASSISTANT_READ_FIRST.md#1210-PowerShell-兼容性和编码问题` |
 | `PROC-013` | `active` | 沟通/记忆 | 用户反复明确的偏好没有及时写入操作手册，导致后续助手再次违反并增加用户阅读和沟通负担 | 严肃且重复出现的偏好立即写入 `AI_ASSISTANT_READ_FIRST.md` 或本台账；方向讨论确认后再归档为产品决定 | 本次 2026-07-26 反馈 |
+| `PROC-014` | `active` | 文档/时间线 | 新版本记录插入错误位置或更新时间早于已有记录，破坏功能历史顺序 | 写入前先读当前版本和最后时间；版本时间线只在末尾按时间正序追加 | `FEAT-007` v0.2.0-v0.2.1 记录整理 |
+| `PROC-015` | `active` | 隧道/服务 | 混淆本地管理 Tunnel 与 Token 管理 Tunnel，连接成功但 origin 缺失并可能暴露 Token | 安装前先确认管理模式；本地 ingress 使用显式 config 和 credentials file，禁止输出服务中的 Token | `FEAT-006-I02`、`FEAT-006-I03` |
+| `PROC-016` | `active` | `P0` 执行/停点 | 基础设施排查没有阶段停点，连续试错和重复验证严重浪费用户资源 | 出现第二种根因、第二次提权/重装或第三轮验证时立即停止 | `FEAT-006-I05`、`AI_ASSISTANT_READ_FIRST.md#1214-p0公网入口排查严重浪费用户资源` |
 
 ## 详细记录
 
@@ -50,6 +53,7 @@ audience: ai_assistants_and_maintainers
 - 错误路径：把命令查询失败直接解释为服务未启动，并准备重复启动或重启服务。
 - 正确路径：先用 `netstat.exe -ano -p tcp` 定位监听 PID，再请求真实健康接口确认服务是否可用。
 - 防再犯触发器：端口命令出现 CIM/WMI 错误或同时包含错误和 `NOT_LISTENING` 时，立即停止使用该结果，切换到 `netstat` 与 HTTP 双重确认。
+- 再次发生：2026-07-28，功能检查中 `Get-NetTCPConnection` 再次因 CIM/WMI 不可用而返回无监听结论，但直接请求 `/api/project` 返回 `200`，原项目 PID 也仍存在。确认服务健康后没有执行重启。
 - 证据：`DEVELOPMENT_PROCESS_BLOCKERS_2026-07-25.md#2-blocker-001端口检查使用了错误的-windows-指令`。
 
 ### PROC-003：SSE 页面使用错误的加载完成条件
@@ -81,12 +85,13 @@ audience: ai_assistants_and_maintainers
 - 发现时间：2026-07-25 23:35 +08:00
 - 分类：普适
 - 状态：active
-- 关联功能：`FEAT-004`
+- 关联功能：`FEAT-001`、`FEAT-004`、`FEAT-006`
 - 现象：Edge 生成的截图宽度为 `390px`，但实际页面 `innerWidth` 为 `502px`；右上角控件坐标 `x=426`，截图把它裁掉，看起来像手机布局丢失。
 - 根因：把截图像素尺寸直接等同于 CSS 视口尺寸，没有验证浏览器最小 headless 窗口限制。
 - 错误路径：根据连续截图继续修改 flex 和定位样式。
 - 正确路径：第一次视觉结果与代码推断冲突时，读取 `innerWidth`、`devicePixelRatio`、`getBoundingClientRect()` 和 computed style。
 - 防再犯触发器：截图显示元素缺失，但构建产物和 DOM 均包含元素时，先验证视口与裁剪关系，不继续改 CSS。
+- 再次发生：2026-07-28，缓存同步检查连续等待 reload 场景，并用被 PowerShell 破坏的中文字符串判断页面，导致正常同步提示被误报为缺失。正确做法是先用短状态采样确认 DOM，再使用独立浏览器上下文模拟重新打开；临时脚本必须在 `finally` 关闭浏览器，避免失败后等待命令超时。
 - 证据：2026-07-25 临时 CDP 检查返回 `viewport.width=502`、切换控件 `display=flex`、`visibility=visible`；临时文件已删除。
 
 ### PROC-006：扫描和补丁范围过大
@@ -100,6 +105,7 @@ audience: ai_assistants_and_maintainers
 - 根因：工具调用范围超过当前判断所需，补丁原子过大。
 - 正确路径：文件发现使用 `rg --files` 并排除依赖和产物；补丁按功能边界拆分，先后端、再共享组件、再入口配置。
 - 防再犯触发器：命令准备递归仓库根目录，或单个补丁跨越三个以上功能层时，立即缩小范围。
+- 再次发生：2026-07-27，`FEAT-007` 首次前端补丁同时新增功能域并修改多个群聊文件，因 `MessageTimeline.tsx` 一处上下文不匹配导致整个补丁拒绝。之后改为“先新增文件，再逐个接线”的小补丁并成功完成。
 
 ### PROC-007：策略限制后重复同类尝试
 
@@ -111,6 +117,7 @@ audience: ai_assistants_and_maintainers
 - 根因：没有在第一次错误后区分“代码问题”和“执行策略问题”。
 - 正确路径：确认策略拦截后停止变化相同的命令，改用已有项目启动脚本、当前服务或纯函数检查。
 - 防再犯触发器：错误信息包含 `blocked by policy` 时，不再用改写语法的方式重试同类操作。
+- 再次发生：2026-07-27，Quick Tunnel 后台启动命令被策略拦截后，拆开停止与启动步骤再次使用 `Start-Process`，仍被拦截。确认仓库没有现成脚本后，才改用当前 Codex 管理的前台长连接。
 
 ### PROC-008：根据控件名称猜测 DOM 与可访问性角色
 
@@ -146,6 +153,7 @@ audience: ai_assistants_and_maintainers
 - 错误路径：在已有运行时可用时准备安装依赖，或直接运行会重建环境的通用命令。
 - 正确路径：先读 `package.json` 和项目脚本；确认 Node、pnpm、store 与现有模块来源；浏览器检查依次核对现有插件、Codex Node REPL 和系统 Edge，均不可用后才讨论安装。
 - 防再犯触发器：命令准备安装、重建或更换 store，或本地 `.bin` 缺失时，先检查项目已有封装与宿主运行时，不自动增加依赖。
+- 再次发生：2026-07-28，`pnpm exec playwright` 不存在且默认 Playwright Chromium 未安装。没有安装新依赖；通过宿主依赖清单找到已有 Playwright 包，并显式使用本机 Edge 完成检查。以后应先读取宿主依赖路径，再决定工具是否不可用。
 - 证据：`DEVELOPMENT_PROCESS_BLOCKERS_2026-07-25.md#8-blocker-007playwright-可用性判断不完整`、`AI_ASSISTANT_READ_FIRST.md#1212-构建工具链未先锁定`。
 
 ### PROC-011：把共享 Thread 或相似页面误当成共享运行状态
@@ -171,6 +179,8 @@ audience: ai_assistants_and_maintainers
 - 正确路径：使用 Windows PowerShell 5 兼容语法；中文文件显式 `-Encoding UTF8`；复杂参数使用数组和 `-LiteralPath`；启动结果、PID、日志和 HTTP readiness 分别验证。
 - 防再犯触发器：出现中文乱码、Unexpected token、参数被截断或“服务可访问但命令失败”时，先检查 shell 版本、编码和分层退出状态。
 - 再次发生：2026-07-25，使用 `rg ... docs/feature-development/features/*.md` 时 PowerShell 没有展开通配符，`rg` 把它当成非法路径。Windows 下应传目录并使用 `-g '*.md'` 过滤。
+- 再次发生：2026-07-27，`FEAT-007` 检查中再次把 `windows/server/*.mjs` 作为 `rg` 路径传入，Windows 返回非法路径。此后同类检索必须传目录 `windows/server`，再使用 `-g '*.mjs'` 过滤。
+- 再次发生：2026-07-28，PowerShell here-string 通过管道交给 Node 时，脚本中的中文断言被转换为问号，造成页面功能假失败和两轮无效复测。向原生进程传递临时检查脚本时应保持脚本 ASCII，中文使用 Unicode 转义，或把页面实际文本作为结构化参数传入；不能只因为 `Get-Content -Encoding UTF8` 正常就假定 native pipeline 也保持 UTF-8。
 - 证据：`AI_ASSISTANT_READ_FIRST.md#1210-powershell-兼容性和编码问题`、`DEVELOPMENT_PROCESS_BLOCKERS_2026-07-25.md#2-blocker-001端口检查使用了错误的-windows-指令`。
 
 ### PROC-013：明确用户偏好未及时写入操作手册
@@ -184,6 +194,51 @@ audience: ai_assistants_and_maintainers
 - 正确路径：明确且严肃的偏好一旦出现，立即记录到 `AI_ASSISTANT_READ_FIRST.md` 或本台账；产品方向、架构方案和远期设想仍保持讨论态，确认后再写入定案文件。
 - 防再犯触发器：用户使用“很多次”“一直”“必须”“严肃”“不要再”等表达时，先检查并更新长期记录，再继续回复或开发。
 - 影响：增加用户重复表达、阅读和沟通成本，降低助手行为的一致性。
+
+### PROC-014：功能版本时间线写入顺序错误
+
+- 发现时间：2026-07-27 22:23 +08:00
+- 分类：普适
+- 状态：active
+- 关联功能：`FEAT-007`
+- 现象：M1 和体验修复完成后，新版本记录被插入时间线顶部；一次更新时间还早于文档中已有的计划时间，造成版本号递增但时间倒退。
+- 根因：写入前只定位了“版本时间线”标题，没有读取最后一条版本记录和既有 `last_updated`，也没有执行记录规范中的“按时间正序追加”。
+- 错误路径：为了让最新信息更显眼，把新版本插在旧版本上方；直接采用本机当前时间而没有检查文档已有时间是否单调。
+- 正确路径：修改功能记录前先读取当前版本、`last_updated` 和时间线末尾；新记录只在末尾追加，时间不得早于上一条；当前结论由 YAML 和 `FEATURE_INDEX.md` 展示，不依赖倒序时间线。
+- 防再犯触发器：准备修改任何 `FEAT-*.md` 的版本或时间时，先读取该文件最后两条时间线和索引行；发现新时间不大于旧时间时暂停写入并核对时间来源。
+- 证据：`docs/feature-development/README.md` 的“版本时间线按时间正序追加”规则，以及 `FEAT-007` v0.2.0-v0.2.1 本次整理。
+
+### PROC-015：没有先区分 Cloudflare Tunnel 管理模式
+
+- 发现时间：2026-07-27 22:53 +08:00
+- 分类：普适
+- 状态：active
+- 关联功能：`FEAT-006`
+- 现象：Named Tunnel 连接器显示在线，但固定域名持续返回 `503`；Token 服务的启动参数还会被 `sc qc` 原样输出。
+- 根因：没有先确认该 Tunnel 使用本地 ingress 配置还是 Cloudflare 远程配置，直接把本地管理 Tunnel 安装成只带 Token 的服务。Token 模式成功建立连接不代表已有 origin。
+- 错误路径：把“Windows 服务 Running”“Tunnel 有 connector”和“origin 可访问”当成同一个成功条件，并在诊断输出中打印完整服务启动参数。
+- 正确路径：安装前确认管理模式。本地管理 Tunnel 使用固定 `config.yml`、credentials file 和显式 `--config ... tunnel run`；分别验证服务、connector、origin、鉴权和 SSE；任何输出都不得包含 Token。
+- 防再犯触发器：出现 Tunnel 在线但 HTTP `503`，或准备执行 `service install <TOKEN>`、`sc qc cloudflared` 时，先核对 ingress 所在位置与凭据暴露风险。
+- 影响：延长部署时间，并可能让 Tunnel Token 出现在终端或日志中。
+- 再次发生：2026-07-27，Quick Tunnel 自动继承 Named Tunnel 的 `config.yml` 与 credentials file；随机地址创建成功、连接器在线，但请求命中 ingress 兜底并返回 `404`。Quick Tunnel 必须通过 `--config NUL` 与本地 Named Tunnel 配置隔离。
+- 证据：`FEAT-006-I02`、`FEAT-006-I03`。
+
+### PROC-016：基础设施排查缺少阶段停点
+
+- 发现时间：2026-07-27 22:53 +08:00
+- P0 定级时间：2026-07-27 23:19 +08:00，由用户明确将本次资源浪费定义为 P0。
+- 优先级：P0
+- 分类：普适
+- 状态：active
+- 关联功能：`FEAT-006`
+- 现象：旧 Windows 服务卡住后，连续进行了服务清理、模式切换、重装和多轮复测；发现新的 `503` 根因后仍继续扩展检查，用户等待时间明显超过预期。
+- 根因：没有服从用户反复强调的“快速、轻量、不要钻牛角尖”，把最小公网入口错误扩展成固定域名、Windows 服务、鉴权和开机恢复；没有先调研成熟路径，也没有把“清理失效服务”“建立连接”“确认 origin”拆成独立停点。
+- 错误路径：认为只要继续操作就能一次完成长期方案，以“快做完了”为理由跨过停止信号；策略拦截后改写同类命令，新根因出现后继续追加验证，直到用户再次明确制止。
+- 正确路径：先写清用户可见的最小结果和禁止扩展项；每次只改变一层状态并做一项验证。出现第二种独立根因、第二次提权或重装、第三轮验证，或用户表达等待过久时，立即停止全部扩展操作并汇报。
+- P0 处置规则：触发后不得继续修改服务、网络、配置或进程；不得新增替代平台、守护机制或“顺便完成”的长期能力；只有用户重新明确授权一个最小动作后才能继续。
+- 防再犯触发器：第二种独立根因、第二次提权/重装、第三轮验证，以及用户使用“搞这么久”“浪费时间”“不要钻牛角尖”等表述，任一出现即触发 P0 停止规则。
+- 影响：浪费用户的等待时间、精力、注意力、心气和继续推进项目的动力；增加不必要的服务状态变化与排查成本；损害用户对助手遵守边界和可靠执行的信任。
+- 证据：`FEAT-006-I05`，2026-07-27 用户反馈“搞这么久”“一点用处都没有吗”“这次的浪费资源我定义为P0级别”。
 
 ## 维护规则
 

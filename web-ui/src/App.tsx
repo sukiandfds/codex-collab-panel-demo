@@ -29,8 +29,10 @@ export function App() {
           selectedId={conversations.selectedId}
           loading={conversations.loadingList}
           connected={conversations.connected}
+          creating={conversations.creating}
           error={conversations.listError}
           onSelect={selectSession}
+          onCreate={conversations.createSession}
           onRefresh={conversations.refresh}
         />
       }
@@ -39,6 +41,7 @@ export function App() {
         <ConversationView
           session={conversations.session}
           loading={conversations.loadingSession}
+          syncing={conversations.syncing}
           loadingOlder={conversations.loadingOlder}
           error={conversations.sessionError}
           listAvailable={!conversations.listError}
@@ -56,10 +59,15 @@ export function App() {
           status={conversations.executionStatus}
           commentary={conversations.commentaryText}
           contextStatus={conversations.contextStatus}
+          models={conversations.models}
+          modelsLoading={conversations.modelsLoading}
+          modelChanging={conversations.modelChanging}
+          modelError={conversations.modelError}
           onSend={conversations.sendMessage}
           onInterrupt={conversations.interrupt}
           onCompactContext={conversations.compactContext}
           onAutoCompactThresholdChange={conversations.setAutoCompactThreshold}
+          onModelChange={conversations.changeModel}
         />
       }
     />

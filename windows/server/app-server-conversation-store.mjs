@@ -19,8 +19,10 @@ export const inputFromAttachments = (text, attachments = []) => {
   return input;
 };
 
-export const createAppServerConversationStore = ({ projectRoot, registerMedia, onProtocolMessage, onSubmitted, onFailed }) => {
-  const client = createAppServerClient();
+export const createAppServerConversationStore = ({
+  projectRoot, registerMedia, onProtocolMessage, onSubmitted, onFailed,
+  client = createAppServerClient(),
+}) => {
   const unsubscribe = client.subscribe(onProtocolMessage || (() => {}));
   const threadCache = new Map();
 
@@ -57,6 +59,33 @@ export const createAppServerConversationStore = ({ projectRoot, registerMedia, o
     return threads
       .filter((thread) => source === "all" || sourceFromThread(thread) === source)
       .map(summaryFromThread);
+  };
+
+  const createSession = async (model = "") => {
+    const params = { cwd: projectRoot };
+    if (model) params.model = model;
+    const result = await client.request("thread/start", params);
+    const thread = result.thread;
+    threadCache.set(thread.id, thread);
+    return summaryFromThread(thread);
+  };
+
+  const listModels = async () => {
+    const models = [];
+    let cursor = null;
+    do {
+      const result = await client.request("model/list", { cursor, limit: 100 });
+      models.push(...result.data);
+      cursor = result.nextCursor;
+    } while (cursor);
+    return models.map((entry) => ({
+      id: entry.id,
+      model: entry.model,
+      displayName: entry.displayName,
+      description: entry.description,
+      isDefault: entry.isDefault,
+      supportedReasoningEfforts: entry.supportedReasoningEfforts || [],
+    }));
   };
 
   const findSession = async (threadId, source = "all", { before, limit } = {}) => {
@@ -127,13 +156,19 @@ export const createAppServerConversationStore = ({ projectRoot, registerMedia, o
     return client.request("thread/compact/start", { threadId });
   };
 
+  const updateModel = async (threadId, model) => {
+    await resumeThread(threadId);
+    await client.request("thread/settings/update", { threadId, model });
+    return getRuntimeContext(threadId);
+  };
+
   const close = () => {
     unsubscribe();
     client.close();
   };
 
   return {
-    listSessions, findSession, sendMessage, steerMessage, interrupt,
-    getRuntimeContext, compactContext, close,
+    listSessions, createSession, findSession, sendMessage, steerMessage, interrupt,
+    listModels, updateModel, getRuntimeContext, compactContext, close,
   };
 };
