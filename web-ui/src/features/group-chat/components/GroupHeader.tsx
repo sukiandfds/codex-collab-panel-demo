@@ -2,7 +2,7 @@ import { MessageSquareText } from "lucide-react";
 import { ViewSwitcher } from "../../../components/ViewSwitcher/ViewSwitcher";
 import { DeviceStatus } from "../../device/components/DeviceStatus";
 import type { GroupAgent, GroupMember, StoredMember } from "../model/types";
-import styles from "../GroupChat.module.css";
+import styles from "./GroupHeader.module.css";
 
 export function GroupHeader({ roomName, connected, deviceName, members, agents, member, onEditMember }: {
   roomName: string;

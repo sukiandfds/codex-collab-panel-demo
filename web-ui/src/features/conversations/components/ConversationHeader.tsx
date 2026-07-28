@@ -1,10 +1,10 @@
 import { Folder, PanelLeft } from "lucide-react";
-import { DeviceStatus } from "../../features/device/components/DeviceStatus";
-import type { ProjectInfo, SessionDetail } from "../../features/conversations/model/types";
-import { ViewSwitcher } from "../ViewSwitcher/ViewSwitcher";
-import styles from "./Topbar.module.css";
+import { ViewSwitcher } from "../../../components/ViewSwitcher/ViewSwitcher";
+import { DeviceStatus } from "../../device/components/DeviceStatus";
+import type { ProjectInfo, SessionDetail } from "../model/types";
+import styles from "./ConversationHeader.module.css";
 
-interface TopbarProps {
+interface ConversationHeaderProps {
   project: ProjectInfo | null;
   session: SessionDetail | null;
   deviceName?: string;
@@ -12,7 +12,7 @@ interface TopbarProps {
   onOpenSidebar: () => void;
 }
 
-export function Topbar({ project, session, deviceName, connected, onOpenSidebar }: TopbarProps) {
+export function ConversationHeader({ project, session, deviceName, connected, onOpenSidebar }: ConversationHeaderProps) {
   return (
     <header className={styles.topbar}>
       <button className={`${styles.iconButton} ${styles.mobileOnly}`} type="button" aria-label="打开侧栏" title="打开侧栏" onClick={onOpenSidebar}>

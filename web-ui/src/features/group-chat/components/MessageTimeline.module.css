@@ -1,0 +1,40 @@
+.timelineShell { position: relative; min-width: 0; min-height: 0; }
+.timeline { width: 100%; height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 28px max(22px, calc((100% - 760px) / 2)) 40px; }
+.timeline::-webkit-scrollbar { width: 10px; }
+.timeline::-webkit-scrollbar-thumb { border: 3px solid #101010; border-radius: 8px; background: #3b3b3b; }
+.jumpToLatest { position: absolute; z-index: 7; right: 50%; bottom: 10px; transform: translateX(50%); }
+.dateDivider { display: flex; align-items: center; gap: 10px; margin: 0 0 22px; color: #707070; font-size: 10px; }
+.dateDivider::before, .dateDivider::after { height: 1px; flex: 1; background: #272727; content: ""; }
+.dateDivider span { flex: 0 0 auto; }
+.emptyRoom { display: grid; min-height: 100%; place-content: center; justify-items: center; gap: 8px; color: #747474; text-align: center; }
+.emptyRoom svg { width: 25px; height: 25px; }
+.emptyRoom strong { color: #aaa; font-size: 13px; }
+.message { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 11px; margin: 0 0 24px; }
+.messageAvatar { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid #3b3b3b; border-radius: 7px; background: #2d2d2d; color: #dedede; font-size: 11px; font-weight: 700; }
+.agentMessageAvatar { border-color: #55704d; background: #233020; color: #bde39b; }
+.systemMessage .messageAvatar { border-color: #6d5145; background: #30221d; color: #e0a886; }
+.messageContent { min-width: 0; padding-top: 1px; }
+.messageMeta { display: flex; min-width: 0; align-items: center; gap: 8px; margin-bottom: 5px; }
+.messageMeta strong { overflow: hidden; color: #dfdfdf; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.messageMeta span { color: #686868; font-size: 10px; }
+.messageMeta em { padding: 1px 5px; border: 1px solid #465d3f; border-radius: 4px; color: #9ac684; font-size: 9px; font-style: normal; }
+.messageContent > p { margin: 0; color: #d0d0d0; font-size: 13px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.markdown { color: #d4d4d4; font-size: 13px; line-height: 1.68; overflow-wrap: anywhere; }
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown p, .markdown ul, .markdown ol, .markdown pre, .markdown blockquote { margin: 7px 0; }
+.markdown pre { max-width: 100%; overflow-x: auto; padding: 11px; border: 1px solid #303030; border-radius: 6px; background: #171717; }
+.markdown code { font-family: "SFMono-Regular", Consolas, monospace; font-size: .92em; }
+.markdown :not(pre) > code { padding: 1px 4px; border-radius: 3px; background: #282828; }
+.markdown a { color: #a8d47d; }
+.markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.markdown th, .markdown td { padding: 6px 8px; border: 1px solid #353535; text-align: left; }
+.streamingText { margin: 0; color: #d4d4d4; font-size: 13px; line-height: 1.68; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cursor { display: inline-block; width: 5px; height: 14px; margin-left: 3px; vertical-align: -2px; background: #b9e769; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+@media (max-width: 680px) {
+  .timeline { padding: 20px 14px 28px; }
+  .message { grid-template-columns: 28px minmax(0, 1fr); gap: 9px; margin-bottom: 20px; }
+  .messageAvatar { width: 28px; height: 28px; }
+}

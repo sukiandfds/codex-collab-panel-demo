@@ -1,6 +1,6 @@
 import { Download, FileText } from "lucide-react";
-import type { MediaFile } from "../../conversations/model/types";
-import { withAccessToken } from "../../conversations/data/http";
+import type { MediaFile } from "../../../shared/model/media";
+import { withAccessToken } from "../../../shared/api/http";
 import styles from "./AttachmentDisplay.module.css";
 
 const sourceUrl = (source: string) => withAccessToken(source);

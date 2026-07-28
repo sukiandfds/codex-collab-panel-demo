@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { uploadAttachment } from "../data/attachmentApi";
-import type { MediaFile } from "../../conversations/model/types";
+import type { MediaFile } from "../../../shared/model/media";
 
 export interface DraftAttachment {
   id: string;

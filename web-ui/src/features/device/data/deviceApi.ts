@@ -1,4 +1,4 @@
-import { fetchJson } from "../../conversations/data/http";
+import { fetchJson } from "../../../shared/api/http";
 import type { DeviceInfo } from "../model/types";
 
 export const deviceApi = {

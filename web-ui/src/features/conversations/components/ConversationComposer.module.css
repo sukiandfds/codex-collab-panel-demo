@@ -19,9 +19,7 @@
   pointer-events: auto;
 }
 
-.composer:focus-within {
-  border-color: #555;
-}
+.composer:focus-within { border-color: #555; }
 
 .composer textarea {
   display: block;
@@ -42,11 +40,7 @@
 }
 
 .composer textarea:focus,
-.composer textarea:focus-visible {
-  outline: 0;
-  box-shadow: none;
-}
-
+.composer textarea:focus-visible { outline: 0; box-shadow: none; }
 .composer textarea:disabled { opacity: 1; }
 .composer textarea::placeholder { color: var(--color-text-muted); }
 
@@ -79,12 +73,7 @@
 }
 
 .sendButton:disabled { cursor: default; }
-
-.sendButton svg {
-  width: 15px;
-  height: 15px;
-  stroke-width: 1.9;
-}
+.sendButton svg { width: 15px; height: 15px; stroke-width: 1.9; }
 .sendButton svg.stopIcon { width: 10px; height: 10px; fill: currentColor; }
 
 .srOnly {

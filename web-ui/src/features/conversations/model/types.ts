@@ -1,3 +1,5 @@
+import type { MediaFile } from "../../../shared/model/media";
+
 export type MessageRole = "user" | "assistant";
 export type SessionSource = "codex" | "happy";
 
@@ -9,7 +11,6 @@ export interface ProjectInfo {
 
 export interface MarkdownBlock { id: string; type: "markdown"; text: string }
 export interface OptionsBlock { id: string; type: "options"; options: string[] }
-export interface MediaFile { id: string; name: string; mimeType: string; url: string }
 export interface ImageBlock { id: string; type: "image"; source: string; alt?: string; file?: MediaFile }
 export interface AudioBlock { id: string; type: "audio"; source: string; file?: MediaFile }
 export interface VideoBlock { id: string; type: "video"; source: string; file?: MediaFile }

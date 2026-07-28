@@ -1,4 +1,4 @@
-import { fetchJson, postJson, withAccessToken } from "../../conversations/data/http";
+import { fetchJson, postJson, withAccessToken } from "../../../shared/api/http";
 import type { GroupMode, GroupSnapshot, StoredMember } from "../model/types";
 
 export const groupApi = {

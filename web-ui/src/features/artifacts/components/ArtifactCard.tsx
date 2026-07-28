@@ -1,5 +1,5 @@
 import { Download, ExternalLink, FileText } from "lucide-react";
-import { withAccessToken } from "../../conversations/data/http";
+import { withAccessToken } from "../../../shared/api/http";
 import type { Artifact, ArtifactReviewDecision } from "../model/types";
 import { ArtifactPreview } from "./ArtifactPreview";
 import { ArtifactReviewActions } from "./ArtifactReviewActions";

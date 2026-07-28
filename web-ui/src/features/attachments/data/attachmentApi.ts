@@ -1,5 +1,5 @@
-import { withAccessToken } from "../../conversations/data/http";
-import type { MediaFile } from "../../conversations/model/types";
+import { withAccessToken } from "../../../shared/api/http";
+import type { MediaFile } from "../../../shared/model/media";
 
 export const uploadAttachment = async (file: File, signal?: AbortSignal): Promise<MediaFile> => {
   const response = await fetch(withAccessToken(`/api/uploads?name=${encodeURIComponent(file.name)}`), {

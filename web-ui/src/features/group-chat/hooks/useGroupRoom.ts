@@ -1,39 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createMemberId, readStoredMember, writeStoredMember } from "../data/groupMemberStorage";
 import { groupApi } from "../data/groupApi";
-import type { GroupEvent, GroupMode, GroupSnapshot, StoredMember } from "../model/types";
-import type { ArtifactRealtimeEvent } from "../../artifacts/model/types";
-
-const memberKey = "codex-collab-group-member";
-
-const createMemberId = () => globalThis.crypto?.randomUUID?.()
-  || `member-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-
-const readMember = (): StoredMember | null => {
-  try {
-    const value = JSON.parse(localStorage.getItem(memberKey) || "null") as StoredMember | null;
-    return value?.id && value?.name ? value : null;
-  } catch {
-    return null;
-  }
-};
+import type { GroupMode, GroupSnapshot, StoredMember } from "../model/types";
+import { useGroupEvents } from "../realtime/useGroupEvents";
 
 export function useGroupRoom() {
   const [snapshot, setSnapshot] = useState<GroupSnapshot | null>(null);
-  const [member, setMember] = useState<StoredMember | null>(readMember);
-  const [connected, setConnected] = useState(false);
+  const [member, setMember] = useState<StoredMember | null>(readStoredMember);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const [streaming, setStreaming] = useState<Record<string, { itemId: string; text: string }>>({});
-  const [artifactEvent, setArtifactEvent] = useState<ArtifactRealtimeEvent | null>(null);
-  const streamingBuffer = useRef<Record<string, { itemId: string; text: string }>>({});
-  const streamingFrame = useRef(0);
   const sendingRef = useRef(false);
+  const realtime = useGroupEvents(setSnapshot);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     try {
-      const next = await groupApi.snapshot(signal);
-      setSnapshot(next);
+      setSnapshot(await groupApi.snapshot(signal));
       setError("");
     } catch (reason) {
       if (!signal?.aborted) setError(reason instanceof Error ? reason.message : String(reason));
@@ -49,63 +31,6 @@ export function useGroupRoom() {
   }, [refresh]);
 
   useEffect(() => {
-    const events = new EventSource(groupApi.eventsUrl());
-    events.onopen = () => setConnected(true);
-    events.onerror = () => setConnected(false);
-    events.onmessage = (message) => {
-      try {
-        const event = JSON.parse(message.data) as GroupEvent;
-        if (event.type === "group_message_created") {
-          setSnapshot((current) => current && current.messages.some((item) => item.id === event.message.id)
-            ? current
-            : current && { ...current, messages: [...current.messages, event.message] });
-          if (event.message.agentId) {
-            const nextBuffer = { ...streamingBuffer.current };
-            delete nextBuffer[event.message.agentId];
-            streamingBuffer.current = nextBuffer;
-            setStreaming((current) => {
-              const next = { ...current };
-              delete next[event.message.agentId!];
-              return next;
-            });
-          }
-        } else if (event.type === "group_message_updated") {
-          setSnapshot((current) => current && {
-            ...current,
-            messages: current.messages.map((item) => item.id === event.message.id ? event.message : item),
-          });
-        } else if (event.type === "group_agent_updated") {
-          setSnapshot((current) => current && {
-            ...current,
-            agents: current.agents.map((agent) => agent.id === event.agent.id ? event.agent : agent),
-          });
-        } else if (event.type === "group_members_changed") {
-          setSnapshot((current) => current && { ...current, members: event.members });
-        } else if (event.type === "group_agent_delta") {
-          const previous = streamingBuffer.current[event.agentId];
-          streamingBuffer.current = {
-            ...streamingBuffer.current,
-            [event.agentId]: {
-              itemId: event.itemId,
-              text: previous?.itemId === event.itemId ? previous.text + event.delta : event.delta,
-            },
-          };
-          if (!streamingFrame.current) {
-            streamingFrame.current = window.requestAnimationFrame(() => {
-              streamingFrame.current = 0;
-              setStreaming(streamingBuffer.current);
-            });
-          }
-        } else if (event.type === "artifact.ready" || event.type === "artifact.reviewed") setArtifactEvent(event);
-      } catch {}
-    };
-    return () => {
-      events.close();
-      if (streamingFrame.current) window.cancelAnimationFrame(streamingFrame.current);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!member) return;
     const controller = new AbortController();
     const ping = () => groupApi.presence(member, controller.signal).catch(() => {});
@@ -118,14 +43,9 @@ export function useGroupRoom() {
   }, [member]);
 
   const join = useCallback(async (name: string) => {
-    const next = { id: member?.id || createMemberId(), name: name.trim() };
-    const joined = await groupApi.join(next);
+    const joined = await groupApi.join({ id: member?.id || createMemberId(), name: name.trim() });
     setMember(joined);
-    try {
-      localStorage.setItem(memberKey, JSON.stringify(joined));
-    } catch {
-      // Storage may be unavailable in private or restricted mobile browsers.
-    }
+    writeStoredMember(joined);
     return joined;
   }, [member?.id]);
 
@@ -146,5 +66,10 @@ export function useGroupRoom() {
     }
   }, [member]);
 
-  return { snapshot, member, connected, loading, sending, error, streaming, artifactEvent, join, send, refresh };
+  return {
+    snapshot, member, loading, sending, error, join, send, refresh,
+    connected: realtime.connected,
+    streaming: realtime.streaming,
+    artifactEvent: realtime.artifactEvent,
+  };
 }

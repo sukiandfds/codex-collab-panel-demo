@@ -1,6 +1,6 @@
 import { FolderKanban, Users } from "lucide-react";
 import type { GroupMember } from "../model/types";
-import styles from "../GroupChat.module.css";
+import styles from "./RoomSidebar.module.css";
 
 export function RoomSidebar({ project, members }: { project: string; members: GroupMember[] }) {
   return (

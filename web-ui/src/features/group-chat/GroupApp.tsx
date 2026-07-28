@@ -9,7 +9,7 @@ import { useGroupRoom } from "./hooks/useGroupRoom";
 import type { GroupMode } from "./model/types";
 import { useDeviceInfo } from "../device/hooks/useDeviceInfo";
 import { useArtifacts } from "../artifacts/hooks/useArtifacts";
-import styles from "./GroupChat.module.css";
+import styles from "./GroupApp.module.css";
 
 export function GroupApp() {
   const group = useGroupRoom();

@@ -35,6 +35,7 @@
 1. **当前优先收尾单人 Codex Web 基础体验，群聊与多 Agent 保留为后续重点。** 单人页稳定后仍以一个项目群继续真实讨论：默认项目经理参与，其他 Agent 通过 `@` 加入；不要扩展跨项目聚合、完整多人权限或企业协作系统。
 2. **所有展示内容必须来自这个项目的真实数据。** 不要用虚构会话、占位成员、假进度或演示文案替代真实内容。
 3. **UI、内容和功能必须分开维护。** UI 文件只负责视觉；内容解析只负责数据；功能组件按功能归属拆分。
+   具体目录和依赖规则见 [`docs/architecture/MODULE_BOUNDARIES.md`](./docs/architecture/MODULE_BOUNDARIES.md)。
 4. **没有用户明确许可，不要修改 UI 样式文件。** 当前样式是否符合 Codex 复刻要求，由用户亲自验收。
 5. **不要默认执行浏览器截图、像素对比或视觉验收。** 默认只做与改动风险相匹配的代码、构建和接口检查。
 6. **保持快速、轻量和小步修改。** 不增加无关依赖，不做大范围重构，不在一个问题上持续钻牛角尖。
@@ -126,27 +127,27 @@ Codex 风格单项目对话页面
 - `windows/server/app-server-conversation-store.mjs`：把 `thread/list`、`thread/read` 结果转换成统一会话模型。
 - `windows/server/jsonl-conversation-store.mjs`：从本地 sessions JSONL 读取真实对话，作为降级数据源。
 - `windows/server/conversation-service.mjs`：选择主要数据源和降级数据源。
-- `windows/server/execution-tracker.mjs`：把 app-server Turn、Item、Delta 和错误事件转换成用户可见执行状态。
+- `windows/server/execution-tracker.mjs`：组装 app-server Turn、Item、Delta 和错误事件；活动映射位于 `windows/server/execution/`。
 - `windows/server/content-blocks.mjs`：把不同来源的消息标准化为前端可渲染的内容块。
 - `windows/server/media-service.mjs`：登记和读取附件，限制可访问文件，并支持音视频 Range 请求。
 - `windows/server/realtime-hub.mjs`：管理 SSE 客户端和刷新通知。
-- `windows/server/request-handler.mjs`：处理项目、会话、媒体、实时事件和静态页面请求。
+- `windows/server/request-handler.mjs`：只负责鉴权、功能路由分发和静态页面回退。
+- `windows/server/routes/`：按会话、群聊、成果和系统能力拆分 HTTP 接口。
+- `windows/server/http/`：请求解析、JSON 响应和访问控制。
+- `windows/server/multi-agent/`：多 Agent 提示词、协议状态和成果任务辅助逻辑。
 - `windows/server/static-files.mjs`：提供 `web-ui/dist` 静态资源。
 
 ## 6. 前端结构
 
-基础视觉组件位于：
+跨功能基础视觉组件位于：
 
 - `web-ui/src/components/AppShell/`
 - `web-ui/src/components/WindowBar/`
-- `web-ui/src/components/Sidebar/`
-- `web-ui/src/components/Topbar/`
-- `web-ui/src/components/Composer/`
 - `web-ui/src/styles/`
 
 这些文件主要决定 Codex 复刻样式。没有用户明确要求，不要修改。
 
-真实对话功能位于 `web-ui/src/features/conversations/`：
+会话侧栏、顶部栏和输入框属于真实对话功能，位于 `web-ui/src/features/conversations/components/`。真实对话功能完整目录为：
 
 - `data/`：HTTP 请求和 API 适配。
 - `model/`：项目、会话、消息和内容块类型。
@@ -154,6 +155,9 @@ Codex 风格单项目对话页面
 - `realtime/`：SSE 更新连接。
 - `components/`：会话列表、连接状态和对话视图。
 - `rendering/`：Markdown、媒体、文件和其他内容块渲染。
+- `state/`：初始化状态和乐观消息等纯状态辅助。
+
+跨功能 HTTP 和稳定媒体类型位于 `web-ui/src/shared/`。任何新功能不得反向引用 `conversations/data` 获取公共网络能力。
 
 后续功能应继续按功能归属放置，不要重新堆回 `App.tsx`，也不要为了接数据顺带改视觉组件。
 
@@ -280,6 +284,8 @@ https://bind-calibration-everywhere-chan.trycloudflare.com/?token=demo123
 问题：早期虽然拆出了侧栏、顶部栏和对话区，但请求、状态、实时连接、内容类型和媒体职责仍混在一起。
 
 经验：大型长期项目应同时保留两种边界：基础视觉组件按页面结构组织，业务能力按功能归属组织。
+
+2026-07-28 已完成一次全量文件整理：会话输入、侧栏和顶部栏归回 `features/conversations`；公共 HTTP 与媒体类型进入 `shared`；会话大 Hook、群聊实时状态、群聊 CSS 和后端集中路由完成拆分。后续不得重新堆回集中入口。
 
 ### 12.5 JSONL 首行被固定长度截断
 
@@ -415,6 +421,7 @@ codex/publish-current-panel
 ## 16. AI 助手开始工作前的检查清单
 
 1. 先读本文，再读与当前任务直接相关的源码。
+   文件归属不确定时先读 [`docs/architecture/MODULE_BOUNDARIES.md`](./docs/architecture/MODULE_BOUNDARIES.md)。
 2. 查看 `git status --short --branch`，保留用户已有改动。
 3. 确认用户要求属于 UI、内容、功能、性能、运行还是公网访问中的哪一层。
 4. 如涉及 UI，确认用户是否明确允许修改样式文件。
@@ -430,6 +437,7 @@ codex/publish-current-panel
 - `docs/feature-development/FEATURE_INDEX.md`：全部功能的当前状态、版本和记录入口。
 - `docs/feature-development/PROCESS_ISSUES.md`：跨功能复用的错误路径、正确路径和防再犯规则。
 - `docs/feature-development/features/`：每个功能从计划、实现、问题到多个版本的连续记录。
+- `docs/architecture/MODULE_BOUNDARIES.md`：前后端目录、依赖方向和长文件拆分规则。
 - `PROJECT.md`：项目愿景、早期右侧面板和长期方向。
 - `DEVELOPMENT_BUG_LOG_2026-07-21.md`：入口、JSONL、启动、错误处理和开发效率问题的详细记录。
 - `DEVELOPMENT_LOG_2026-07-22.md`：真实数据、结构化渲染、性能、浏览器控制、运行时修复和 Desktop 同步边界。

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Users } from "lucide-react";
-import styles from "../GroupChat.module.css";
+import styles from "./MemberDialog.module.css";
 
 export function MemberDialog({ initialName, open, onSubmit }: {
   initialName: string;

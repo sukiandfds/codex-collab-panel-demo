@@ -1,0 +1,16 @@
+.header { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 16px; padding: 0 18px; border-bottom: 1px solid #292929; background: #121212; }
+.roomTitle, .headerActions { display: flex; min-width: 0; align-items: center; }
+.roomTitle { gap: 10px; }
+.roomTitle > svg { width: 18px; height: 18px; color: #a7a7a7; }
+.roomTitle div { display: grid; min-width: 0; gap: 1px; }
+.roomTitle strong { overflow: hidden; color: #ededed; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.roomTitle span { color: #7f7f7f; font-size: 11px; }
+.headerActions { gap: 8px; }
+.memberButton { display: inline-flex; min-height: 30px; max-width: 120px; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #303030; border-radius: 6px; padding: 0 10px; background: #191919; color: #bcbcbc; cursor: pointer; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.memberButton:hover { background: #242424; color: #f1f1f1; }
+
+@media (max-width: 680px) {
+  .header { padding: 0 80px 0 12px; }
+  .activity { display: none; }
+  .memberButton { max-width: 80px; }
+}

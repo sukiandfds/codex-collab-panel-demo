@@ -2,7 +2,7 @@ import { Download, FileText, ImageOff } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ContentBlock, SessionMessage } from "../model/types";
-import { withAccessToken } from "../data/http";
+import { withAccessToken } from "../../../shared/api/http";
 import styles from "./ContentRenderer.module.css";
 
 const sourceUrl = (source: string) => withAccessToken(source);

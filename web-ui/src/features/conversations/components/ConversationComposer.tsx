@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Square } from "lucide-react";
-import { AttachmentButton, AttachmentPreviews } from "../../features/attachments/components/AttachmentDraft";
-import { useAttachmentDraft } from "../../features/attachments/hooks/useAttachmentDraft";
-import { ExecutionStatus } from "../../features/execution/components/ExecutionStatus";
-import type { ExecutionStatus as ExecutionStatusValue } from "../../features/execution/model/types";
-import type { MediaFile } from "../../features/conversations/model/types";
-import { ContextControl } from "../../features/context-management/components/ContextControl";
-import type { ContextStatus } from "../../features/context-management/model/types";
-import { ModelSelect } from "../../features/models/components/ModelSelect";
-import type { CodexModel } from "../../features/models/model/types";
-import styles from "./Composer.module.css";
+import { AttachmentButton, AttachmentPreviews } from "../../attachments/components/AttachmentDraft";
+import { useAttachmentDraft } from "../../attachments/hooks/useAttachmentDraft";
+import { ContextControl } from "../../context-management/components/ContextControl";
+import type { ContextStatus } from "../../context-management/model/types";
+import { ExecutionStatus } from "../../execution/components/ExecutionStatus";
+import type { ExecutionStatus as ExecutionStatusValue } from "../../execution/model/types";
+import { ModelSelect } from "../../models/components/ModelSelect";
+import type { CodexModel } from "../../models/model/types";
+import type { MediaFile } from "../../../shared/model/media";
+import styles from "./ConversationComposer.module.css";
 
-interface ComposerProps {
+interface ConversationComposerProps {
   connected: boolean;
   selected: boolean;
   sending: boolean;
@@ -29,11 +29,11 @@ interface ComposerProps {
   onModelChange: (model: string) => Promise<boolean>;
 }
 
-export function Composer({
+export function ConversationComposer({
   connected, selected, sending, status, commentary, contextStatus,
   models, modelsLoading, modelChanging, modelError,
   onSend, onInterrupt, onCompactContext, onAutoCompactThresholdChange, onModelChange,
-}: ComposerProps) {
+}: ConversationComposerProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submittingRef = useRef(false);
@@ -48,15 +48,13 @@ export function Composer({
     try {
       const uploaded = await draft.uploadAll();
       setText("");
-      if (await onSend(submittedText, uploaded)) {
-        draft.clear();
-      } else {
-        setText((current) => current || submittedText);
-      }
+      if (await onSend(submittedText, uploaded)) draft.clear();
+      else setText((current) => current || submittedText);
     } catch {
       setText((current) => current || submittedText);
+    } finally {
+      submittingRef.current = false;
     }
-    finally { submittingRef.current = false; }
   };
 
   useEffect(() => {

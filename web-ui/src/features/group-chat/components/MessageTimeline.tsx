@@ -7,7 +7,7 @@ import { AttachmentDisplay } from "../../attachments/components/AttachmentDispla
 import { ArtifactCollection } from "../../artifacts/components/ArtifactCollection";
 import type { Artifact, ArtifactReviewDecision } from "../../artifacts/model/types";
 import type { GroupAgent, GroupMessage } from "../model/types";
-import styles from "../GroupChat.module.css";
+import styles from "./MessageTimeline.module.css";
 
 const timeText = (value: string) => new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 const dayKey = (value: string) => new Date(value).toLocaleDateString("zh-CN");

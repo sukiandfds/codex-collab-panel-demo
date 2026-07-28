@@ -1,9 +1,9 @@
 import { useCallback, useState } from "react";
 import { AppShell } from "./components/AppShell/AppShell";
-import { Composer } from "./components/Composer/Composer";
-import { Sidebar } from "./components/Sidebar/Sidebar";
-import { Topbar } from "./components/Topbar/Topbar";
 import { WindowBar } from "./components/WindowBar/WindowBar";
+import { ConversationComposer } from "./features/conversations/components/ConversationComposer";
+import { ConversationHeader } from "./features/conversations/components/ConversationHeader";
+import { ConversationSidebar } from "./features/conversations/components/ConversationSidebar";
 import { ConversationView } from "./features/conversations/components/ConversationView";
 import { useProjectConversations } from "./features/conversations/hooks/useProjectConversations";
 import { useDeviceInfo } from "./features/device/hooks/useDeviceInfo";
@@ -23,7 +23,7 @@ export function App() {
       sidebarOpen={sidebarOpen}
       onCloseSidebar={() => setSidebarOpen(false)}
       sidebar={
-        <Sidebar
+        <ConversationSidebar
           project={conversations.project}
           sessions={conversations.sessions}
           selectedId={conversations.selectedId}
@@ -36,7 +36,7 @@ export function App() {
           onRefresh={conversations.refresh}
         />
       }
-      header={<Topbar project={conversations.project} session={conversations.session} deviceName={device?.name} connected={conversations.connected} onOpenSidebar={() => setSidebarOpen(true)} />}
+      header={<ConversationHeader project={conversations.project} session={conversations.session} deviceName={device?.name} connected={conversations.connected} onOpenSidebar={() => setSidebarOpen(true)} />}
       conversation={
         <ConversationView
           session={conversations.session}
@@ -51,7 +51,7 @@ export function App() {
         />
       }
       composer={
-        <Composer
+        <ConversationComposer
           key={conversations.selectedId}
           connected={conversations.connected}
           selected={Boolean(conversations.selectedId)}

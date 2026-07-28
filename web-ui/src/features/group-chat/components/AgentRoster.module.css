@@ -1,0 +1,18 @@
+.agentPanel { min-width: 0; border-left: 1px solid #2a2a2a; padding: 18px 12px; background: #171717; }
+.panelHeading { display: flex; align-items: center; gap: 7px; padding: 0 7px 12px; color: #8f8f8f; font-size: 11px; font-weight: 600; }
+.panelHeading svg { width: 14px; height: 14px; }
+.agentList { display: grid; gap: 4px; }
+.agentRow { display: grid; grid-template-columns: 32px minmax(0, 1fr) 13px; width: 100%; align-items: center; gap: 9px; border: 1px solid transparent; border-radius: 7px; padding: 9px 7px; background: transparent; color: inherit; cursor: pointer; text-align: left; }
+.agentRow:hover { background: #202020; }
+.selectedAgent { border-color: #384334; background: #20261e; }
+.agentAvatar { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid #424242; border-radius: 7px; background: #292929; color: #cfcfcf; font-size: 11px; font-weight: 700; }
+.selectedAgent .agentAvatar { border-color: #526b49; color: #b8dc9f; }
+.agentText { display: grid; min-width: 0; gap: 3px; }
+.agentText strong, .agentText small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agentText strong { color: #d6d6d6; font-size: 12px; }
+.agentText small { color: #747474; font-size: 10px; }
+.agentRow > svg { width: 11px; height: 11px; }
+.agentActive { color: #86c176; }
+.agentIdle { color: #535353; }
+
+@media (max-width: 680px) { .agentPanel { display: none; } }

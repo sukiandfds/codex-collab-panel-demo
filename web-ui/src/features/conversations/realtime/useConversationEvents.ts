@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { hasAccessToken, withAccessToken } from "../data/http";
+import { hasAccessToken, withAccessToken } from "../../../shared/api/http";
 import type { ProjectEvent } from "../../execution/model/types";
 
 export function useConversationEvents(

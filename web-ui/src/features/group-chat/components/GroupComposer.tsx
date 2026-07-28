@@ -4,7 +4,7 @@ import { AttachmentButton, AttachmentPreviews } from "../../attachments/componen
 import { useAttachmentDraft } from "../../attachments/hooks/useAttachmentDraft";
 import type { GroupAgent, GroupMember, GroupMode } from "../model/types";
 import { MentionMenu, type MentionOption } from "./MentionMenu";
-import styles from "../GroupChat.module.css";
+import styles from "./GroupComposer.module.css";
 
 interface MentionState { start: number; end: number; query: string }
 

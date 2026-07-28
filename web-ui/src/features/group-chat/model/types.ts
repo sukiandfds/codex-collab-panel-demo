@@ -1,4 +1,4 @@
-import type { MediaFile } from "../../conversations/model/types";
+import type { MediaFile } from "../../../shared/model/media";
 import type { ArtifactRealtimeEvent } from "../../artifacts/model/types";
 
 export type GroupMode = "discussion" | "development";

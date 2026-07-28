@@ -1,5 +1,5 @@
 import type { ProjectInfo, SessionDetail, SessionSummary } from "../model/types";
-import { fetchJson, postJson } from "./http";
+import { fetchJson, postJson } from "../../../shared/api/http";
 
 const PAGE_SIZE = 60;
 const READ_TIMEOUT_MS = 12000;

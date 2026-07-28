@@ -1,5 +1,5 @@
 import { Bot, UserRound } from "lucide-react";
-import styles from "../GroupChat.module.css";
+import styles from "./MentionMenu.module.css";
 
 export interface MentionOption {
   id: string;

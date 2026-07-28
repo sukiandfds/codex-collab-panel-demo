@@ -1,10 +1,10 @@
 import { ChevronDown, Folder, RefreshCw, SquarePen } from "lucide-react";
-import type { ProjectInfo, SessionSummary } from "../../features/conversations/model/types";
-import { ConnectionStatus } from "../../features/conversations/components/ConnectionStatus";
-import { SessionList } from "../../features/conversations/components/SessionList";
-import styles from "./Sidebar.module.css";
+import type { ProjectInfo, SessionSummary } from "../model/types";
+import { ConnectionStatus } from "./ConnectionStatus";
+import { SessionList } from "./SessionList";
+import styles from "./ConversationSidebar.module.css";
 
-interface SidebarProps {
+interface ConversationSidebarProps {
   project: ProjectInfo | null;
   sessions: SessionSummary[];
   selectedId: string;
@@ -17,7 +17,7 @@ interface SidebarProps {
   onRefresh: () => void;
 }
 
-export function Sidebar({ project, sessions, selectedId, loading, connected, creating, error, onSelect, onCreate, onRefresh }: SidebarProps) {
+export function ConversationSidebar({ project, sessions, selectedId, loading, connected, creating, error, onSelect, onCreate, onRefresh }: ConversationSidebarProps) {
   return (
     <aside className={styles.sidebar} aria-label="当前项目会话">
       <div className={styles.brandRow}>
@@ -34,12 +34,10 @@ export function Sidebar({ project, sessions, selectedId, loading, connected, cre
           </button>
         </div>
       </div>
-
       <div className={styles.projectHeader}>
         <Folder aria-hidden="true" />
         <span>{project?.name || "正在读取项目"}</span>
       </div>
-
       <SessionList sessions={sessions} selectedId={selectedId} loading={loading} error={error} onSelect={onSelect} />
       <ConnectionStatus connected={connected} />
     </aside>

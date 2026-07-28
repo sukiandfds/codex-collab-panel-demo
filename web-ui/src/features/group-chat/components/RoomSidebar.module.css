@@ -1,0 +1,16 @@
+.sidebar { min-width: 0; border-right: 1px solid #2a2a2a; background: #171717; }
+.brand { display: flex; height: 54px; align-items: center; gap: 10px; padding: 0 15px; border-bottom: 1px solid #262626; color: #f2f2f2; font-size: 13px; font-weight: 600; }
+.brandMark { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid #464646; border-radius: 6px; background: #ececec; color: #141414; font-weight: 750; }
+.sidebarSection { padding: 18px 12px 6px; }
+.sectionLabel { display: flex; align-items: center; gap: 6px; margin: 0 4px 8px; color: #858585; font-size: 11px; font-weight: 600; }
+.sectionLabel svg { width: 13px; height: 13px; }
+.projectRow, .memberRow { display: flex; min-width: 0; align-items: center; gap: 9px; min-height: 36px; padding: 7px 8px; color: #d5d5d5; font-size: 13px; }
+.projectRow { border-radius: 6px; background: #222; }
+.projectRow svg { width: 15px; height: 15px; color: #a3a3a3; }
+.projectRow span, .memberRow span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memberList { display: grid; gap: 2px; }
+.memberRow i { width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: #71bd76; }
+.avatar { display: grid; width: 24px; height: 24px; flex: 0 0 24px; place-items: center; border-radius: 50%; background: #333; color: #ddd; font-size: 11px; }
+.emptyText { display: block; padding: 8px; color: #777; font-size: 12px; }
+
+@media (max-width: 900px) { .sidebar { display: none; } }

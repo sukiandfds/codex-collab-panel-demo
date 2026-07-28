@@ -1,4 +1,4 @@
-import { fetchJson, postJson } from "../../conversations/data/http";
+import { fetchJson, postJson } from "../../../shared/api/http";
 import type { ExecutionStatus } from "../model/types";
 
 interface SendMessageResult {

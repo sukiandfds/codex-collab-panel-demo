@@ -1,6 +1,6 @@
 import { Bot, CircleDot } from "lucide-react";
 import type { GroupAgent } from "../model/types";
-import styles from "../GroupChat.module.css";
+import styles from "./AgentRoster.module.css";
 
 export function AgentRoster({ agents, selectedId, onSelect }: {
   agents: GroupAgent[];

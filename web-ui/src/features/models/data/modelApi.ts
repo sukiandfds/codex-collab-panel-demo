@@ -1,4 +1,4 @@
-import { fetchJson, postJson } from "../../conversations/data/http";
+import { fetchJson, postJson } from "../../../shared/api/http";
 import type { CodexModel, ModelUpdateResult } from "../model/types";
 
 export const modelApi = {

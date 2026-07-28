@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { withAccessToken } from "../../conversations/data/http";
+import { withAccessToken } from "../../../shared/api/http";
 import type { Artifact } from "../model/types";
 import styles from "./ArtifactCard.module.css";
 

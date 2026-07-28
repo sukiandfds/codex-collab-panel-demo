@@ -1,0 +1,134 @@
+import { paginationFrom, readJson, sendJson } from "../http/request-utils.mjs";
+
+export const createConversationRoutes = ({ conversations, execution, contextManagement, media }) => async (request, response, url) => {
+  if (url.pathname === "/api/models" && request.method === "GET") {
+    sendJson(response, await conversations.listModels());
+    return true;
+  }
+  if (url.pathname === "/api/session/message" && request.method === "POST") {
+    const body = await readJson(request);
+    const threadId = String(body.threadId || "").trim();
+    const text = String(body.text || "").trim();
+    const attachments = media.resolveMany(body.attachmentIds);
+    if (!threadId || (!text && !attachments.length)) {
+      sendJson(response, { error: "threadId and message content are required" }, 400);
+      return true;
+    }
+    if (text.length > 32000) {
+      sendJson(response, { error: "message is too long" }, 413);
+      return true;
+    }
+    const status = execution.getStatus(threadId);
+    if (status.active && !status.turnId) {
+      sendJson(response, { error: "Codex 正在启动当前任务，请稍后再试" }, 409);
+      return true;
+    }
+    let result;
+    try {
+      result = status.active
+        ? await conversations.steerMessage(threadId, status.turnId, text, attachments)
+        : await conversations.sendMessage(threadId, text, attachments);
+    } catch (error) {
+      const recovered = execution.getStatus(threadId);
+      if (status.active || !recovered.turnId || recovered.turnId === status.turnId) throw error;
+      sendJson(response, { threadId, turnId: recovered.turnId, status: "inProgress", recovered: true }, 202);
+      return true;
+    }
+    sendJson(response, {
+      threadId,
+      turnId: status.active ? status.turnId : result.turn?.id || "",
+      status: status.active ? "steered" : result.turn?.status || "inProgress",
+    }, 202);
+    return true;
+  }
+  if (url.pathname === "/api/session/model" && request.method === "POST") {
+    const body = await readJson(request);
+    const threadId = String(body.threadId || "").trim();
+    const model = String(body.model || "").trim();
+    if (!threadId || !model) {
+      sendJson(response, { error: "threadId and model are required" }, 400);
+      return true;
+    }
+    if (execution.getStatus(threadId).active) {
+      sendJson(response, { error: "当前任务运行中，请在完成后切换模型" }, 409);
+      return true;
+    }
+    sendJson(response, await conversations.updateModel(threadId, model));
+    return true;
+  }
+  if (url.pathname === "/api/session/interrupt" && request.method === "POST") {
+    const body = await readJson(request);
+    const threadId = String(body.threadId || "").trim();
+    const status = execution.getStatus(threadId);
+    if (!threadId || !status.active || !status.turnId) {
+      sendJson(response, { error: "当前没有可停止的任务" }, 409);
+      return true;
+    }
+    await conversations.interrupt(threadId, status.turnId);
+    sendJson(response, { threadId, turnId: status.turnId, status: "interrupting" }, 202);
+    return true;
+  }
+  if (url.pathname === "/api/session/context" && request.method === "GET") {
+    const threadId = url.searchParams.get("threadId") || "";
+    if (!threadId) {
+      sendJson(response, { error: "threadId is required" }, 400);
+      return true;
+    }
+    sendJson(response, await contextManagement.load(threadId));
+    return true;
+  }
+  if (url.pathname === "/api/session/context/settings" && request.method === "POST") {
+    const body = await readJson(request);
+    const threadId = String(body.threadId || "").trim();
+    if (!threadId) {
+      sendJson(response, { error: "threadId is required" }, 400);
+      return true;
+    }
+    const threshold = body.autoCompactThreshold === null ? null : Number(body.autoCompactThreshold);
+    sendJson(response, await contextManagement.setThreshold(threadId, threshold));
+    return true;
+  }
+  if (url.pathname === "/api/session/context/compact" && request.method === "POST") {
+    const body = await readJson(request);
+    const threadId = String(body.threadId || "").trim();
+    if (!threadId) {
+      sendJson(response, { error: "threadId is required" }, 400);
+      return true;
+    }
+    sendJson(response, await contextManagement.requestCompaction(threadId), 202);
+    return true;
+  }
+  if (url.pathname === "/api/execution-status") {
+    const threadId = url.searchParams.get("threadId") || "";
+    if (!threadId) {
+      sendJson(response, { error: "threadId is required" }, 400);
+      return true;
+    }
+    sendJson(response, execution.getStatus(threadId));
+    return true;
+  }
+  if (url.pathname === "/api/sessions") {
+    const sessions = await conversations.listSessions(url.searchParams.get("source") || "all");
+    sendJson(response, sessions.map(({ messages, file, ...summary }) => summary));
+    return true;
+  }
+  if (url.pathname === "/api/session" && request.method === "POST") {
+    const body = await readJson(request);
+    sendJson(response, await conversations.createSession(String(body.model || "").trim()), 201);
+    return true;
+  }
+  if (url.pathname === "/api/session") {
+    const session = await conversations.findSession(
+      url.searchParams.get("threadId") || "",
+      url.searchParams.get("source") || "all",
+      paginationFrom(url),
+    );
+    if (!session) {
+      sendJson(response, { error: "session not found" }, 404);
+      return true;
+    }
+    sendJson(response, session);
+    return true;
+  }
+  return false;
+};

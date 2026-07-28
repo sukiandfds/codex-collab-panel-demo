@@ -1,4 +1,4 @@
-import { fetchJson, postJson } from "../../conversations/data/http";
+import { fetchJson, postJson } from "../../../shared/api/http";
 import type { ContextStatus } from "../model/types";
 
 export const contextApi = {

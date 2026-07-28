@@ -1,0 +1,10 @@
+.dialogBackdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 72%); }
+.dialog { width: min(360px, 100%); border: 1px solid #393939; border-radius: 8px; padding: 24px; background: #1b1b1b; box-shadow: 0 20px 70px rgb(0 0 0 / 55%); }
+.dialogIcon { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid #454545; border-radius: 7px; background: #252525; color: #bdbdbd; }
+.dialogIcon svg { width: 17px; height: 17px; }
+.dialog h2 { margin: 17px 0 6px; color: #eee; font-size: 17px; }
+.dialog p { margin: 0 0 18px; color: #888; font-size: 12px; }
+.dialog input { width: 100%; height: 40px; border: 1px solid #383838; border-radius: 6px; outline: 0; padding: 0 10px; background: #131313; color: #eee; font-size: 13px; }
+.dialogError { margin-top: 9px; color: #e59a91; font-size: 12px; line-height: 1.45; }
+.dialog button { width: 100%; height: 38px; margin-top: 12px; border: 0; border-radius: 6px; background: #e7e7e7; color: #171717; cursor: pointer; font-size: 12px; font-weight: 600; }
+.dialog button:disabled { opacity: .45; cursor: default; }
