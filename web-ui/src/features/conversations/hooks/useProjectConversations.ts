@@ -133,6 +133,7 @@ export function useProjectConversations() {
     compactContext: contextManagement.compact,
     setAutoCompactThreshold: contextManagement.setThreshold,
     changeModel: modelManager.change,
+    changeReasoningEffort: modelManager.changeReasoningEffort,
     refresh: () => catalog.refreshSessions(),
   };
 }

@@ -6,7 +6,7 @@ import { ContextControl } from "../../context-management/components/ContextContr
 import type { ContextStatus } from "../../context-management/model/types";
 import { ExecutionStatus } from "../../execution/components/ExecutionStatus";
 import type { ExecutionStatus as ExecutionStatusValue } from "../../execution/model/types";
-import { ModelSelect } from "../../models/components/ModelSelect";
+import { ModelSettingsControl } from "../../models/components/ModelSettingsControl";
 import type { CodexModel } from "../../models/model/types";
 import type { MediaFile } from "../../../shared/model/media";
 import styles from "./ConversationComposer.module.css";
@@ -27,12 +27,14 @@ interface ConversationComposerProps {
   onCompactContext: () => Promise<boolean>;
   onAutoCompactThresholdChange: (threshold: number | null) => Promise<boolean>;
   onModelChange: (model: string) => Promise<boolean>;
+  onReasoningEffortChange: (reasoningEffort: string) => Promise<boolean>;
 }
 
 export function ConversationComposer({
   connected, selected, sending, status, commentary, contextStatus,
   models, modelsLoading, modelChanging, modelError,
   onSend, onInterrupt, onCompactContext, onAutoCompactThresholdChange, onModelChange,
+  onReasoningEffortChange,
 }: ConversationComposerProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -97,26 +99,39 @@ export function ConversationComposer({
             }
           }}
         />
-        <AttachmentPreviews attachments={draft.attachments} error={draft.error} uploading={draft.uploading} onRemove={draft.removeFile} />
+        <AttachmentPreviews
+          attachments={draft.attachments}
+          error={draft.error}
+          uploading={draft.uploading}
+          uploadSlow={draft.uploadSlow}
+          onRemove={draft.removeFile}
+          onCancelUpload={draft.cancelUpload}
+        />
         <div className={styles.footer}>
-          <AttachmentButton disabled={inputDisabled} onFiles={draft.addFiles} />
-          <ExecutionStatus connected={connected} status={status} commentary={commentary} />
+          <div className={styles.leadingControls}>
+            <AttachmentButton disabled={inputDisabled} onFiles={draft.addFiles} />
+            <ExecutionStatus connected={connected} status={status} commentary={commentary} />
+          </div>
           <span className={styles.spacer} />
-          <ModelSelect
-            currentModel={contextStatus.model}
-            models={models}
-            loading={modelsLoading}
-            changing={modelChanging}
-            error={modelError}
-            disabled={!connected || !selected || status.active}
-            onChange={onModelChange}
-          />
-          <ContextControl
-            status={contextStatus}
-            disabled={!connected || !selected}
-            onCompact={onCompactContext}
-            onThresholdChange={onAutoCompactThresholdChange}
-          />
+          <div className={styles.settingsControls}>
+            <ModelSettingsControl
+              currentModel={contextStatus.model}
+              currentEffort={contextStatus.reasoningEffort}
+              models={models}
+              loading={modelsLoading}
+              changing={modelChanging}
+              error={modelError}
+              disabled={!connected || !selected || status.active}
+              onModelChange={onModelChange}
+              onReasoningEffortChange={onReasoningEffortChange}
+            />
+            <ContextControl
+              status={contextStatus}
+              disabled={!connected || !selected}
+              onCompact={onCompactContext}
+              onThresholdChange={onAutoCompactThresholdChange}
+            />
+          </div>
           <button
             className={styles.sendButton}
             type="button"

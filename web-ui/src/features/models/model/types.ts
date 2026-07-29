@@ -13,4 +13,5 @@ export interface CodexModel {
 export interface ModelUpdateResult {
   model: string;
   modelProvider: string;
+  reasoningEffort: string;
 }

@@ -8,4 +8,9 @@ export const modelApi = {
     { threadId, model },
     signal,
   ),
+  updateReasoningEffort: (threadId: string, reasoningEffort: string, signal?: AbortSignal) => postJson<ModelUpdateResult>(
+    "/api/session/reasoning-effort",
+    { threadId, reasoningEffort },
+    signal,
+  ),
 };

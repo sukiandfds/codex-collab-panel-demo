@@ -41,7 +41,10 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
   const applyStatus = useCallback((next: ExecutionStatus) => {
     setStatus({ ...next, turnId: next.turnId || "", activities: next.activities || [] });
     setCommentaryText(next.commentary || "");
-    if (next.streamingText !== undefined) {
+    const preserveCompletedStream = next.phase === "completed"
+      && !next.streamingText
+      && Boolean(streamingBuffer.current);
+    if (next.streamingText !== undefined && !preserveCompletedStream) {
       window.clearTimeout(streamingTimer.current);
       streamingTimer.current = 0;
       streamingItemId.current = next.streamingItemId || "";
@@ -50,10 +53,10 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
     }
   }, []);
 
-  const refreshStatus = useCallback(async (signal?: AbortSignal) => {
+  const refreshStatus = useCallback(async (signal?: AbortSignal, reconcile = false) => {
     if (!threadId) return null;
     try {
-      const next = await executionApi.status(threadId, signal);
+      const next = await executionApi.status(threadId, signal, reconcile);
       applyStatus(next);
       return next;
     } catch {

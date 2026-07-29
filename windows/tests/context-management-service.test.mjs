@@ -12,7 +12,7 @@ const createService = async ({ active = false } = {}) => {
     stateFile: path.join(os.tmpdir(), `missing-context-settings-${process.pid}-${Date.now()}.json`),
     broadcast: (event) => events.push(event),
     getExecutionStatus: () => ({ active: executionActive }),
-    getRuntimeContext: async () => ({ model: "gpt-5.6-sol" }),
+    getRuntimeContext: async () => ({ model: "gpt-5.6-sol", reasoningEffort: "medium" }),
     compactContext: async (threadId) => { compacted.push(threadId); },
   });
   return { service, events, compacted, setExecutionActive: (value) => { executionActive = value; } };
@@ -31,6 +31,7 @@ test("reports the real model and current context percentage", async () => {
 
   const status = service.getStatus("thread-1");
   assert.equal(status.model, "gpt-5.6-sol");
+  assert.equal(status.reasoningEffort, "medium");
   assert.equal(status.usedTokens, 120000);
   assert.equal(status.contextWindow, 240000);
   assert.equal(status.percentage, 50);

@@ -2,8 +2,8 @@
 feature_id: FEAT-006
 title: 固定公网入口与正式访问控制
 status: in_progress
-current_version: v0.2.1
-last_updated: 2026-07-27 23:16 +08:00
+current_version: v0.2.2
+last_updated: 2026-07-28 23:19 +08:00
 owners: [remote_access, deployment, security]
 key_paths:
   - windows/scripts/start-web-demo.ps1
@@ -69,17 +69,15 @@ key_paths:
 
 已完成：
 
-- 当前最小回退方案已恢复：独立 Quick Tunnel 指向本机 `9360`，项目服务重启时不重启 Tunnel。
-- 当前临时入口为 `https://hobby-skill-tire-ties.trycloudflare.com/?token=demo123`；仅在当前 Quick Tunnel 进程持续运行时有效。
-- 创建 Named Tunnel `codex-collab-panel`，ID 为 `08c8f021-1a59-4755-91a8-c29cae318761`。
-- 创建固定入口 `https://codex.negus.us.ci`，origin 指向 `http://127.0.0.1:9360`。
-- `cloudflared` 已作为 Windows 自动启动服务运行，并显式读取 `C:\Users\Hans\.cloudflared\config.yml`。
-- 定向检查确认带 Token 的项目 API 返回 `200`，无 Token 返回 `401`，SSE 收到 `connected`。
-- 原 Quick Tunnel 进程未被本轮操作停止，避免影响已有临时入口。
+- 已创建 Named Tunnel `codex-collab-panel`，ID 为 `08c8f021-1a59-4755-91a8-c29cae318761`。
+- 当前入口为 `https://codex.negus.us.ci/?token=demo123`，origin 指向 `http://127.0.0.1:9360`；项目服务重启不改变该网址。
+- 2026-07-28 香港 VPN 开启后，手动 Named Tunnel 连接器 PID `33596` 注册到 `hkg08/hkg09`；当前公网 API 返回 `200`。
+- 旧 Quick Tunnel `hobby-skill-tire-ties.trycloudflare.com` 已失效，只保留在历史时间线，不再作为当前入口。
+- Windows `cloudflared` 服务仍存在，但当前真实流量由手动连接器承担，自动恢复能力尚未验证通过。
 
 尚未完成：
 
-- 固定域名方案按用户要求延期研究；当前不继续修改 Named Tunnel。
+- 固定域名已经可用，但低延迟当前依赖电脑保持香港 VPN；无需人工 VPN 的稳定线路尚未确定。
 - Cloudflare Access 尚未配置，当前仍依赖 Demo Token，不适合长期公开使用。
 - `9360` 项目服务尚未确认具备开机自动启动能力；电脑重启后可能出现 Tunnel 在线但 origin 离线。
 - 尚未执行 Windows 重启和移动网络切换验证。
@@ -95,6 +93,7 @@ key_paths:
 | `FEAT-006-I05` | 普适 | active | **P0 资源浪费事故**：没有服从快速、轻量边界；发现服务模式不符后仍连续安装、复测和扩展检查，严重浪费用户时间、精力、注意力和信任 | 触发第二种根因、第二次提权/重装、第三轮验证或用户明确等待过久时，立即停止所有扩展操作；经验同步至 `PROC-016` |
 | `FEAT-006-I06` | 特例 | resolved | Quick Tunnel 自动读取域名方案留下的 `config.yml` 和 credentials file；随机网址虽生成，但请求命中 ingress 兜底并返回 `404` | Quick Tunnel 使用 `--config NUL` 与 Named Tunnel 配置隔离；新入口 API 返回 `200` |
 | `FEAT-006-I07` | 普适 | mitigated | 后台 `Start-Process` 被终端策略拦截，拆开后再次尝试仍被拦截 | 停止同类后台命令，改用当前 Codex 管理的前台长连接；再次发生记录到 `PROC-007` |
+| `FEAT-006-I08` | 特例 | active | 活动任务中切换 VPN 并重连 Tunnel，浏览器实时请求被取消，Web Turn 随后停住且核心 app-server 接口超时 | 网络线路变更前必须确认没有活动 Turn、附件上传或检查任务；变更后除公网 200 外，还要检查模型、会话和任务状态接口。当前香港线路依赖 VPN，属于临时方案 |
 
 ## 版本时间线
 
@@ -127,8 +126,19 @@ key_paths:
 - 用户可见变化：当前可访问 `https://hobby-skill-tire-ties.trycloudflare.com/?token=demo123`；重启项目服务不改变此链接，但关闭 Quick Tunnel 进程会使链接失效。
 - Git：uncommitted。
 
+### 2026-07-28 23:19 +08:00 | v0.2.2 | incident_recorded
+
+- 调研：Cloudflare 官方不支持手工指定香港等具体 colo；全球模式由网络路由选择边缘节点。中国大陆经境外节点存在明显延迟和可靠性风险。
+- 实测：无 VPN 时 Named Tunnel 连到洛杉矶；香港 VPN 开启后重连到 `hkg08/hkg09`，固定域名不变，小接口稳定后约 `0.77-1.34s`，仍有偶发波动。
+- 事故：在 Web Turn 运行期间切换 VPN/Tunnel，进行中请求被取消，任务停在未知状态，最终需要单独重启项目服务恢复。
+- 边界：香港 VPN 线路只是临时加速方式；关闭或切换 VPN 可能使 Tunnel 断线或重新选路，不能在活动任务和附件上传期间操作。
+- 问题：新增 `FEAT-006-I08`，关联 `FEAT-001-I12`、`PROC-018`。
+- 验证：重启项目服务后固定公网版本接口返回 `200`；未做新的图片上传测试。
+- Git：`uncommitted`，未提交、未推送。
+
 ## 下一步
 
-1. 当前只使用最小 Quick Tunnel 方案，不继续改动域名配置。
-2. 日常开发只重启 `9360`，不得停止当前 Quick Tunnel 进程。
-3. 用户后续明确要求时，再单独研究固定域名、鉴权和开机恢复。
+1. 当前使用固定域名 `codex.negus.us.ci`，不再交付失效的 Quick Tunnel 地址。
+2. 日常开发只重启 `9360`，不得顺带重启当前 Named Tunnel 连接器。
+3. 当前香港 VPN/Tunnel 仅在没有活动 Turn、附件上传或检查任务时切换；长期方案不能依赖人工保持 VPN 节点。
+4. 用户后续明确要求时，再单独研究无需 VPN 的稳定线路、正式鉴权和开机恢复。

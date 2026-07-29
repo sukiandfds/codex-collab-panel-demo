@@ -14,8 +14,8 @@ interface InterruptResult {
 }
 
 export const executionApi = {
-  status: (threadId: string, signal?: AbortSignal) => fetchJson<ExecutionStatus>(
-    `/api/execution-status?threadId=${encodeURIComponent(threadId)}`,
+  status: (threadId: string, signal?: AbortSignal, reconcile = false) => fetchJson<ExecutionStatus>(
+    `/api/execution-status?threadId=${encodeURIComponent(threadId)}${reconcile ? "&reconcile=1" : ""}`,
     signal,
   ),
   sendMessage: (threadId: string, text: string, attachmentIds: string[] = [], signal?: AbortSignal) => postJson<SendMessageResult>(

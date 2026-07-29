@@ -5,6 +5,7 @@
   "scripts": {
     "build:ui": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/build-web-ui.ps1",
     "start:demo": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/start-web-demo.ps1",
-    "start:demo:build": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/start-web-demo.ps1 -Build"
+    "start:demo:build": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/start-web-demo.ps1 -Build",
+    "restart:demo": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/restart-web-demo.ps1"
   }
 }

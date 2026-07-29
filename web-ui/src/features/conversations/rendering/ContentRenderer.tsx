@@ -8,6 +8,16 @@ import styles from "./ContentRenderer.module.css";
 const sourceUrl = (source: string) => withAccessToken(source);
 const downloadUrl = (source: string) => withAccessToken(`${source}${source.includes("?") ? "&" : "?"}download=1`);
 
+function RenderedImage({ source, alt }: { source: string; alt: string }) {
+  const url = sourceUrl(source);
+  return (
+    <a className={styles.imageLink} href={url} target="_blank" rel="noreferrer">
+      <img src={url} alt={alt} loading="lazy" />
+      <span><ImageOff aria-hidden="true" />图片无法显示时点击打开原文件</span>
+    </a>
+  );
+}
+
 function Block({ block }: { block: ContentBlock }) {
   if (block.type === "markdown") {
     return (
@@ -15,7 +25,7 @@ function Block({ block }: { block: ContentBlock }) {
         remarkPlugins={[remarkGfm]}
         components={{
           a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer">{children}</a>,
-          img: ({ src, alt }) => <img src={sourceUrl(src || "")} alt={alt || ""} loading="lazy" />,
+          img: ({ src, alt }) => <RenderedImage source={src || ""} alt={alt || ""} />,
         }}
       >
         {block.text}
@@ -26,12 +36,7 @@ function Block({ block }: { block: ContentBlock }) {
     return <div className={styles.options}>{block.options.map((option) => <div key={option}>{option}</div>)}</div>;
   }
   if (block.type === "image") {
-    return (
-      <a className={styles.imageLink} href={sourceUrl(block.source)} target="_blank" rel="noreferrer">
-        <img src={sourceUrl(block.source)} alt={block.alt || block.file?.name || "对话图片"} loading="lazy" />
-        <span><ImageOff aria-hidden="true" />图片无法显示时点击打开原文件</span>
-      </a>
-    );
+    return <RenderedImage source={block.source} alt={block.alt || block.file?.name || "对话图片"} />;
   }
   if (block.type === "audio") return <audio className={styles.audio} controls preload="metadata" src={sourceUrl(block.source)} />;
   if (block.type === "video") return <video className={styles.video} controls preload="metadata" src={sourceUrl(block.source)} />;

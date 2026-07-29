@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { createExecutionTracker } from "../server/execution-tracker.mjs";
 
@@ -161,4 +164,132 @@ test("shows the inner PowerShell command instead of the launcher path", () => {
   });
 
   assert.equal(tracker.getStatus("thread-1").activities[0].detail, "pnpm build:ui");
+});
+
+test("clears a stale active state when the authoritative thread is idle", () => {
+  const tracker = createExecutionTracker({ broadcast: () => {} });
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-1" } },
+  });
+
+  tracker.reconcile("thread-1", { type: "idle" });
+
+  assert.equal(tracker.getStatus("thread-1").active, false);
+  assert.equal(tracker.getStatus("thread-1").phase, "idle");
+});
+
+test("reports an uncertain state when app-server cannot confirm an active thread", () => {
+  const tracker = createExecutionTracker({ broadcast: () => {} });
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-1" } },
+  });
+
+  tracker.reconcile("thread-1", { type: "notLoaded" });
+
+  const status = tracker.getStatus("thread-1");
+  assert.equal(status.active, true);
+  assert.equal(status.phase, "unknown");
+  assert.equal(status.label, "状态暂时无法确认");
+  assert.equal(status.turnId, "turn-1");
+});
+
+test("restores explicit approval state from the authoritative thread", () => {
+  const tracker = createExecutionTracker({ broadcast: () => {} });
+  tracker.markSubmitted("thread-1");
+
+  tracker.reconcile("thread-1", { type: "active", activeFlags: ["waitingOnApproval"] });
+
+  assert.equal(tracker.getStatus("thread-1").phase, "waitingOnApproval");
+  assert.equal(tracker.getStatus("thread-1").label, "需要在电脑端确认");
+});
+
+test("shows app-server recovery and marks the interrupted turn after recovery", () => {
+  const events = [];
+  const tracker = createExecutionTracker({ broadcast: (event) => events.push(event) });
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-1" } },
+  });
+  const lastEventAt = tracker.getStatus("thread-1").lastEventAt;
+
+  tracker.handleHealthState({ phase: "checking", threadId: "thread-1" });
+  assert.equal(tracker.getStatus("thread-1").label, "暂时没有新输出，正在确认状态");
+  assert.equal(tracker.getStatus("thread-1").lastEventAt, lastEventAt);
+  assert.equal(typeof tracker.getStatus("thread-1").lastProbeAt, "string");
+
+  tracker.handleHealthState({ phase: "recovering", threadId: "thread-1" });
+  assert.equal(tracker.getStatus("thread-1").phase, "recovering");
+  assert.equal(tracker.getStatus("thread-1").active, true);
+
+  tracker.handleHealthState({ phase: "recovered", threadId: "thread-1" });
+  assert.equal(tracker.getStatus("thread-1").phase, "interrupted");
+  assert.equal(tracker.getStatus("thread-1").active, false);
+  assert.equal(events.some((event) => event.type === "sessions_changed"), true);
+});
+
+test("reports an app-server recovery failure without leaving the page active", () => {
+  const tracker = createExecutionTracker({ broadcast: () => {} });
+  tracker.markSubmitted("thread-1");
+
+  tracker.handleHealthState({ phase: "failed", threadId: "thread-1", error: new Error("restart failed") });
+
+  assert.equal(tracker.getStatus("thread-1").phase, "systemError");
+  assert.equal(tracker.getStatus("thread-1").label, "Codex 自动恢复失败");
+  assert.equal(tracker.getStatus("thread-1").active, false);
+});
+
+test("distinguishes a completed reply from a completed turn", () => {
+  const tracker = createExecutionTracker({ broadcast: () => {} });
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-1" } },
+  });
+  tracker.handleProtocolMessage({
+    method: "item/completed",
+    params: {
+      threadId: "thread-1",
+      item: { id: "answer-1", type: "agentMessage", phase: "final_answer", text: "Done" },
+    },
+  });
+
+  assert.equal(tracker.getStatus("thread-1").phase, "finalizing");
+  assert.equal(tracker.getStatus("thread-1").label, "回复已完成，正在收尾");
+  assert.equal(tracker.getStatus("thread-1").active, true);
+
+  tracker.handleHealthState({
+    phase: "authoritative",
+    threadId: "thread-1",
+    status: { type: "idle" },
+    finalAnswerCompleted: true,
+  });
+  assert.equal(tracker.getStatus("thread-1").phase, "completed");
+  assert.equal(tracker.getStatus("thread-1").active, false);
+});
+
+test("restores an unfinished persisted run as interrupted", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "execution-tracker-"));
+  const stateFile = path.join(directory, "runs.json");
+  try {
+    const tracker = createExecutionTracker({ broadcast: () => {}, stateFile });
+    tracker.markSubmitted("thread-1");
+    tracker.handleProtocolMessage({
+      method: "turn/started",
+      params: { threadId: "thread-1", turn: { id: "turn-1" } },
+    });
+    await tracker.close();
+
+    const restored = createExecutionTracker({ broadcast: () => {}, stateFile });
+    assert.equal(restored.getStatus("thread-1").phase, "interrupted");
+    assert.equal(restored.getStatus("thread-1").active, false);
+    assert.equal(restored.getStatus("thread-1").turnId, "turn-1");
+    await restored.close();
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
 });

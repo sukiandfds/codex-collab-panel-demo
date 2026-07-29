@@ -9,12 +9,15 @@ export type ExecutionPhase =
   | "fileChange"
   | "tool"
   | "responding"
+  | "finalizing"
   | "waitingOnApproval"
   | "waitingOnUserInput"
   | "completed"
   | "failed"
   | "interrupted"
-  | "systemError";
+  | "systemError"
+  | "recovering"
+  | "unknown";
 
 export interface ExecutionActivity {
   id: string;
@@ -39,6 +42,8 @@ export interface ExecutionStatus {
   active: boolean;
   startedAt: string | null;
   updatedAt: string | null;
+  lastEventAt?: string | null;
+  lastProbeAt?: string | null;
 }
 
 export interface AssistantDeltaEvent {

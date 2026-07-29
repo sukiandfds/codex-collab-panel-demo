@@ -11,6 +11,7 @@ const emptyStatus = (threadId, threshold) => ({
   type: "context_status",
   threadId,
   model: "",
+  reasoningEffort: "",
   usedTokens: null,
   contextWindow: null,
   percentage: null,
@@ -91,7 +92,10 @@ export const createContextManagementService = async ({
   const requestCompaction = async (threadId, source = "manual") => {
     if (!statusFor(threadId).model) {
       const runtime = await getRuntimeContext(threadId);
-      publish(threadId, { model: runtime.model || "" });
+      publish(threadId, {
+        model: runtime.model || "",
+        reasoningEffort: runtime.reasoningEffort || "",
+      });
     }
     const current = statusFor(threadId);
     if (current.phase === "compacting" || current.phase === "queued") return publicStatus(current);
@@ -120,7 +124,10 @@ export const createContextManagementService = async ({
 
   const load = async (threadId) => {
     const runtime = await getRuntimeContext(threadId);
-    publish(threadId, { model: runtime.model || statusFor(threadId).model });
+    publish(threadId, {
+      model: runtime.model || statusFor(threadId).model,
+      reasoningEffort: runtime.reasoningEffort || statusFor(threadId).reasoningEffort,
+    });
     maybeAutoCompact(threadId);
     return publicStatus(statusFor(threadId));
   };
@@ -157,7 +164,10 @@ export const createContextManagementService = async ({
       return;
     }
     if (method === "thread/settings/updated") {
-      publish(threadId, { model: params.threadSettings?.model || statusFor(threadId).model });
+      publish(threadId, {
+        model: params.threadSettings?.model || statusFor(threadId).model,
+        reasoningEffort: params.threadSettings?.reasoningEffort || statusFor(threadId).reasoningEffort,
+      });
       return;
     }
     if (method === "model/rerouted") {

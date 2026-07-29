@@ -68,6 +68,7 @@ export function App() {
           onCompactContext={conversations.compactContext}
           onAutoCompactThresholdChange={conversations.setAutoCompactThreshold}
           onModelChange={conversations.changeModel}
+          onReasoningEffortChange={conversations.changeReasoningEffort}
         />
       }
     />

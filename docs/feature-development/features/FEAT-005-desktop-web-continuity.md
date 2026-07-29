@@ -2,8 +2,8 @@
 feature_id: FEAT-005
 title: Desktop/Web 连续性与同任务提示
 status: discovery
-current_version: v0.4.0
-last_updated: 2026-07-28 15:47 +08:00
+current_version: v0.4.1
+last_updated: 2026-07-28 22:20 +08:00
 owners: [connector, task_state, cross_device_continuity]
 key_paths:
   - windows/server/app-server-client.mjs
@@ -20,8 +20,9 @@ key_paths:
 - 手机或浏览器可以通过独立 Codex app-server 向真实持久化 Thread 发送消息并接收回复。
 - Codex Desktop 已打开的同一任务页面不会热刷新 Web 侧新增的消息。
 - “引用同一个 Thread”只表示持久化任务可能相同，不表示 Desktop 与 Web 共享同一个运行实例、事件订阅或实时 UI 状态。
-- Desktop 完全关闭后重新打开任务，能否在当前 Codex 版本中稳定恢复全部 Web 新消息，仍待真实验证。
+- Desktop 完全关闭后重新打开任务读取 Web 新消息已得到一次用户实测；多轮和异常中断下的稳定性仍待验证。
 - 当前没有统一 Connector、控制权租约、跨端事件序号和断线恢复协议。
+- 2026-07-28 实际发生过 Desktop 与 Web 同时使用同一持久化 Thread 后，Web 的独立 app-server 失联，页面停在无法确认的旧任务状态；重启 `9360` 项目服务后恢复。
 - 用户的最低要求不是立刻实现双向同步，而是：Web 打开任务时，如果 Codex Desktop 正在同一任务内工作，Web 应明确提示。暂不要求 Desktop 反向提示 Web 正在执行。
 - 本机 Codex `0.146.0-alpha.3.1` 已包含 app-server daemon、proxy 和 remote-control 协议入口，但 daemon 生命周期实测仅支持 Unix，当前 Windows 不能直接用它让 Desktop 与 Web 共享同一个受管理实例。
 
@@ -88,6 +89,7 @@ Web SSE 只分发 Web 所连接 app-server 的 Notification；已经打开的 De
 | `FEAT-005-I04` | 特例 | active | 新版 Codex daemon 暂时不能直接解决 Windows 双端同步 | 本机命令返回 daemon 生命周期仅支持 Unix；保留协议适配层，不能把存在命令误写成 Windows 已可用 |
 | `FEAT-005-I05` | 特例 | resolved | Desktop 冷启动后能否承接 Web 已持久化的对话内容此前没有实测结论 | 用户已实测：完全关闭并重新打开 Codex Desktop 后，可以看到 Web 端发送的对话；这只证明冷启动读取持久化 Thread，不代表已打开页面会热刷新 |
 | `FEAT-005-I06` | 特例 | planned | Web 无法提示 Codex Desktop 是否正在同一 Thread 内工作，用户可能从 Web 重复发起或干扰当前任务 | 先确认可用检测信号；能可靠识别时在 Web 显示“桌面端正在此任务工作”。暂不要求 Desktop 反向显示 Web 状态 |
+| `FEAT-005-I07` | 特例 | active | Desktop 与 Web 同时操作同一 Thread 后，Web 可能卡在旧任务状态，模型和会话接口也可能失去响应 | 两端使用独立 app-server，实时事件不共享且缺少同任务控制权；Desktop 回复通常会写入共享持久化记录，但 Web 不会实时收到 Desktop 的过程事件。短期避免并发发送并允许受控重启 Web 服务；长期由统一 Connector 或控制权租约解决 |
 
 ## 禁止的伪修复
 
@@ -130,9 +132,21 @@ Web SSE 只分发 Web 所连接 app-server 的 Notification；已经打开的 De
 - 第一阶段收缩为 Web 单向提示：如果 Desktop 正在同一任务工作，Web 必须提示；暂不要求 Desktop 反向提示 Web。
 - 新增 `FEAT-005-I06`。本轮只更新需求，没有修改代码。
 
+### 2026-07-28 22:20 +08:00 | v0.4.1 | discovery
+
+- 用户实测：Desktop 已完成回复，但 Web 页面仍停在旧任务状态；随后 Web 的模型和会话接口失去响应。
+- 排查：项目基础接口仍正常，Web 独立 app-server 相关接口超时；Desktop 与 Web 当时正在操作同一个持久化 Thread。
+- 结论：不是“Desktop 回复不会保存”，而是两端不共享实时事件，且并发操作同一 Thread 存在争用和 Web app-server 失联风险。
+- 临时恢复：保持端口、Token 和公网入口不变，仅重启 `9360` 项目服务后恢复接口。
+- 问题：新增 `FEAT-005-I07`，保持 active；未实现控制权或自动恢复机制。
+- 验证：重启后 `/api/models`、`/api/sessions` 和公网项目 API 返回 HTTP 200。
+- 用户可见变化：本轮只记录问题，没有修改页面或执行逻辑。
+- Git：`uncommitted`。
+
 ## 下一步
 
 - 冷启动恢复已得到一次用户实测结论；后续再验证多轮和异常中断场景，不扩大本轮开发。
 - 第一优先验证能否可靠识别 Desktop 正在执行的 Thread，并只在 Web 增加同任务提示。
+- 在同任务提示之后增加最小控制权约束：Desktop 正在执行时，Web 不重复发起；Web app-server 业务接口连续失联时提供受控恢复，不改变固定端口、Token、入口或会话数据。
 - 若后续多轮或异常中断暴露冷启动恢复不可靠，电脑与手机先统一使用 Web/PWA；原生 Desktop 实时同步等待可验证的 Windows 集成入口。
 - 统一 Connector 继续明确事件 ID、控制权、重连和补偿，但不把 Unix-only daemon 写成 Windows 现成方案。

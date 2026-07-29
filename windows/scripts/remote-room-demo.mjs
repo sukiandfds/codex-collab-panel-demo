@@ -35,7 +35,10 @@ const sessionRoot = process.env.CODEX_SESSION_DIR || path.join(os.homedir(), ".c
 const media = createMediaService({ uploadRoot: path.join(projectRoot, "runtime", "uploads") });
 await media.restoreUploads();
 const realtime = createRealtimeHub();
-const execution = createExecutionTracker({ broadcast: realtime.broadcast });
+const execution = createExecutionTracker({
+  broadcast: realtime.broadcast,
+  stateFile: path.join(projectRoot, "runtime", "execution-runs.json"),
+});
 let contextManagement;
 const jsonlConversations = createJsonlConversationStore({
   sessionRoot,
@@ -52,6 +55,7 @@ const appServerConversations = createAppServerConversationStore({
   },
   onSubmitted: execution.markSubmitted,
   onFailed: execution.markFailed,
+  onHealthState: execution.handleHealthState,
 });
 const conversations = createConversationService({ primary: appServerConversations, fallback: jsonlConversations });
 contextManagement = await createContextManagementService({
@@ -96,6 +100,7 @@ const server = http.createServer(requestHandler);
 
 const close = () => {
   realtime.close();
+  void execution.close();
   conversations.close();
   void contextManagement.close();
   multiAgent.close();

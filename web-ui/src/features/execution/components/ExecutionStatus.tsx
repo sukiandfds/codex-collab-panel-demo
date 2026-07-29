@@ -10,7 +10,8 @@ export function ExecutionStatus({ connected, status }: { connected: boolean; sta
   const failed = status.phase === "failed" || status.phase === "systemError";
   const completed = status.phase === "completed";
   const Icon = status.active ? CircleDot : failed ? CircleAlert : completed ? CheckCircle2 : CheckCircle2;
-  const label = status.active ? "Codex 正在运行" : status.label;
+  const showsSpecificStatus = ["unknown", "recovering", "finalizing"].includes(status.phase);
+  const label = showsSpecificStatus ? status.label : status.active ? "Codex 正在运行" : status.label;
   return (
     <span className={`${styles.status} ${failed ? styles.failed : ""}`} title={status.detail || label}>
       <Icon aria-hidden="true" />

@@ -93,14 +93,27 @@ function Get-ToolReadinessChecks {
 
   $checks = New-Object System.Collections.Generic.List[object]
 
-  $node = Find-ReadinessCommand -Names @("node.exe", "node")
-  if (-not $node) {
+  # Match start-web-demo.ps1: the service prefers the Codex runtime, then PATH.
+  $bundledNode = Join-Path $env:USERPROFILE ".cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
+  $nodePath = $null
+  $nodeSource = "PATH"
+  if (Test-Path -LiteralPath $bundledNode -PathType Leaf) {
+    $nodePath = $bundledNode
+    $nodeSource = "Codex project runtime"
+  }
+  else {
+    $node = Find-ReadinessCommand -Names @("node.exe", "node")
+    if ($node) {
+      $nodePath = [string]$node.Source
+    }
+  }
+
+  if (-not $nodePath) {
     $checks.Add((New-ReadinessCheck -Id "tool.node" -Category "tools" -Status "BLOCKED" -Subject "Node.js" `
-      -Summary "Node.js was not found on PATH." `
+      -Summary "Node.js was not found in the project runtime or on PATH." `
       -Recommendation "Install Node.js for the current user or use the existing project runtime; do not require a machine-wide update.")) | Out-Null
   }
   else {
-    $nodePath = [string]$node.Source
     $nodeVersion = Get-FileProductVersion -Path $nodePath
     $nodeMajor = Get-SemanticMajorVersion -Version $nodeVersion
     $nodeStatus = "PASS"
@@ -117,7 +130,7 @@ function Get-ToolReadinessChecks {
       $nodeRecommendation = "Use a user-scoped Node.js $MinimumNodeMajor+ runtime."
     }
     else {
-      $nodeSummary = "Node.js $nodeVersion meets the major version requirement ($MinimumNodeMajor+)."
+      $nodeSummary = "$nodeSource Node.js $nodeVersion meets the major version requirement ($MinimumNodeMajor+)."
     }
     $checks.Add((New-ReadinessCheck -Id "tool.node" -Category "tools" -Status $nodeStatus -Subject "Node.js" `
       -Summary $nodeSummary -Detail $nodePath -Recommendation $nodeRecommendation)) | Out-Null

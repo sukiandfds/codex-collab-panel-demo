@@ -6,6 +6,7 @@ const emptyStatus = (threadId: string): ContextStatus => ({
   type: "context_status",
   threadId,
   model: "",
+  reasoningEffort: "",
   usedTokens: null,
   contextWindow: null,
   percentage: null,

@@ -1,5 +1,5 @@
 import { useId, useRef } from "react";
-import { FileText, LoaderCircle, Paperclip, X } from "lucide-react";
+import { FileText, Paperclip, X } from "lucide-react";
 import type { DraftAttachment } from "../hooks/useAttachmentDraft";
 import styles from "./AttachmentDraft.module.css";
 
@@ -35,11 +35,15 @@ export function AttachmentButton({ disabled, onFiles }: {
   );
 }
 
-export function AttachmentPreviews({ attachments, error, uploading = false, onRemove }: {
+export function AttachmentPreviews({
+  attachments, error, uploading = false, uploadSlow = false, onRemove, onCancelUpload,
+}: {
   attachments: DraftAttachment[];
   error: string;
   uploading?: boolean;
+  uploadSlow?: boolean;
   onRemove: (id: string) => void;
+  onCancelUpload?: () => void;
 }) {
   if (!attachments.length && !error) return null;
   return (
@@ -57,7 +61,14 @@ export function AttachmentPreviews({ attachments, error, uploading = false, onRe
           ))}
         </div>
       ) : null}
-      {uploading ? <div className={styles.uploading} role="status"><LoaderCircle aria-hidden="true" />正在上传附件…</div> : null}
+      {uploading ? (
+        <div className={styles.uploading} role="status">
+          {uploadSlow ? <span>网络较慢</span> : null}
+          <button type="button" aria-label="取消上传" title="取消上传" onClick={onCancelUpload}>
+            <X aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
       {error ? <div className={styles.error} role="alert">{error}</div> : null}
     </div>
   );

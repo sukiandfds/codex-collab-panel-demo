@@ -144,7 +144,14 @@ export function GroupComposer({ mode, agentId, agents, members, disabled, error,
           }}
           disabled={disabled}
         />
-        <AttachmentPreviews attachments={draft.attachments} error={draft.error} uploading={draft.uploading} onRemove={draft.removeFile} />
+        <AttachmentPreviews
+          attachments={draft.attachments}
+          error={draft.error}
+          uploading={draft.uploading}
+          uploadSlow={draft.uploadSlow}
+          onRemove={draft.removeFile}
+          onCancelUpload={draft.cancelUpload}
+        />
         <div className={styles.composerFooter}>
           <AttachmentButton disabled={disabled || draft.uploading} onFiles={draft.addFiles} />
           <div className={styles.modeSwitch}>

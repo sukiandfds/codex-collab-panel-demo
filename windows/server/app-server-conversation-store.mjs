@@ -20,11 +20,85 @@ export const inputFromAttachments = (text, attachments = []) => {
 };
 
 export const createAppServerConversationStore = ({
-  projectRoot, registerMedia, onProtocolMessage, onSubmitted, onFailed,
+  projectRoot, registerMedia, onProtocolMessage, onSubmitted, onFailed, onHealthState,
   client = createAppServerClient(),
+  supervision = {},
 }) => {
-  const unsubscribe = client.subscribe(onProtocolMessage || (() => {}));
+  const activeRuns = new Map();
+  const monitorIntervalMs = supervision.intervalMs ?? 5000;
+  const staleAfterMs = supervision.staleAfterMs ?? 30000;
+  const finalizingAfterMs = supervision.finalizingAfterMs ?? 10000;
+  const retryAfterMs = supervision.retryAfterMs ?? 10000;
+  let monitorBusy = false;
+
+  const handleProtocolMessage = (message) => {
+    const { method, params = {} } = message || {};
+    const threadId = params.threadId;
+    if (threadId) {
+      const current = activeRuns.get(threadId) || {};
+      if (method === "turn/completed" || (method === "thread/status/changed" && params.status?.type === "idle")) {
+        activeRuns.delete(threadId);
+      } else if (method === "turn/started" || activeRuns.has(threadId)) {
+        activeRuns.set(threadId, {
+          ...current,
+          lastEventAt: Date.now(),
+          nextProbeAt: 0,
+          finalAnswerCompleted: method === "turn/started"
+            ? false
+            : Boolean(current.finalAnswerCompleted) || (method === "item/completed"
+              && params.item?.type === "agentMessage"
+              && params.item?.phase !== "commentary"),
+        });
+      }
+    }
+    onProtocolMessage?.(message);
+  };
+
+  const handleHealthState = (event) => {
+    if (["recovered", "failed"].includes(event?.phase)) activeRuns.delete(event.threadId);
+    onHealthState?.(event);
+  };
+
+  const unsubscribe = client.subscribe(handleProtocolMessage);
+  const unsubscribeHealth = client.subscribeHealth?.(handleHealthState) || (() => {});
   const threadCache = new Map();
+
+  const monitorActiveRuns = async () => {
+    if (monitorBusy || !client.probe || activeRuns.size === 0) return;
+    monitorBusy = true;
+    try {
+      const now = Date.now();
+      for (const [threadId, run] of activeRuns) {
+        const staleMs = run.finalAnswerCompleted ? finalizingAfterMs : staleAfterMs;
+        if (now - run.lastEventAt < staleMs || now < (run.nextProbeAt || 0)) continue;
+        run.nextProbeAt = now + retryAfterMs;
+        try {
+          const result = await client.probe(
+            "thread/read",
+            { threadId, includeTurns: false },
+            { timeoutMs: 5000, threadId },
+          );
+          const status = result.thread?.status || null;
+          onHealthState?.({
+            phase: "authoritative",
+            threadId,
+            status,
+            finalAnswerCompleted: Boolean(run.finalAnswerCompleted),
+          });
+          if (status?.type === "idle") activeRuns.delete(threadId);
+        } catch {
+          // The client emits checking/recovery events and owns the restart policy.
+        }
+      }
+    } finally {
+      monitorBusy = false;
+    }
+  };
+
+  const monitorTimer = client.probe
+    ? setInterval(() => void monitorActiveRuns(), monitorIntervalMs)
+    : null;
+  monitorTimer?.unref?.();
 
   const listThreads = async () => {
     const threads = [];
@@ -148,7 +222,21 @@ export const createAppServerConversationStore = ({
 
   const getRuntimeContext = async (threadId) => {
     const result = await resumeThread(threadId);
-    return { model: result.model || "", modelProvider: result.modelProvider || "" };
+    return {
+      model: result.model || "",
+      modelProvider: result.modelProvider || "",
+      reasoningEffort: result.reasoningEffort || "",
+    };
+  };
+
+  const getThreadStatus = async (threadId) => {
+    const request = client.probe?.bind(client) || client.request.bind(client);
+    const result = await request(
+      "thread/read",
+      { threadId, includeTurns: false },
+      { timeoutMs: 5000, threadId },
+    );
+    return result.thread?.status || null;
   };
 
   const compactContext = async (threadId) => {
@@ -162,13 +250,22 @@ export const createAppServerConversationStore = ({
     return getRuntimeContext(threadId);
   };
 
+  const updateReasoningEffort = async (threadId, reasoningEffort) => {
+    await resumeThread(threadId);
+    await client.request("thread/settings/update", { threadId, reasoningEffort });
+    return getRuntimeContext(threadId);
+  };
+
   const close = () => {
+    if (monitorTimer) clearInterval(monitorTimer);
     unsubscribe();
+    unsubscribeHealth();
     client.close();
   };
 
   return {
     listSessions, createSession, findSession, sendMessage, steerMessage, interrupt,
-    listModels, updateModel, getRuntimeContext, compactContext, close,
+    listModels, updateModel, updateReasoningEffort, getRuntimeContext, getThreadStatus,
+    compactContext, close,
   };
 };

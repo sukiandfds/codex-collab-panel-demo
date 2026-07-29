@@ -1,14 +1,60 @@
+import fs from "node:fs";
+import fsp from "node:fs/promises";
+import path from "node:path";
 import { activityFromItem, detailFromItem, maxActivities, stateFromItem, terminalPhases } from "./execution/activity.mjs";
 
-export const createExecutionTracker = ({ broadcast }) => {
+export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
   const statuses = new Map();
   const messagePhases = new Map();
   const reasoningBuffers = new Map();
+  const protocolEventTimes = new Map();
+  let persistTimer;
+  let persistChain = Promise.resolve();
+
+  if (stateFile) {
+    try {
+      const stored = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+      for (const status of stored.statuses || []) {
+        if (!status?.threadId) continue;
+        statuses.set(status.threadId, status.active ? {
+          ...status,
+          phase: "interrupted",
+          label: "项目服务已重启，上一任务已中断",
+          active: false,
+          streamingItemId: "",
+          streamingText: "",
+          updatedAt: new Date().toISOString(),
+        } : status);
+      }
+    } catch {}
+  }
+
+  const persist = () => {
+    if (!stateFile) return Promise.resolve();
+    const payload = `${JSON.stringify({
+      version: 1,
+      statuses: [...statuses.values()].slice(-50),
+    }, null, 2)}\n`;
+    persistChain = persistChain.catch(() => {}).then(async () => {
+      await fsp.mkdir(path.dirname(stateFile), { recursive: true });
+      const temporary = `${stateFile}.${process.pid}.tmp`;
+      await fsp.writeFile(temporary, payload, "utf8");
+      await fsp.rename(temporary, stateFile);
+    }).catch((error) => console.warn(`[execution-tracker] state persistence failed: ${error.message}`));
+    return persistChain;
+  };
+
+  const schedulePersist = () => {
+    if (!stateFile) return;
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(() => void persist(), 200);
+    persistTimer.unref?.();
+  };
 
   const publish = (threadId, next) => {
     if (!threadId) return;
     const previous = statuses.get(threadId);
-    const active = !terminalPhases.has(next.phase) && next.phase !== "idle";
+    const active = next.active ?? (!terminalPhases.has(next.phase) && next.phase !== "idle");
     const now = new Date().toISOString();
     const beginsTurn = next.phase === "submitted" || (active && !previous?.active);
     let activities = beginsTurn ? [] : previous?.activities || [];
@@ -32,8 +78,11 @@ export const createExecutionTracker = ({ broadcast }) => {
       active,
       startedAt: active ? beginsTurn ? now : previous?.startedAt || now : previous?.startedAt || null,
       updatedAt: now,
+      lastEventAt: protocolEventTimes.get(threadId) || previous?.lastEventAt || null,
+      lastProbeAt: next.lastProbeAt ?? previous?.lastProbeAt ?? null,
     };
     statuses.set(threadId, status);
+    schedulePersist();
     broadcast(status);
   };
 
@@ -68,6 +117,7 @@ export const createExecutionTracker = ({ broadcast }) => {
       : [...previous.activities, activity].slice(-maxActivities);
     const status = { ...previous, activities, updatedAt: activity.updatedAt };
     statuses.set(threadId, status);
+    schedulePersist();
     broadcast(status);
   };
 
@@ -86,6 +136,7 @@ export const createExecutionTracker = ({ broadcast }) => {
     const activities = [...previous.activities.filter((value) => value.id !== activity.id), activity].slice(-maxActivities);
     const status = { ...previous, commentary: text, activities, updatedAt: now };
     statuses.set(threadId, status);
+    schedulePersist();
     broadcast(status);
   };
 
@@ -118,6 +169,7 @@ export const createExecutionTracker = ({ broadcast }) => {
     const { method, params = {} } = message || {};
     const threadId = params.threadId;
     if (!threadId) return;
+    protocolEventTimes.set(threadId, new Date().toISOString());
 
     if (method === "turn/started") {
       reasoningBuffers.delete(threadId);
@@ -175,6 +227,13 @@ export const createExecutionTracker = ({ broadcast }) => {
           });
         }
       } else if (["userMessage", "agentMessage", "imageGeneration"].includes(params.item?.type)) {
+        if (params.item?.type === "agentMessage" && params.item?.phase !== "commentary") {
+          publish(threadId, {
+            phase: "finalizing",
+            label: "回复已完成，正在收尾",
+            active: true,
+          });
+        }
         broadcast({ type: "sessions_changed", threadId });
       } else {
         completeActivity(threadId, params.item);
@@ -199,6 +258,7 @@ export const createExecutionTracker = ({ broadcast }) => {
             streamingText,
             updatedAt: new Date().toISOString(),
           });
+          schedulePersist();
         }
         broadcast({ type: "assistant_delta", ...params });
       }
@@ -227,7 +287,106 @@ export const createExecutionTracker = ({ broadcast }) => {
     active: false,
     startedAt: null,
     updatedAt: null,
+    lastEventAt: null,
+    lastProbeAt: null,
   };
 
-  return { markSubmitted, markFailed, handleProtocolMessage, getStatus };
+  const handleHealthState = (event = {}) => {
+    const threadId = event.threadId;
+    if (!threadId) return;
+    const lastProbeAt = new Date().toISOString();
+    if (event.phase === "healthy") {
+      const current = statuses.get(threadId);
+      if (current) {
+        statuses.set(threadId, { ...current, lastProbeAt });
+        schedulePersist();
+      }
+      return;
+    }
+    if (event.phase === "authoritative") {
+      const current = statuses.get(threadId);
+      if (event.status?.type === "idle" && current?.active) {
+        publish(threadId, {
+          phase: event.finalAnswerCompleted ? "completed" : "idle",
+          label: event.finalAnswerCompleted ? "Codex 已完成" : "Codex 已就绪",
+          active: false,
+          lastProbeAt,
+        });
+      } else {
+        reconcile(threadId, event.status);
+      }
+      return;
+    }
+    if (event.phase === "checking") {
+      publish(threadId, {
+        phase: "unknown",
+        label: "暂时没有新输出，正在确认状态",
+        detail: "正在确认 Codex 是否仍在运行",
+        active: true,
+        lastProbeAt,
+      });
+      return;
+    }
+    if (event.phase === "recovering") {
+      publish(threadId, {
+        phase: "recovering",
+        label: "Codex 连接异常，正在恢复",
+        active: true,
+        lastProbeAt,
+      });
+      return;
+    }
+    if (event.phase === "recovered") {
+      publish(threadId, {
+        phase: "interrupted",
+        label: "连接已恢复，上一任务已中断",
+        active: false,
+        lastProbeAt,
+      });
+      broadcast({ type: "sessions_changed", threadId });
+      return;
+    }
+    if (event.phase === "failed") {
+      publish(threadId, {
+        phase: "systemError",
+        label: "Codex 自动恢复失败",
+        detail: event.error instanceof Error ? event.error.message : String(event.error || ""),
+        active: false,
+        lastProbeAt,
+      });
+    }
+  };
+
+  const reconcile = (threadId, authoritativeStatus) => {
+    const current = statuses.get(threadId);
+    if (!current?.active) return getStatus(threadId);
+    const type = authoritativeStatus?.type;
+    const flags = authoritativeStatus?.activeFlags || [];
+    if (type === "idle") {
+      publish(threadId, { phase: "idle", label: "Codex 已就绪" });
+    } else if (type === "systemError") {
+      publish(threadId, { phase: "systemError", label: "Codex 连接异常" });
+    } else if (type === "active" && flags.includes("waitingOnApproval")) {
+      publish(threadId, { phase: "waitingOnApproval", label: "需要在电脑端确认" });
+    } else if (type === "active" && flags.includes("waitingOnUserInput")) {
+      publish(threadId, { phase: "waitingOnUserInput", label: "Codex 正在等待补充信息" });
+    } else if (type === "active") {
+      publish(threadId, { phase: "working", label: "Codex 正在处理任务" });
+    } else {
+      publish(threadId, {
+        phase: "unknown",
+        label: "状态暂时无法确认",
+        detail: "实时状态暂时无法确认，可以等待自动恢复或手动停止后重试",
+        active: true,
+      });
+    }
+    return getStatus(threadId);
+  };
+
+  const close = async () => {
+    clearTimeout(persistTimer);
+    await persist();
+  };
+
+  return { markSubmitted, markFailed, handleProtocolMessage, handleHealthState, getStatus, reconcile, close };
 };

@@ -41,5 +41,21 @@ export function useModels(threadId: string, onChanged: () => void) {
     }
   }, [changing, onChanged, threadId]);
 
-  return { models, loading, changing, error, change };
+  const changeReasoningEffort = useCallback(async (reasoningEffort: string) => {
+    if (!threadId || !reasoningEffort || changing) return false;
+    setChanging(true);
+    setError("");
+    try {
+      await modelApi.updateReasoningEffort(threadId, reasoningEffort);
+      onChanged();
+      return true;
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+      return false;
+    } finally {
+      setChanging(false);
+    }
+  }, [changing, onChanged, threadId]);
+
+  return { models, loading, changing, error, change, changeReasoningEffort };
 }

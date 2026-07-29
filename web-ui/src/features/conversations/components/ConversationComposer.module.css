@@ -51,6 +51,15 @@
   padding: 0 9px 7px 14px;
 }
 
+.leadingControls,
+.settingsControls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.leadingControls { gap: 4px; }
+.settingsControls { gap: 2px; }
 .spacer { flex: 1; }
 
 .sendButton {
@@ -86,5 +95,42 @@
 }
 
 @media (max-width: 760px) {
-  .positioner { padding: 20px 12px 10px; }
+  .positioner { padding: 20px 12px max(10px, env(safe-area-inset-bottom)); }
+
+  .footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 36px;
+    row-gap: 2px;
+    padding: 0 9px 8px 10px;
+  }
+
+  .leadingControls {
+    grid-column: 1;
+    grid-row: 1;
+    overflow: hidden;
+  }
+
+  .leadingControls > label {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+
+  .spacer { display: none; }
+
+  .settingsControls {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .sendButton {
+    grid-column: 2;
+    grid-row: 1;
+    width: 36px;
+    height: 36px;
+  }
 }

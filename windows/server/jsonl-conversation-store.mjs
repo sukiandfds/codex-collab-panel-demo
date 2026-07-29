@@ -2,7 +2,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
-import { messageFromItem, previewText } from "./content-blocks.mjs";
+import { blocksFromContent, messageFromItem, previewText } from "./content-blocks.mjs";
 
 const walkJsonl = async (directory) => {
   let entries = [];
@@ -114,13 +114,53 @@ export const createJsonlConversationStore = ({ sessionRoot, projectRoot, registe
   const fallbackTimer = setInterval(() => void reconcile(), 60000);
   fallbackTimer.unref?.();
 
-  const createSessionState = (header) => ({ ...header, offset: 0, carry: "", lastKey: "", messages: [], decoder: new StringDecoder("utf8") });
+  const createSessionState = (header) => ({
+    ...header,
+    offset: 0,
+    carry: "",
+    lastKey: "",
+    messages: [],
+    pendingAssistantMedia: [],
+    decoder: new StringDecoder("utf8"),
+  });
+
+  const blockKey = (block) => `${block.type}:${block.source || block.text || ""}`;
+
+  const mergeBlocks = (current, incoming) => {
+    const seen = new Set(current.map(blockKey));
+    return [...current, ...incoming.filter((block) => !seen.has(blockKey(block)))];
+  };
+
+  const isFinalAssistantItem = (item) => (
+    (item?.type === "event_msg" && item.payload?.type === "agent_message" && item.payload?.phase === "final_answer")
+    || (item?.type === "response_item" && item.payload?.type === "message" && item.payload?.role === "assistant"
+      && (!item.payload?.phase || item.payload.phase === "final_answer"))
+  );
 
   const processLine = (state, line) => {
     if (!line.trim()) return;
     try {
-      const message = messageFromItem(JSON.parse(line), registerMedia);
+      const item = JSON.parse(line);
+      if (item?.type === "response_item" && item.payload?.type === "custom_tool_call_output") {
+        const media = blocksFromContent(item.payload.output, registerMedia)
+          .filter((block) => ["image", "audio", "video"].includes(block.type));
+        state.pendingAssistantMedia = mergeBlocks(state.pendingAssistantMedia, media);
+        return;
+      }
+
+      const message = messageFromItem(item, registerMedia);
       if (!message) return;
+      if (isFinalAssistantItem(item) && state.pendingAssistantMedia.length) {
+        message.blocks = mergeBlocks(message.blocks, state.pendingAssistantMedia);
+        state.pendingAssistantMedia = [];
+      }
+
+      const previous = state.messages.at(-1);
+      if (previous?.role === message.role && previous.text === message.text) {
+        previous.blocks = mergeBlocks(previous.blocks, message.blocks);
+        state.lastKey = `${previous.role}:${previous.text}:${previous.blocks.map(blockKey).join("|")}`;
+        return;
+      }
       const key = `${message.role}:${message.text}:${message.blocks.map((block) => `${block.type}:${block.source || block.text || ""}`).join("|")}`;
       if (key !== state.lastKey) state.messages.push(message);
       state.lastKey = key;

@@ -56,6 +56,21 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
     sendJson(response, await conversations.updateModel(threadId, model));
     return true;
   }
+  if (url.pathname === "/api/session/reasoning-effort" && request.method === "POST") {
+    const body = await readJson(request);
+    const threadId = String(body.threadId || "").trim();
+    const reasoningEffort = String(body.reasoningEffort || "").trim();
+    if (!threadId || !reasoningEffort) {
+      sendJson(response, { error: "threadId and reasoningEffort are required" }, 400);
+      return true;
+    }
+    if (execution.getStatus(threadId).active) {
+      sendJson(response, { error: "当前任务运行中，请在完成后调整推理强度" }, 409);
+      return true;
+    }
+    sendJson(response, await conversations.updateReasoningEffort(threadId, reasoningEffort));
+    return true;
+  }
   if (url.pathname === "/api/session/interrupt" && request.method === "POST") {
     const body = await readJson(request);
     const threadId = String(body.threadId || "").trim();
@@ -103,6 +118,14 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
     if (!threadId) {
       sendJson(response, { error: "threadId is required" }, 400);
       return true;
+    }
+    const current = execution.getStatus(threadId);
+    if (current.active && url.searchParams.get("reconcile") === "1") {
+      try {
+        execution.reconcile(threadId, await conversations.getThreadStatus(threadId));
+      } catch {
+        execution.reconcile(threadId, null);
+      }
     }
     sendJson(response, execution.getStatus(threadId));
     return true;

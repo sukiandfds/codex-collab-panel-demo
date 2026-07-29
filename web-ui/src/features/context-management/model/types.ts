@@ -4,6 +4,7 @@ export interface ContextStatus {
   type: "context_status";
   threadId: string;
   model: string;
+  reasoningEffort: string;
   usedTokens: number | null;
   contextWindow: number | null;
   percentage: number | null;
