@@ -112,7 +112,7 @@ test("publishes an existing mediaId and rejects absolute or escaping paths", asy
     /相对路径/u,
   );
   await assert.rejects(
-    service.publish({ createdByAgent: "developer", relativePath: "..\\uploaded.txt" }),
+    service.publish({ createdByAgent: "developer", relativePath: path.join("..", "uploaded.txt") }),
     /超出允许目录/u,
   );
   await service.close();
