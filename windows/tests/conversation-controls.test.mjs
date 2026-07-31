@@ -86,7 +86,7 @@ test("updates the model only after resuming the selected project thread", async 
       };
       if (method === "thread/settings/update") {
         if (params.model) currentModel = params.model;
-        if (params.reasoningEffort) currentReasoningEffort = params.reasoningEffort;
+        if (params.effort) currentReasoningEffort = params.effort;
         return {};
       }
       throw new Error(`Unexpected request: ${method}`);
@@ -113,7 +113,7 @@ test("updates the model only after resuming the selected project thread", async 
   assert.equal(effortResult.reasoningEffort, "high");
   assert.deepEqual(calls.at(-2), {
     method: "thread/settings/update",
-    params: { threadId: "thread-1", reasoningEffort: "high" },
+    params: { threadId: "thread-1", effort: "high" },
   });
 });
 

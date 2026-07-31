@@ -37,6 +37,17 @@ test("reports the real model and current context percentage", async () => {
   assert.equal(status.percentage, 50);
 });
 
+test("tracks the protocol effort field after thread settings change", async () => {
+  const { service } = await createService();
+  await service.load("thread-1");
+  service.handleProtocolMessage({
+    method: "thread/settings/updated",
+    params: { threadId: "thread-1", threadSettings: { model: "gpt-5.6-sol", effort: "high" } },
+  });
+
+  assert.equal(service.getStatus("thread-1").reasoningEffort, "high");
+});
+
 test("queues auto compaction until the active turn completes", async () => {
   const { service, compacted, setExecutionActive } = await createService({ active: true });
   await service.load("thread-1");

@@ -166,7 +166,7 @@ export const createContextManagementService = async ({
     if (method === "thread/settings/updated") {
       publish(threadId, {
         model: params.threadSettings?.model || statusFor(threadId).model,
-        reasoningEffort: params.threadSettings?.reasoningEffort || statusFor(threadId).reasoningEffort,
+        reasoningEffort: params.threadSettings?.effort || statusFor(threadId).reasoningEffort,
       });
       return;
     }

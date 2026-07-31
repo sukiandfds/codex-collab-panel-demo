@@ -252,7 +252,7 @@ export const createAppServerConversationStore = ({
 
   const updateReasoningEffort = async (threadId, reasoningEffort) => {
     await resumeThread(threadId);
-    await client.request("thread/settings/update", { threadId, reasoningEffort });
+    await client.request("thread/settings/update", { threadId, effort: reasoningEffort });
     return getRuntimeContext(threadId);
   };
 
