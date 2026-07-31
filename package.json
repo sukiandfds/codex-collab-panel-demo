@@ -7,5 +7,8 @@
     "start:demo": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/start-web-demo.ps1",
     "start:demo:build": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/start-web-demo.ps1 -Build",
     "restart:demo": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/restart-web-demo.ps1"
+  },
+  "dependencies": {
+    "image-size": "2.0.2"
   }
 }

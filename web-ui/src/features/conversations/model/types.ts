@@ -11,7 +11,7 @@ export interface ProjectInfo {
 
 export interface MarkdownBlock { id: string; type: "markdown"; text: string }
 export interface OptionsBlock { id: string; type: "options"; options: string[] }
-export interface ImageBlock { id: string; type: "image"; source: string; alt?: string; file?: MediaFile }
+export interface ImageBlock { id: string; type: "image"; source: string; alt?: string; width?: number; height?: number; file?: MediaFile }
 export interface AudioBlock { id: string; type: "audio"; source: string; file?: MediaFile }
 export interface VideoBlock { id: string; type: "video"; source: string; file?: MediaFile }
 export interface FileBlock { id: string; type: "file"; source: string; name?: string; file?: MediaFile }

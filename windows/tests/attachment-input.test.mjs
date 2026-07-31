@@ -7,6 +7,16 @@ import test from "node:test";
 import { inputFromAttachments } from "../server/app-server-conversation-store.mjs";
 import { createMediaService } from "../server/media-service.mjs";
 
+const pngHeader = (width, height) => {
+  const buffer = Buffer.alloc(24);
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(buffer);
+  buffer.writeUInt32BE(13, 8);
+  Buffer.from("IHDR").copy(buffer, 12);
+  buffer.writeUInt32BE(width, 16);
+  buffer.writeUInt32BE(height, 20);
+  return buffer;
+};
+
 test("maps uploaded files to Codex native input types", () => {
   const input = inputFromAttachments("检查附件", [
     { name: "screen.png", mimeType: "image/png", path: "C:\\uploads\\screen.png" },
@@ -49,6 +59,26 @@ test("reuses the same stored upload for identical retry content", async () => {
 
     assert.equal(retried.id, first.id);
     assert.equal(files.length, 1);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("returns stable dimensions for uploaded and restored images", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "codex-collab-image-size-"));
+  try {
+    const media = createMediaService({ uploadRoot: root });
+    const uploaded = await media.upload(Readable.from([pngHeader(1200, 800)]), { name: "photo.png", mimeType: "image/png" });
+
+    assert.equal(uploaded.width, 1200);
+    assert.equal(uploaded.height, 800);
+    assert.match(uploaded.url, /\?w=1200&h=800$/u);
+
+    const restored = createMediaService({ uploadRoot: root });
+    await restored.restoreUploads();
+    const restoredImage = restored.resolveMany([uploaded.id])[0];
+    assert.equal(restoredImage.width, 1200);
+    assert.equal(restoredImage.height, 800);
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }

@@ -20,6 +20,7 @@ TASK_PROGRESS.md
 
 # Local frontend dependencies, caches, and generated output
 .pnpm-store/
+node_modules/
 .playwright-mcp/
 web-ui/node_modules/
 web-ui/dist/

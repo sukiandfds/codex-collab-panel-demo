@@ -2,6 +2,8 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { imageSize } from "image-size";
+import { imageSizeFromFile } from "image-size/fromFile";
 
 const mimeTypes = new Map([
   [".png", "image/png"], [".jpg", "image/jpeg"], [".jpeg", "image/jpeg"], [".gif", "image/gif"],
@@ -20,8 +22,40 @@ const mimeTypes = new Map([
 
 const inlineTypes = /^(?:image|audio|video)\//u;
 const maxUploadBytes = 20 * 1024 * 1024;
+const maxImageProbeBytes = 25 * 1024 * 1024;
 
-const publicMedia = ({ id, name, mimeType, url }) => ({ id, name, mimeType, url });
+const validDimension = (value) => Number.isSafeInteger(value) && value > 0;
+const publicMedia = ({ id, name, mimeType, url, width, height }) => ({
+  id,
+  name,
+  mimeType,
+  url,
+  ...(validDimension(width) && validDimension(height) ? { width, height } : {}),
+});
+const normalizeSize = (size) => {
+  if (!validDimension(size?.width) || !validDimension(size?.height)) return {};
+  const rotated = [5, 6, 7, 8].includes(size.orientation);
+  return rotated
+    ? { width: size.height, height: size.width }
+    : { width: size.width, height: size.height };
+};
+const normalizeDimensions = (input) => {
+  try {
+    return normalizeSize(imageSize(input));
+  } catch {
+    return {};
+  }
+};
+const dimensionsFromFile = async (file) => {
+  try {
+    return normalizeSize(await imageSizeFromFile(file));
+  } catch {
+    return {};
+  }
+};
+const imageUrl = (id, dimensions) => validDimension(dimensions.width) && validDimension(dimensions.height)
+  ? `/api/media/${id}?w=${dimensions.width}&h=${dimensions.height}`
+  : `/api/media/${id}`;
 const storedUploadName = (value) => {
   const marker = value.indexOf("__");
   return marker >= 0 ? value.slice(marker + 2) : value;
@@ -64,12 +98,36 @@ export const createMediaService = ({ uploadRoot } = {}) => {
     const declaredType = /^[\w.+-]+\/[\w.+-]+(?:;\s*charset=[\w-]+)?$/iu.test(overrides.mimeType || "")
       ? overrides.mimeType
       : "";
+    const mimeType = inferredType || declaredType || "application/octet-stream";
+    let stat = null;
+    try {
+      stat = fs.statSync(resolved);
+    } catch {
+      // Missing files remain registered so the normal availability path can handle them.
+    }
+    const signature = stat?.isFile() ? `${stat.size}:${stat.mtimeMs}` : "";
+    const existing = entries.get(id);
+    if (existing && existing.signature === signature && existing.mimeType === mimeType) return publicMedia(existing);
+
+    let dimensions = overrides.dimensions || {};
+    if (!(validDimension(dimensions.width) && validDimension(dimensions.height)) && mimeType.startsWith("image/") && (!stat || stat.size <= maxImageProbeBytes)) {
+      const input = overrides.buffer || (() => {
+        try {
+          return fs.readFileSync(resolved);
+        } catch {
+          return null;
+        }
+      })();
+      if (input) dimensions = normalizeDimensions(input);
+    }
     const value = {
       id,
       path: resolved,
       name: overrides.name || path.basename(resolved),
-      mimeType: inferredType || declaredType || "application/octet-stream",
-      url: `/api/media/${id}`,
+      mimeType,
+      url: imageUrl(id, dimensions),
+      ...dimensions,
+      signature,
     };
     entries.set(id, value);
     return publicMedia(value);
@@ -79,10 +137,12 @@ export const createMediaService = ({ uploadRoot } = {}) => {
     if (!uploadRoot) return;
     try {
       const files = await fsp.readdir(uploadRoot, { withFileTypes: true });
-      for (const file of files) {
-        if (!file.isFile()) continue;
-        register(path.join(uploadRoot, file.name), { name: storedUploadName(file.name) });
-      }
+      await Promise.all(files.filter((file) => file.isFile()).map(async (file) => {
+        const resolved = path.join(uploadRoot, file.name);
+        const inferredType = mimeTypes.get(path.extname(resolved).toLowerCase()) || "";
+        const dimensions = inferredType.startsWith("image/") ? await dimensionsFromFile(resolved) : {};
+        register(resolved, { name: storedUploadName(file.name), dimensions });
+      }));
     } catch (error) {
       if (error?.code !== "ENOENT") throw error;
     }
@@ -101,7 +161,7 @@ export const createMediaService = ({ uploadRoot } = {}) => {
     } catch (error) {
       if (error?.code !== "EEXIST") throw error;
     }
-    return register(file, { name: displayName, mimeType });
+    return register(file, { name: displayName, mimeType, buffer: body });
   };
 
   const resolveMany = (ids) => [...new Set(Array.isArray(ids) ? ids : [])]
