@@ -56,6 +56,7 @@ export function App() {
           connected={conversations.connected}
           selected={Boolean(conversations.selectedId)}
           sending={conversations.sending}
+          sendingSlow={conversations.sendingSlow}
           status={conversations.executionStatus}
           commentary={conversations.commentaryText}
           contextStatus={conversations.contextStatus}

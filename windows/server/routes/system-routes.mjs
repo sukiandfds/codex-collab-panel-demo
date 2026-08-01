@@ -1,3 +1,5 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import { sendJson } from "../http/request-utils.mjs";
 
 const createObserverReader = (observerPort) => async (threadId = "") => {
@@ -11,8 +13,9 @@ const createObserverReader = (observerPort) => async (threadId = "") => {
   }
 };
 
-export const createSystemRoutes = ({ project, projectRoot, device, observerPort, media, realtime }) => {
+export const createSystemRoutes = ({ token, project, projectRoot, device, observerPort, media, realtime }) => {
   const readObserverStatus = createObserverReader(observerPort);
+  const progressFile = path.join(projectRoot, "docs", "feature-development", "FEATURE_INDEX.md");
   return async (request, response, url) => {
     if (url.pathname === "/api/project") {
       sendJson(response, { name: project, root: projectRoot, mode: "interactive" });
@@ -20,6 +23,18 @@ export const createSystemRoutes = ({ project, projectRoot, device, observerPort,
     }
     if (url.pathname === "/api/device") {
       sendJson(response, device);
+      return true;
+    }
+    if (url.pathname === "/api/share-link" && request.method === "GET") {
+      sendJson(response, { token });
+      return true;
+    }
+    if (url.pathname === "/api/project-progress" && request.method === "GET") {
+      const [markdown, stat] = await Promise.all([
+        fs.readFile(progressFile, "utf8"),
+        fs.stat(progressFile),
+      ]);
+      sendJson(response, { markdown, updatedAt: stat.mtime.toISOString() });
       return true;
     }
     if (url.pathname === "/api/uploads" && request.method === "POST") {

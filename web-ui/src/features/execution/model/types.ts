@@ -15,6 +15,7 @@ export type ExecutionPhase =
   | "completed"
   | "failed"
   | "interrupted"
+  | "stopping"
   | "systemError"
   | "recovering"
   | "unknown";

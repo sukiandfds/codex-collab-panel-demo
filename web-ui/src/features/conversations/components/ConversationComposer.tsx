@@ -15,6 +15,7 @@ interface ConversationComposerProps {
   connected: boolean;
   selected: boolean;
   sending: boolean;
+  sendingSlow: boolean;
   status: ExecutionStatusValue;
   commentary: string;
   contextStatus: ContextStatus;
@@ -31,7 +32,7 @@ interface ConversationComposerProps {
 }
 
 export function ConversationComposer({
-  connected, selected, sending, status, commentary, contextStatus,
+  connected, selected, sending, sendingSlow, status, commentary, contextStatus,
   models, modelsLoading, modelChanging, modelError,
   onSend, onInterrupt, onCompactContext, onAutoCompactThresholdChange, onModelChange,
   onReasoningEffortChange,
@@ -110,7 +111,7 @@ export function ConversationComposer({
         <div className={styles.footer}>
           <div className={styles.leadingControls}>
             <AttachmentButton disabled={inputDisabled} onFiles={draft.addFiles} />
-            <ExecutionStatus connected={connected} status={status} commentary={commentary} />
+            <ExecutionStatus connected={connected} status={status} commentary={commentary} sendingSlow={sendingSlow} />
           </div>
           <span className={styles.spacer} />
           <div className={styles.settingsControls}>

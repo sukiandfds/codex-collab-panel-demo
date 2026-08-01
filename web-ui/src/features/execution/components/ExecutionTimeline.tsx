@@ -23,9 +23,9 @@ export function ExecutionTimeline({ status }: { status: ExecutionStatus }) {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    setExpanded(true);
+    setExpanded(status.active);
     setNow(Date.now());
-  }, [status.startedAt]);
+  }, [status.active, status.startedAt]);
 
   useEffect(() => {
     if (!status.active) return;

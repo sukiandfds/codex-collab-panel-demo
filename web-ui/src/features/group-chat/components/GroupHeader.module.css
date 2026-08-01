@@ -10,7 +10,7 @@
 .memberButton:hover { background: #242424; color: #f1f1f1; }
 
 @media (max-width: 680px) {
-  .header { padding: 0 80px 0 12px; }
+  .header { padding: 0 112px 0 12px; }
   .activity { display: none; }
   .memberButton { max-width: 80px; }
 }

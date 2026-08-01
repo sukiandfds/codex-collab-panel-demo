@@ -24,7 +24,7 @@ export default defineConfig(({ command }) => {
     },
     build: {
       rollupOptions: {
-        input: { main: "index.html", group: "group.html" },
+        input: { main: "index.html", group: "group.html", progress: "progress.html" },
       },
     },
     server: {

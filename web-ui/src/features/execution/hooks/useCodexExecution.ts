@@ -3,6 +3,7 @@ import { executionApi } from "../data/executionApi";
 import type { ExecutionStatus, ProjectEvent } from "../model/types";
 
 const SEND_CONFIRM_TIMEOUT_MS = 20000;
+const SEND_SLOW_NOTICE_MS = 3000;
 
 const idleStatus = (threadId: string): ExecutionStatus => ({
   type: "execution_status",
@@ -27,8 +28,10 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
   const streamingItemId = useRef("");
   const streamingBuffer = useRef("");
   const streamingTimer = useRef(0);
+  const sendingSlowTimer = useRef(0);
   const sendingRef = useRef(false);
   const [sending, setSending] = useState(false);
+  const [sendingSlow, setSendingSlow] = useState(false);
 
   const clearStreaming = useCallback(() => {
     window.clearTimeout(streamingTimer.current);
@@ -78,6 +81,7 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
 
   useEffect(() => () => {
     window.clearTimeout(streamingTimer.current);
+    window.clearTimeout(sendingSlowTimer.current);
   }, []);
 
   const handleEvent = useCallback((event: ProjectEvent) => {
@@ -113,6 +117,8 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
     if (!threadId || (!message && !attachmentIds.length) || sendingRef.current) return false;
     sendingRef.current = true;
     setSending(true);
+    setSendingSlow(false);
+    sendingSlowTimer.current = window.setTimeout(() => setSendingSlow(true), SEND_SLOW_NOTICE_MS);
     const steering = status.active;
     const previousTurnId = status.turnId;
     const controller = new AbortController();
@@ -127,7 +133,7 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
       void refreshStatus();
       return true;
     } catch (reason) {
-      const recovered = await refreshStatus();
+      const recovered = await refreshStatus(undefined, true);
       const acceptedAfterFailure = !steering
         && Boolean(recovered?.turnId)
         && recovered?.turnId !== previousTurnId
@@ -153,6 +159,9 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
       return false;
     } finally {
       window.clearTimeout(timeout);
+      window.clearTimeout(sendingSlowTimer.current);
+      sendingSlowTimer.current = 0;
+      setSendingSlow(false);
       sendingRef.current = false;
       setSending(false);
     }
@@ -162,20 +171,33 @@ export function useCodexExecution(threadId: string, onMessageAccepted: () => voi
     if (!threadId || !status.active || sendingRef.current) return false;
     sendingRef.current = true;
     setSending(true);
+    setStatus((current) => ({
+      ...current,
+      phase: "stopping",
+      label: "正在停止",
+      detail: "",
+      active: true,
+    }));
     try {
       await executionApi.interrupt(threadId);
       return true;
     } catch (reason) {
-      setStatus((current) => ({
-        ...current,
-        detail: reason instanceof Error ? reason.message : String(reason),
-      }));
+      const recovered = await refreshStatus(undefined, true);
+      if (!recovered) {
+        setStatus((current) => ({
+          ...current,
+          phase: "unknown",
+          label: "停止状态待确认",
+          detail: reason instanceof Error ? reason.message : String(reason),
+          active: true,
+        }));
+      }
       return false;
     } finally {
       sendingRef.current = false;
       setSending(false);
     }
-  }, [status.active, threadId]);
+  }, [refreshStatus, status.active, threadId]);
 
-  return { status, streamingText, commentaryText, sending, handleEvent, sendMessage, interrupt, clearStreaming, refreshStatus };
+  return { status, streamingText, commentaryText, sending, sendingSlow, handleEvent, sendMessage, interrupt, clearStreaming, refreshStatus };
 }

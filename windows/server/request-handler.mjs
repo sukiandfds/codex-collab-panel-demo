@@ -15,7 +15,7 @@ export const createRequestHandler = ({
     createArtifactRoutes({ groupRoom, artifacts, webOutputs }),
     createGroupRoutes({ groupRoom, media, multiAgent, webOutputs }),
     createConversationRoutes({ conversations, execution, contextManagement, media }),
-    createSystemRoutes({ project, projectRoot, device, observerPort, media, realtime }),
+    createSystemRoutes({ token, project, projectRoot, device, observerPort, media, realtime }),
   ];
 
   return async (request, response) => {

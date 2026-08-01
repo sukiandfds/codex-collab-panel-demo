@@ -84,12 +84,11 @@ export function useProjectConversations() {
     execution.handleEvent(event);
     if (event.type === "context_status") contextManagement.handleEvent(event);
   }, [contextManagement.handleEvent, execution.handleEvent]);
-  const recoverRealtime = useCallback((reason: RealtimeRecoveryReason) => {
-    void execution.refreshStatus().then((latest) => {
-      if (reason === "stale-execution" && latest?.active) return;
-      onSessionsChanged(undefined, latest ? !latest.active : false);
+  const recoverRealtime = useCallback((_reason: RealtimeRecoveryReason) => {
+    void execution.refreshStatus(undefined, true).then((latest) => {
+      onSessionsChanged(selection.selectedIdRef.current || undefined, latest ? !latest.active : false);
     });
-  }, [execution.refreshStatus, onSessionsChanged]);
+  }, [execution.refreshStatus, onSessionsChanged, selection.selectedIdRef]);
   const connected = useConversationEvents(
     onSessionsChanged,
     handleEvent,
@@ -100,7 +99,7 @@ export function useProjectConversations() {
   );
 
   useEffect(() => {
-    if (connected && selection.selectedId) void execution.refreshStatus();
+    if (connected && selection.selectedId) void execution.refreshStatus(undefined, true);
   }, [connected, execution.refreshStatus, selection.selectedId]);
 
   return {
@@ -128,6 +127,7 @@ export function useProjectConversations() {
     modelChanging: modelManager.changing,
     modelError: modelManager.error,
     sending: execution.sending,
+    sendingSlow: execution.sendingSlow,
     sendMessage,
     interrupt: execution.interrupt,
     compactContext: contextManagement.compact,

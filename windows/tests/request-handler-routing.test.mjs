@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
 import http from "node:http";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { createRequestHandler } from "../server/request-handler.mjs";
 
-const createFixture = () => {
+const createFixture = (projectRoot = "C:\\demo") => {
   const serveStatic = async (_url, response) => {
     response.writeHead(200, { "Content-Type": "text/plain" });
     response.end("static");
@@ -11,7 +14,7 @@ const createFixture = () => {
   return createRequestHandler({
     token: "test-token",
     project: "demo",
-    projectRoot: "C:\\demo",
+    projectRoot,
     device: { name: "test-device" },
     observerPort: 1,
     conversations: {
@@ -31,8 +34,8 @@ const createFixture = () => {
   });
 };
 
-const withServer = async (run) => {
-  const server = http.createServer(createFixture());
+const withServer = async (run, projectRoot) => {
+  const server = http.createServer(createFixture(projectRoot));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   try {
     const address = server.address();
@@ -46,6 +49,7 @@ test("dispatches feature routes and preserves static fallback", async () => {
   await withServer(async (baseUrl) => {
     const request = (pathname) => fetch(`${baseUrl}${pathname}${pathname.includes("?") ? "&" : "?"}token=test-token`);
     assert.deepEqual(await (await request("/api/project")).json(), { name: "demo", root: "C:\\demo", mode: "interactive" });
+    assert.deepEqual(await (await request("/api/share-link")).json(), { token: "test-token" });
     assert.deepEqual(await (await request("/api/models")).json(), [{ id: "model" }]);
     assert.equal((await (await request("/api/group/snapshot")).json()).room.id, "room");
     assert.deepEqual(await (await request("/api/artifacts")).json(), [{ id: "artifact" }]);
@@ -63,4 +67,22 @@ test("keeps API routes protected after route extraction", async () => {
     assert.equal(response.status, 401);
     assert.equal(await response.text(), "Unauthorized");
   });
+});
+
+test("serves the current feature index as live project progress", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "codex-progress-route-"));
+  try {
+    const docs = path.join(root, "docs", "feature-development");
+    await fs.mkdir(docs, { recursive: true });
+    await fs.writeFile(path.join(docs, "FEATURE_INDEX.md"), "# Feature index\n\n| ID | Status |\n| --- | --- |\n| FEAT-001 | active |\n", "utf8");
+    await withServer(async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/project-progress?token=test-token`);
+      const payload = await response.json();
+      assert.equal(response.status, 200);
+      assert.match(payload.markdown, /FEAT-001/u);
+      assert.ok(Date.parse(payload.updatedAt));
+    }, root);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
 });
