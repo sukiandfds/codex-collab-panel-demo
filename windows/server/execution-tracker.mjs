@@ -78,6 +78,7 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
       active,
       startedAt: active ? beginsTurn ? now : previous?.startedAt || now : previous?.startedAt || null,
       updatedAt: now,
+      durationMs: beginsTurn ? next.durationMs ?? null : next.durationMs ?? previous?.durationMs ?? null,
       lastEventAt: protocolEventTimes.get(threadId) || previous?.lastEventAt || null,
       lastProbeAt: next.lastProbeAt ?? previous?.lastProbeAt ?? null,
     };
@@ -185,6 +186,7 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
         phase,
         label: failed ? "Codex 执行失败" : phase === "interrupted" ? "Codex 已中断" : "Codex 已完成",
         detail: params.turn?.error?.message || "",
+        durationMs: Number.isFinite(params.turn?.durationMs) ? params.turn.durationMs : null,
       });
       broadcast({ type: "sessions_changed", threadId });
       return;
@@ -287,6 +289,7 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
     active: false,
     startedAt: null,
     updatedAt: null,
+    durationMs: null,
     lastEventAt: null,
     lastProbeAt: null,
   };

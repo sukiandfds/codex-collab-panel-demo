@@ -62,6 +62,7 @@ export const createAppServerConversationStore = ({
   const unsubscribe = client.subscribe(handleProtocolMessage);
   const unsubscribeHealth = client.subscribeHealth?.(handleHealthState) || (() => {});
   const threadCache = new Map();
+  const freshThreadRuntime = new Map();
 
   const monitorActiveRuns = async () => {
     if (monitorBusy || !client.probe || activeRuns.size === 0) return;
@@ -141,6 +142,10 @@ export const createAppServerConversationStore = ({
     const result = await client.request("thread/start", params);
     const thread = result.thread;
     threadCache.set(thread.id, thread);
+    freshThreadRuntime.set(thread.id, {
+      ...result,
+      model: result.model || model,
+    });
     return summaryFromThread(thread);
   };
 
@@ -170,8 +175,14 @@ export const createAppServerConversationStore = ({
     if (source !== "all" && sourceFromThread(thread) !== source) return null;
     threadCache.set(thread.id, thread);
     const messages = thread.turns
-      .flatMap((turn) => turn.items)
-      .map((item) => messageFromThreadItem(item, registerMedia))
+      .flatMap((turn) => turn.items.map((item) => {
+        const message = messageFromThreadItem(item, registerMedia);
+        if (!message) return null;
+        const timestamp = message.role === "user" ? turn.startedAt : turn.completedAt;
+        return Number.isFinite(timestamp)
+          ? { ...message, createdAt: new Date(timestamp * 1000).toISOString() }
+          : message;
+      }))
       .filter(Boolean);
     const latestUser = messages.findLast((item) => item.role === "user")?.text || "";
     const latestAssistant = messages.findLast((item) => item.role === "assistant")?.text || "";
@@ -195,6 +206,8 @@ export const createAppServerConversationStore = ({
       throw new Error("This conversation does not belong to the current project.");
     }
     threadCache.set(thread.id, thread);
+    const freshRuntime = freshThreadRuntime.get(threadId);
+    if (freshRuntime) return freshRuntime;
     return client.request("thread/resume", { threadId, persistExtendedHistory: true });
   };
 
@@ -202,10 +215,12 @@ export const createAppServerConversationStore = ({
     onSubmitted?.(threadId);
     try {
       await resumeThread(threadId);
-      return await client.request("turn/start", {
+      const result = await client.request("turn/start", {
         threadId,
         input: inputFromAttachments(text, attachments),
       });
+      freshThreadRuntime.delete(threadId);
+      return result;
     } catch (error) {
       onFailed?.(threadId, error);
       throw error;
@@ -245,14 +260,20 @@ export const createAppServerConversationStore = ({
   };
 
   const updateModel = async (threadId, model) => {
-    await resumeThread(threadId);
+    const runtime = await resumeThread(threadId);
     await client.request("thread/settings/update", { threadId, model });
+    if (freshThreadRuntime.has(threadId)) {
+      freshThreadRuntime.set(threadId, { ...runtime, model });
+    }
     return getRuntimeContext(threadId);
   };
 
   const updateReasoningEffort = async (threadId, reasoningEffort) => {
-    await resumeThread(threadId);
+    const runtime = await resumeThread(threadId);
     await client.request("thread/settings/update", { threadId, effort: reasoningEffort });
+    if (freshThreadRuntime.has(threadId)) {
+      freshThreadRuntime.set(threadId, { ...runtime, reasoningEffort });
+    }
     return getRuntimeContext(threadId);
   };
 

@@ -2,8 +2,8 @@
 feature_id: FEAT-001
 title: 单人 Codex Web 对话与控制
 status: implemented_pending_review
-current_version: v0.10.4
-last_updated: 2026-07-31 15:31 +08:00
+current_version: v0.10.7
+last_updated: 2026-08-01 23:23 +08:00
 owners: [conversations, execution, web_ui]
 key_paths:
   - web-ui/src/features/conversations
@@ -98,12 +98,14 @@ Codex app-server protocol
 | `FEAT-001-I13` | 特例 | implemented_pending_review | 过程区重复显示空洞的“已完成分析”，命令详情只看到冗长 PowerShell 路径 | 已接入 Codex 公开的 reasoning summary；无内容的分析记录不再保留，PowerShell 命令只展示实际执行部分，过程区限制为最近四项，等待用户体验 |
 | `FEAT-001-I14` | 普适 | planned_p0 | 手机 UI 排查过程触发 Windows 网络授权弹窗并卡住；用户被迫回到电脑确认，手机残留“正在处理” | UI 诊断工具也必须经过远程无交互安全门；系统弹窗阻塞、取消或超时后必须清理运行状态。后续重启是恢复措施，不是事故原因 |
 | `FEAT-001-I15` | 特例 | implemented_pending_review | 手机版开始约 2 分钟基本能持续收到实时进度，之后不再更新过程，用户无法判断任务是否仍在运行 | SSE 心跳、事件序号重放和断档恢复已存在；v0.10.4 进一步在无真实进展、页面恢复和重连时强制查询 Codex 权威状态并补拉当前会话。仍需手机真实长任务确认两分钟后是否持续恢复，不能用整页轮询代替 |
-| `FEAT-001-I16` | 特例 | active | 创建新对话后，新对话短暂出现随即消失，无法继续使用 | 后续检查 `thread/start`、会话列表刷新和当前选中项的竞态；新 Thread 在服务端确认和列表收录前不得被旧快照覆盖，失败时才移除并明确报错 |
+| `FEAT-001-I16` | 特例 | implemented_pending_review | 创建新对话后，新对话短暂出现随即消失，无法继续使用 | 已确认 `thread/start` 成功后首次用户消息前不会进入 `thread/list`；会话目录现保留尚未收录的新 Thread，并忽略过期列表响应，等待用户体验确认 |
 | `FEAT-001-I17` | 特例 | active | 发送新消息时，有概率暂时显示上一条消息的处理过程 | 后续按 Turn 隔离过程状态；新发送立即建立独立状态，旧 Turn 内容不得进入新 Turn，真实 `turnId` 返回后再完成绑定 |
 | `FEAT-001-I18` | 功能缺口 | implemented_pending_review | 模型选择区域没有思考程度选择 | 已接入模型支持的 reasoning effort，并与模型选择合并为“模型 · 思考程度”入口；等待用户体验 |
 | `FEAT-001-I19` | 特例 | mitigated | 手机输入框同时显示模型、思考程度、自动压缩阈值、压缩图标和当前占用，两个百分比无说明且字体不统一 | 高频信息只保留“模型 · 思考程度”和“上下文占用”；低频设置进入对应二级菜单，压缩操作改用文字，底部状态与设置入口统一字号和字重 |
 | `FEAT-001-I20` | 特例 | resolved | 助手通过内部图片工具展示图片时，最终回复只有文字；改用 Markdown 本地图片后，手机端又按原始宽度溢出，比例看起来错误 | JSONL 解析暂存工具输出中的图片并合并到下一条最终助手回复，主 app-server 会话只补充媒体块；Markdown 和结构化图片共用响应式容器。真实问题会话已确认返回 4 张图片 |
 | `FEAT-001-I21` | 普适 | mitigated | 页面长时间只显示“正在运行”且没有新内容，用户无法判断 Codex 正常处理、等待安全重启还是已经卡死 | 已对照 Codex 官方 app-server 与 Happy 源码，采用“实时事件负责快路径、权威状态和持久化会话负责恢复”的边界；v0.10.4 已修复“最终回复已保存但页面仍卡在运行中”。服务端核心接口半失效仍由 `I12` 处理，不能继续靠状态文案或单一超时猜测 |
+| `FEAT-001-I22` | 特例 | implemented_pending_review | 新建对话在首条消息前无法选择模型或思考程度 | `thread/start` 后尚无 rollout，旧逻辑错误调用 `thread/resume` 并返回 `no rollout found`；现复用新 Thread 的运行上下文，首条消息成功后再恢复历史 Thread 逻辑 |
+| `FEAT-001-I23` | 功能增强 | implemented_pending_review | 用户和助手消息缺少时间；过程区默认展开且完成用时没有使用 Codex 权威字段 | 消息现按本地时区显示 `MM-DD HH:mm`，跨年显示 `YYYY-MM-DD HH:mm`；过程区默认折叠，完成用时读取 `turn/completed.durationMs`，等待用户体验确认 |
 
 ## 版本时间线
 
@@ -310,6 +312,37 @@ Codex app-server protocol
 - 验证：执行状态、会话控制和 SSE 恢复共 23 项定向测试通过；`pnpm build:ui` 与 `git diff --check` 通过。按当前任务边界未启动或重启服务，也未做视觉验收；真实手机长任务仍由用户验收。
 - 用户可见变化：即使完成事件偶发遗漏，页面也会通过真实 Thread 状态和持久化会话补出最终回复，不再要求关闭重开；弱网发送和停止过程拥有明确但不夸大的状态。
 - Git：`uncommitted`，未提交、未推送。
+
+### 2026-08-01 12:41 +08:00 | v0.10.5 | implemented_pending_review
+
+- 用户问题：点击“新话题”后空白对话短暂出现，随即被旧历史列表覆盖并自动切回旧对话。
+- 根因：`thread/start` 已成功，但 Codex 在首条用户消息前尚未生成 rollout，新 Thread 暂时不会出现在 `thread/list`；前端创建后立即刷新列表，把这个合法的过渡状态误判为会话消失。
+- 实现：会话目录在当前页面生命周期内保留尚未进入服务端列表的新 Thread；列表刷新会将其与正式历史合并，服务端出现相同 Thread ID 后自动转为正式记录；并忽略晚到的旧列表响应。
+- 边界：没有修改基础 UI、Codex 协议、服务端、新话题标题策略或空话题跨页面刷新持久化。
+- 验证：`pnpm build:ui` 和 `git diff --check` 通过；未启动或重启服务，真实交互由用户验收。
+- 用户可见变化：点击“新话题”后会稳定停留并可立即输入；后台列表更新不会切回旧对话；首条消息被 Codex 收录后正常进入历史列表。
+- Git：`uncommitted`，未提交、未推送。
+
+### 2026-08-01 16:20 +08:00 | v0.10.6 | implemented_pending_review
+
+- 用户问题：新建对话已经可以停留，但首条消息前无法选择模型。
+- 真实错误：运行记录显示新 Thread 在模型操作期间返回 `no rollout found for thread id ...`。
+- 根因：`thread/start` 已把新 Thread 加载到当前 app-server，但旧逻辑仍先调用面向历史会话的 `thread/resume`；首条消息前没有 rollout，因此操作失败。
+- 实现：仅对刚创建且尚未发送首条消息的 Thread 复用 `thread/start` 返回的模型上下文；模型和思考程度修改直接写入该 Thread；首条消息成功后移除过渡状态，继续使用原有恢复逻辑。
+- 验证：会话控制定向测试 `5/5`、后端语法、`pnpm build:ui` 和 `git diff --check` 通过。
+- 用户可见变化：新建话题后无需先发送消息，即可立即选择模型和思考程度。
+- Git：`uncommitted`，未提交、未推送。
+
+### 2026-08-01 23:23 +08:00 | v0.10.7 | implemented_pending_review
+
+- 用户要求：所有用户与助手消息显示月、日、24 小时时间，精确到分钟，跨年时增加年份；思考过程默认折叠，可点击查看过程和用时。
+- 时间来源：app-server 使用 Turn 的 `startedAt` / `completedAt`；JSONL 降级读取使用每条记录原始 `timestamp`；前端即时发送消息先使用本机当前时间，服务端同步后由真实记录替换。
+- 展示格式：当年 `MM-DD HH:mm`，跨年 `YYYY-MM-DD HH:mm`，不使用中文日期。
+- 展示位置：时间位于对应消息气泡上方；用户消息气泡使用较浅的局部背景色，不修改全局主题。
+- 过程与用时：沿用现有 Codex 状态文字，不新增“工作了”等文案；运行过程默认折叠；完成用时读取 `turn/completed.durationMs`，运行中才按真实开始时间动态递增。
+- 当前边界：初版继续展示当前或最近一个 Turn 的过程；尚未把所有历史 Turn 的过程分别绑定到每条历史助手回答。
+- 验证：消息、会话和执行状态定向测试 `22/22`、后端语法、`pnpm build:ui` 和 `git diff --check` 通过。
+- Git：随本轮功能提交推送至 `codex/publish-current-panel`。
 
 ## 下一步
 

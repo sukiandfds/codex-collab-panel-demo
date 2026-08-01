@@ -43,6 +43,7 @@ export interface ExecutionStatus {
   active: boolean;
   startedAt: string | null;
   updatedAt: string | null;
+  durationMs?: number | null;
   lastEventAt?: string | null;
   lastProbeAt?: string | null;
 }

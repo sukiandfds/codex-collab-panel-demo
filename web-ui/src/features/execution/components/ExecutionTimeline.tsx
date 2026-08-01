@@ -11,21 +11,20 @@ const iconFor = (activity: ExecutionActivity) => {
   return Brain;
 };
 
-const elapsedText = (startedAt: string | null, now: number) => {
-  if (!startedAt) return "";
-  const seconds = Math.max(0, Math.floor((now - Date.parse(startedAt)) / 1000));
+const elapsedText = (durationMs: number) => {
+  const seconds = Math.max(0, Math.floor(durationMs / 1000));
   if (seconds < 60) return `${seconds}s`;
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 };
 
 export function ExecutionTimeline({ status }: { status: ExecutionStatus }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    setExpanded(status.active);
+    setExpanded(false);
     setNow(Date.now());
-  }, [status.active, status.startedAt]);
+  }, [status.startedAt]);
 
   useEffect(() => {
     if (!status.active) return;
@@ -35,8 +34,11 @@ export function ExecutionTimeline({ status }: { status: ExecutionStatus }) {
 
   if (!status.active && !status.activities.length) return null;
   const activities = (status.activities || []).slice(-4);
-  const endTime = status.active ? now : Date.parse(status.updatedAt || "") || now;
-  const elapsed = elapsedText(status.startedAt, endTime);
+  const startedAt = Date.parse(status.startedAt || "");
+  const liveDurationMs = Number.isFinite(startedAt) ? now - startedAt : 0;
+  const elapsed = status.active
+    ? elapsedText(liveDurationMs)
+    : Number.isFinite(status.durationMs) ? elapsedText(status.durationMs || 0) : "";
 
   return (
     <section className={styles.timeline} aria-label="Codex 工作过程">

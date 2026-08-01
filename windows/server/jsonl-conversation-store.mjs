@@ -150,6 +150,8 @@ export const createJsonlConversationStore = ({ sessionRoot, projectRoot, registe
 
       const message = messageFromItem(item, registerMedia);
       if (!message) return;
+      const timestamp = Date.parse(item.timestamp || "");
+      if (Number.isFinite(timestamp)) message.createdAt = new Date(timestamp).toISOString();
       if (isFinalAssistantItem(item) && state.pendingAssistantMedia.length) {
         message.blocks = mergeBlocks(message.blocks, state.pendingAssistantMedia);
         state.pendingAssistantMedia = [];

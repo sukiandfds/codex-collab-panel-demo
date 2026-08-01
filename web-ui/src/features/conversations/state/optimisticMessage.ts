@@ -19,5 +19,5 @@ const optimisticBlocks = (messageId: string, text: string, attachments: MediaFil
 
 export const createOptimisticMessage = (text: string, attachments: MediaFile[]): SessionMessage => {
   const id = `optimistic-${Date.now().toString(36)}-${nextOptimisticMessageId++}`;
-  return { id, role: "user", text, blocks: optimisticBlocks(id, text, attachments) };
+  return { id, role: "user", text, blocks: optimisticBlocks(id, text, attachments), createdAt: new Date().toISOString() };
 };

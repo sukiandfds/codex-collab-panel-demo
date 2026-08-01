@@ -19,6 +19,7 @@ const idleStatus = (threadId: string): ExecutionStatus => ({
   active: false,
   startedAt: null,
   updatedAt: null,
+  durationMs: null,
 });
 
 export function useCodexExecution(threadId: string, onMessageAccepted: () => void) {

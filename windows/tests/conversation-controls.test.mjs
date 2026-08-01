@@ -61,6 +61,51 @@ test("creates a persisted project thread and exposes the real model catalog", as
   assert.equal(calls.filter((call) => call.method === "model/list").length, 2);
 });
 
+test("updates a fresh thread before its first turn without trying to resume it", async () => {
+  const calls = [];
+  const thread = {
+    id: "thread-new",
+    cwd: "D:\\project",
+    source: "appServer",
+    name: "",
+    updatedAt: 100,
+  };
+  const client = {
+    subscribe: () => () => {},
+    close: () => {},
+    request: async (method, params) => {
+      calls.push({ method, params });
+      if (method === "thread/start") return {
+        thread,
+        model: "gpt-5.6-sol",
+        modelProvider: "openai",
+        reasoningEffort: "medium",
+      };
+      if (method === "thread/settings/update") return {};
+      throw new Error(`Unexpected request: ${method}`);
+    },
+  };
+  const store = createAppServerConversationStore({
+    projectRoot: "D:\\project",
+    registerMedia: () => null,
+    client,
+  });
+
+  await store.createSession("gpt-5.6-sol");
+  const modelResult = await store.updateModel("thread-new", "gpt-5.6-terra");
+  const effortResult = await store.updateReasoningEffort("thread-new", "high");
+
+  assert.equal(modelResult.model, "gpt-5.6-terra");
+  assert.equal(modelResult.reasoningEffort, "medium");
+  assert.equal(effortResult.model, "gpt-5.6-terra");
+  assert.equal(effortResult.reasoningEffort, "high");
+  assert.deepEqual(calls.map((call) => call.method), [
+    "thread/start",
+    "thread/settings/update",
+    "thread/settings/update",
+  ]);
+});
+
 test("updates the model only after resuming the selected project thread", async () => {
   const calls = [];
   let currentModel = "gpt-5.6-sol";
@@ -134,6 +179,45 @@ test("reads the authoritative status from the service-owned app-server", async (
   });
 
   assert.deepEqual(await store.getThreadStatus("thread-1"), { type: "idle" });
+});
+
+test("maps turn timestamps onto user and assistant messages", async () => {
+  const client = {
+    subscribe: () => () => {},
+    close: () => {},
+    request: async (method) => {
+      assert.equal(method, "thread/read");
+      return {
+        thread: {
+          id: "thread-1",
+          cwd: "D:\\project",
+          source: "appServer",
+          name: "Timestamp test",
+          updatedAt: 130,
+          turns: [{
+            id: "turn-1",
+            startedAt: 100,
+            completedAt: 130,
+            items: [
+              { type: "userMessage", id: "user-1", content: [{ type: "text", text: "Hello" }] },
+              { type: "agentMessage", id: "answer-1", phase: "final_answer", text: "Done" },
+            ],
+          }],
+        },
+      };
+    },
+  };
+  const store = createAppServerConversationStore({
+    projectRoot: "D:\\project",
+    registerMedia: () => null,
+    client,
+  });
+
+  const session = await store.findSession("thread-1");
+  assert.deepEqual(session.messages.map((message) => message.createdAt), [
+    "1970-01-01T00:01:40.000Z",
+    "1970-01-01T00:02:10.000Z",
+  ]);
 });
 
 test("supervises an active turn without depending on a browser request", async () => {

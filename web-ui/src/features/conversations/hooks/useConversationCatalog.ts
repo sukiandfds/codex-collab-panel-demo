@@ -26,13 +26,22 @@ export function useConversationCatalog(
   const [listError, setListError] = useState("");
   const creatingRef = useRef(false);
   const listRetryTimerRef = useRef(0);
+  const listRequestRef = useRef(0);
+  const transientSessionsRef = useRef(new Map<string, SessionSummary>());
   const refreshSessionsRef = useRef<(initialLoad?: boolean, changedThreadId?: string, reloadSelected?: boolean, retry?: boolean) => Promise<void>>(async () => {});
 
   const refreshSessions = useCallback(async (initialLoad = false, changedThreadId?: string, reloadSelected = true, retry = true) => {
+    const requestId = ++listRequestRef.current;
     if (initialLoad) setLoadingList(true);
     setListError("");
     try {
-      const nextSessions = await conversationApi.sessions();
+      const serverSessions = await conversationApi.sessions();
+      if (requestId !== listRequestRef.current) return;
+
+      const serverIds = new Set(serverSessions.map((item) => item.threadId));
+      for (const threadId of serverIds) transientSessionsRef.current.delete(threadId);
+      const transientSessions = Array.from(transientSessionsRef.current.values()).reverse();
+      const nextSessions = [...transientSessions, ...serverSessions];
       setSessions(nextSessions);
       const requestedId = new URLSearchParams(window.location.search).get("thread") || "";
       const currentId = selection.selectedIdRef.current;
@@ -51,6 +60,7 @@ export function useConversationCatalog(
         await selection.loadSession(nextId, { quiet: !initialLoad });
       }
     } catch (reason) {
+      if (requestId !== listRequestRef.current) return;
       setListError(reason instanceof Error ? reason.message : String(reason));
       if (retry) {
         window.clearTimeout(listRetryTimerRef.current);
@@ -95,9 +105,9 @@ export function useConversationCatalog(
     try {
       const created = await conversationApi.create(currentModel);
       const detail: SessionDetail = { ...created, messages: [] };
+      transientSessionsRef.current.set(created.threadId, created);
       selection.setCreatedSession(detail);
       setSessions((current) => [created, ...current.filter((item) => item.threadId !== created.threadId)]);
-      void refreshSessions(false, created.threadId, false);
       return true;
     } catch (reason) {
       setListError(reason instanceof Error ? reason.message : String(reason));
@@ -106,7 +116,7 @@ export function useConversationCatalog(
       creatingRef.current = false;
       setCreating(false);
     }
-  }, [currentModel, refreshSessions, selection.setCreatedSession]);
+  }, [currentModel, selection.setCreatedSession]);
 
   useEffect(() => () => window.clearTimeout(listRetryTimerRef.current), []);
 

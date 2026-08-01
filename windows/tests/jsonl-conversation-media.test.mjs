@@ -16,7 +16,7 @@ test("attaches tool preview images to the following final assistant message", as
       { type: "input_text", text: "Script completed" },
       { type: "input_image", image_url: "data:image/png;base64,AAAA" },
     ] } },
-    { type: "response_item", payload: { type: "message", role: "assistant", phase: "final_answer", content: [
+    { timestamp: "2026-08-01T09:38:20.165Z", type: "response_item", payload: { type: "message", role: "assistant", phase: "final_answer", content: [
       { type: "output_text", text: "Here are the images." },
     ] } },
   ];
@@ -33,6 +33,7 @@ test("attaches tool preview images to the following final assistant message", as
     assert.equal(session.messages.length, 1);
     assert.deepEqual(session.messages[0].blocks.map((block) => block.type), ["markdown", "image"]);
     assert.equal(session.messages[0].blocks[1].source, "data:image/png;base64,AAAA");
+    assert.equal(session.messages[0].createdAt, "2026-08-01T09:38:20.165Z");
   } finally {
     store.close();
     await rm(root, { recursive: true, force: true });

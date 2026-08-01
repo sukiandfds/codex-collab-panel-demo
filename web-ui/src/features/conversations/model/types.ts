@@ -22,6 +22,7 @@ export interface SessionMessage {
   role: MessageRole;
   text: string;
   blocks?: ContentBlock[];
+  createdAt?: string;
 }
 
 export interface SessionSummary {

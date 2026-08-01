@@ -110,7 +110,7 @@ test("keeps an authoritative terminal snapshot for clients that missed the final
   });
   tracker.handleProtocolMessage({
     method: "turn/completed",
-    params: { threadId: "thread-1", turn: { id: "turn-1", status: "completed" } },
+    params: { threadId: "thread-1", turn: { id: "turn-1", status: "completed", durationMs: 12345 } },
   });
 
   const snapshot = tracker.getStatus("thread-1");
@@ -119,6 +119,7 @@ test("keeps an authoritative terminal snapshot for clients that missed the final
   assert.equal(snapshot.active, false);
   assert.equal(snapshot.streamingItemId, "");
   assert.equal(snapshot.streamingText, "");
+  assert.equal(snapshot.durationMs, 12345);
   assert.equal(typeof snapshot.updatedAt, "string");
 });
 

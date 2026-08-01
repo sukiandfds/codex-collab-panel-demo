@@ -20,11 +20,16 @@ export const createConversationService = ({ primary, fallback }) => {
         ));
         if (index < 0) return message;
         const [candidate] = fallbackMessages.splice(index, 1);
+        const createdAt = message.createdAt || candidate.createdAt;
         const extra = (candidate.blocks || []).filter((block) => mediaTypes.has(block.type));
-        if (!extra.length) return message;
+        if (!extra.length) return createdAt ? { ...message, createdAt } : message;
         const blocks = message.blocks || [];
         const existing = new Set(blocks.map((block) => `${block.type}:${block.source || ""}`));
-        return { ...message, blocks: [...blocks, ...extra.filter((block) => !existing.has(`${block.type}:${block.source || ""}`))] };
+        return {
+          ...message,
+          createdAt,
+          blocks: [...blocks, ...extra.filter((block) => !existing.has(`${block.type}:${block.source || ""}`))],
+        };
       }),
     };
   };

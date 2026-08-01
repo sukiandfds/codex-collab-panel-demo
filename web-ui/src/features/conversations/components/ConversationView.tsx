@@ -7,9 +7,23 @@ import { ExecutionTimeline } from "../../execution/components/ExecutionTimeline"
 import type { ExecutionStatus } from "../../execution/model/types";
 import styles from "./ConversationView.module.css";
 
+const padTimePart = (value: number) => String(value).padStart(2, "0");
+
+const messageTime = (value?: string) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const monthDayTime = `${padTimePart(date.getMonth() + 1)}-${padTimePart(date.getDate())} ${padTimePart(date.getHours())}:${padTimePart(date.getMinutes())}`;
+  return date.getFullYear() === new Date().getFullYear()
+    ? monthDayTime
+    : `${date.getFullYear()}-${monthDayTime}`;
+};
+
 function Message({ message, streaming = false }: { message: SessionMessage; streaming?: boolean }) {
+  const formattedTime = messageTime(message.createdAt);
   return (
     <article className={`${styles.message} ${message.role === "user" ? styles.user : styles.assistant}`}>
+      {formattedTime ? <time className={styles.timestamp} dateTime={message.createdAt}>{formattedTime}</time> : null}
       <div className={styles.body}>
         {streaming ? <div className={styles.streamingText}>{message.text}<i className={styles.cursor} /></div> : <ContentRenderer message={message} />}
       </div>
@@ -40,7 +54,12 @@ export function ConversationView({ session, loading, syncing, loadingOlder, erro
   const [hasNewActivity, setHasNewActivity] = useState(false);
   const messages = session?.messages || [];
   const executionMatchesSession = executionStatus.threadId === session?.threadId;
-  const showExecution = executionMatchesSession && (executionStatus.active || executionStatus.activities.length > 0);
+  const completedExecution = ["completed", "failed", "interrupted", "systemError"].includes(executionStatus.phase);
+  const showExecution = executionMatchesSession && (
+    executionStatus.active
+    || executionStatus.activities.length > 0
+    || (completedExecution && Boolean(executionStatus.startedAt))
+  );
   const visibleStreamingText = executionMatchesSession ? streamingText : "";
   const executionIndex = !executionStatus.active && messages.at(-1)?.role === "assistant"
     ? messages.length - 1
@@ -52,7 +71,12 @@ export function ConversationView({ session, loading, syncing, loadingOlder, erro
     ...(visibleStreamingText ? [{
       id: "streaming-assistant",
       type: "message" as const,
-      message: { id: "streaming-assistant", role: "assistant" as const, text: visibleStreamingText },
+      message: {
+        id: "streaming-assistant",
+        role: "assistant" as const,
+        text: visibleStreamingText,
+        createdAt: executionStatus.startedAt || undefined,
+      },
       streaming: true,
     }] : []),
   ];

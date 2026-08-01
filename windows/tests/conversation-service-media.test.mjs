@@ -10,15 +10,19 @@ test("enriches app-server messages with media captured from JSONL", async () => 
     close: () => {},
   };
   const fallback = {
-    findSession: async () => ({ threadId: "thread", messages: [message([
-      { id: "text", type: "markdown", text: "Done" },
-      { id: "image", type: "image", source: "data:image/png;base64,AAAA" },
-    ])] }),
+    findSession: async () => ({ threadId: "thread", messages: [{
+      ...message([
+        { id: "text", type: "markdown", text: "Done" },
+        { id: "image", type: "image", source: "data:image/png;base64,AAAA" },
+      ]),
+      createdAt: "2026-08-01T09:38:20.165Z",
+    }] }),
     close: () => {},
   };
   const service = createConversationService({ primary, fallback });
 
   const session = await service.findSession("thread");
   assert.deepEqual(session.messages[0].blocks.map((block) => block.type), ["markdown", "image"]);
+  assert.equal(session.messages[0].createdAt, "2026-08-01T09:38:20.165Z");
   service.close();
 });
