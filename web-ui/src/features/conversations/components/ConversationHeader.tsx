@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { Folder, PanelLeft, Share2 } from "lucide-react";
 import { ViewSwitcher } from "../../../components/ViewSwitcher/ViewSwitcher";
 import { ShareConversationDialog } from "../../conversation-sharing/components/ShareConversationDialog";
@@ -12,9 +12,10 @@ interface ConversationHeaderProps {
   deviceName?: string;
   connected: boolean;
   onOpenSidebar: () => void;
+  usage?: ReactNode;
 }
 
-export function ConversationHeader({ project, session, deviceName, connected, onOpenSidebar }: ConversationHeaderProps) {
+export function ConversationHeader({ project, session, deviceName, connected, onOpenSidebar, usage }: ConversationHeaderProps) {
   const [sharing, setSharing] = useState(false);
   const closeSharing = useCallback(() => setSharing(false), []);
   const title = session?.title || project?.name || "当前对话";
@@ -34,6 +35,7 @@ export function ConversationHeader({ project, session, deviceName, connected, on
           </div>
         </div>
         <span className={styles.spacer} />
+        {usage}
         <button className={styles.iconButton} type="button" aria-label="分享当前对话" title="分享" onClick={() => setSharing(true)}>
           <Share2 aria-hidden="true" />
         </button>

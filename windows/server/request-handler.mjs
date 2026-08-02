@@ -4,17 +4,19 @@ import { createArtifactRoutes } from "./routes/artifact-routes.mjs";
 import { createConversationRoutes } from "./routes/conversation-routes.mjs";
 import { createGroupRoutes } from "./routes/group-routes.mjs";
 import { createSystemRoutes } from "./routes/system-routes.mjs";
+import { createUsageRoutes } from "./routes/usage-routes.mjs";
 import { createVersionRoutes } from "./routes/version-routes.mjs";
 
 export const createRequestHandler = ({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
-  contextManagement, groupRoom, multiAgent, artifacts, webOutputs, readWebVersion, serveStatic,
+  contextManagement, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
 }) => {
   const routes = [
     createVersionRoutes({ readWebVersion }),
     createArtifactRoutes({ groupRoom, artifacts, webOutputs }),
     createGroupRoutes({ groupRoom, media, multiAgent, webOutputs }),
     createConversationRoutes({ conversations, execution, contextManagement, media }),
+    createUsageRoutes({ fushengUsage }),
     createSystemRoutes({ token, project, projectRoot, device, observerPort, media, realtime }),
   ];
 

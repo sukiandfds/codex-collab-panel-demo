@@ -7,10 +7,13 @@ import { ConversationSidebar } from "./features/conversations/components/Convers
 import { ConversationView } from "./features/conversations/components/ConversationView";
 import { useProjectConversations } from "./features/conversations/hooks/useProjectConversations";
 import { useDeviceInfo } from "./features/device/hooks/useDeviceInfo";
+import { UsageSummaryControl } from "./features/usage-monitor/components/UsageSummaryControl";
+import { useUsageMonitor } from "./features/usage-monitor/hooks/useUsageMonitor";
 
 export function App() {
   const conversations = useProjectConversations();
   const device = useDeviceInfo(conversations.connected);
+  const usage = useUsageMonitor(conversations.executionStatus);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const selectSession = useCallback((threadId: string) => {
     conversations.selectSession(threadId);
@@ -36,7 +39,23 @@ export function App() {
           onRefresh={conversations.refresh}
         />
       }
-      header={<ConversationHeader project={conversations.project} session={conversations.session} deviceName={device?.name} connected={conversations.connected} onOpenSidebar={() => setSidebarOpen(true)} />}
+      header={
+        <ConversationHeader
+          project={conversations.project}
+          session={conversations.session}
+          deviceName={device?.name}
+          connected={conversations.connected}
+          onOpenSidebar={() => setSidebarOpen(true)}
+          usage={
+            <UsageSummaryControl
+              snapshot={usage.snapshot}
+              loading={usage.loading}
+              error={usage.error}
+              onRefresh={() => void usage.refresh(true)}
+            />
+          }
+        />
+      }
       conversation={
         <ConversationView
           session={conversations.session}

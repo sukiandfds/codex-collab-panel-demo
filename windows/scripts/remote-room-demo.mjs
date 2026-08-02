@@ -16,6 +16,7 @@ import { createGroupRoomStore } from "../server/group-room-store.mjs";
 import { createMultiAgentService } from "../server/multi-agent-service.mjs";
 import { createArtifactService } from "../server/artifact-service.mjs";
 import { createWebOutputService } from "../server/web-output-service.mjs";
+import { createFushengUsageService } from "../server/fusheng-usage-service.mjs";
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -89,12 +90,16 @@ const multiAgent = createMultiAgentService({
   broadcast: realtime.broadcast,
   webOutputs,
 });
+const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
+const fushengUsage = createFushengUsageService({
+  credentialsFile: path.join(localAppData, "FushengUsageMonitor", "credentials.json"),
+});
 
 const serveStatic = createStaticFileServer(webRoot);
 const readWebVersion = createWebVersionReader(webRoot);
 const requestHandler = createRequestHandler({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
-  contextManagement, groupRoom, multiAgent, artifacts, webOutputs, readWebVersion, serveStatic,
+  contextManagement, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
 });
 const server = http.createServer(requestHandler);
 

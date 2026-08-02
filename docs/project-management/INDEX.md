@@ -2,7 +2,7 @@
 document_type: project_management_index
 schema_version: 1
 project_id: codex-collab-panel-demo
-last_updated: 2026-08-02 18:00 +08:00
+last_updated: 2026-08-03 00:22 +08:00
 ---
 
 # 项目管理目录
@@ -13,6 +13,7 @@ last_updated: 2026-08-02 18:00 +08:00
 
 - `PM-001`
 - `FEAT-001`
+- `FEAT-011`
 - `FEAT-005`
 - `FEAT-002`
 - `FEAT-009`
@@ -40,6 +41,7 @@ last_updated: 2026-08-02 18:00 +08:00
 | `FEAT-007` | delivery | delivery | `items/FEAT-007/` | 8 |
 | `FEAT-008` | delivery | delivery | `items/FEAT-008/` | 9 |
 | `FEAT-009` | feature | development | `items/FEAT-009/` | 10 |
+| `FEAT-011` | feature | development | `items/FEAT-011/` | 11 |
 
 条目的摘要、级别、状态和更新时间均从对应 `item.md` 读取；不要在本表重复维护。
 
