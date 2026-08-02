@@ -2,8 +2,8 @@
 feature_id: FEAT-001
 title: 单人 Codex Web 对话与控制
 status: implemented_pending_review
-current_version: v0.10.7
-last_updated: 2026-08-01 23:23 +08:00
+current_version: v0.10.8
+last_updated: 2026-08-02 11:39 +08:00
 owners: [conversations, execution, web_ui]
 key_paths:
   - web-ui/src/features/conversations
@@ -106,6 +106,7 @@ Codex app-server protocol
 | `FEAT-001-I21` | 普适 | mitigated | 页面长时间只显示“正在运行”且没有新内容，用户无法判断 Codex 正常处理、等待安全重启还是已经卡死 | 已对照 Codex 官方 app-server 与 Happy 源码，采用“实时事件负责快路径、权威状态和持久化会话负责恢复”的边界；v0.10.4 已修复“最终回复已保存但页面仍卡在运行中”。服务端核心接口半失效仍由 `I12` 处理，不能继续靠状态文案或单一超时猜测 |
 | `FEAT-001-I22` | 特例 | implemented_pending_review | 新建对话在首条消息前无法选择模型或思考程度 | `thread/start` 后尚无 rollout，旧逻辑错误调用 `thread/resume` 并返回 `no rollout found`；现复用新 Thread 的运行上下文，首条消息成功后再恢复历史 Thread 逻辑 |
 | `FEAT-001-I23` | 功能增强 | implemented_pending_review | 用户和助手消息缺少时间；过程区默认展开且完成用时没有使用 Codex 权威字段 | 消息现按本地时区显示 `MM-DD HH:mm`，跨年显示 `YYYY-MM-DD HH:mm`；过程区默认折叠，完成用时读取 `turn/completed.durationMs`，等待用户体验确认 |
+| `FEAT-001-I24` | 普适 | active | 跨设备实时会话在结束、重新打开和流式回答交接时状态不一致：页面重开不刷新仍显示旧的“处理中”；最终回答快结束时已显示的流式文字短暂消失；新消息开始后短暂串出上一次 Turn 的思考过程 | 根因待通过真实事件序列进一步确认，初步怀疑是恢复快照、流式草稿和最终持久化消息之间缺少同一 `runId/turnId/eventSeq` 的单调交接。正确路径是以权威 Run 生命周期和终止事件为准，流式内容只追加不回退；页面恢复先清理旧运行态并补拉终态快照；新 Turn 建立独立事件缓冲，禁止旧 Turn 事件进入新消息。关联 `FEAT-001-I08`、`I15`、`I17`、`FEAT-005` |
 
 ## 版本时间线
 
@@ -343,6 +344,16 @@ Codex app-server protocol
 - 当前边界：初版继续展示当前或最近一个 Turn 的过程；尚未把所有历史 Turn 的过程分别绑定到每条历史助手回答。
 - 验证：消息、会话和执行状态定向测试 `22/22`、后端语法、`pnpm build:ui` 和 `git diff --check` 通过。
 - Git：随本轮功能提交推送至 `codex/publish-current-panel`。
+
+### 2026-08-02 11:39 +08:00 | v0.10.8 | implemented_pending_review
+
+- 计划：在思考程度选择器中补充英文代码，帮助用户理解 `low`、`medium`、`max`、`xhigh` 等模型参数。
+- 实际：新增模型功能域内的统一文案格式化函数；下拉选项、折叠后的当前模型状态和悬停提示均显示中英对照，例如 `中 (medium)`。
+- 偏差：未修改基础 UI 样式、布局、请求协议或模型行为。
+- 问题：关联 `FEAT-001-I24` / `PROC-022`；本轮只记录问题，不改变其状态。
+- 验证：`pnpm build:ui` 通过；`git diff --check` 通过。
+- 用户可见变化：选择思考程度时能同时看到中文含义和 Codex 使用的英文参数名。
+- Git：`uncommitted`，未提交、未推送。
 
 ## 下一步
 

@@ -1,14 +1,6 @@
 import type { CodexModel } from "../model/types";
+import { formatReasoningEffort } from "../model/reasoningEffortLabels";
 import styles from "./ModelSelect.module.css";
-
-const labels: Record<string, string> = {
-  low: "低",
-  medium: "中",
-  high: "高",
-  xhigh: "超高",
-  max: "极高",
-  ultra: "最高",
-};
 
 interface ReasoningEffortSelectProps {
   currentModel: CodexModel | undefined;
@@ -30,7 +22,7 @@ export function ReasoningEffortSelect({
     <select
       className={styles.select}
       aria-label="调整推理强度"
-      title={error || `推理强度：${labels[selected] || selected || "未读取"}`}
+      title={error || `推理强度：${formatReasoningEffort(selected) || "未读取"}`}
       value={selected}
       disabled={disabled || loading || changing || !options.length}
       onChange={(event) => void onChange(event.target.value)}
@@ -38,7 +30,7 @@ export function ReasoningEffortSelect({
       {!selected ? <option value="">推理强度</option> : null}
       {options.map((entry) => (
         <option key={entry.reasoningEffort} value={entry.reasoningEffort}>
-          {labels[entry.reasoningEffort] || entry.reasoningEffort}
+          {formatReasoningEffort(entry.reasoningEffort)}
         </option>
       ))}
     </select>

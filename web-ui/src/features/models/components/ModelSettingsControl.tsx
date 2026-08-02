@@ -1,18 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { CodexModel } from "../model/types";
+import { formatReasoningEffort } from "../model/reasoningEffortLabels";
 import { ModelSelect } from "./ModelSelect";
 import { ReasoningEffortSelect } from "./ReasoningEffortSelect";
 import styles from "./ModelSelect.module.css";
-
-const effortLabels: Record<string, string> = {
-  low: "低",
-  medium: "中",
-  high: "高",
-  xhigh: "超高",
-  max: "极高",
-  ultra: "最高",
-};
 
 interface ModelSettingsControlProps {
   currentModel: string;
@@ -34,7 +26,7 @@ export function ModelSettingsControl({
   const rootRef = useRef<HTMLDivElement>(null);
   const current = models.find((entry) => entry.model === currentModel);
   const modelLabel = current?.displayName || currentModel || (loading ? "读取模型" : "选择模型");
-  const effortLabel = effortLabels[currentEffort] || currentEffort;
+  const effortLabel = formatReasoningEffort(currentEffort);
 
   useEffect(() => {
     if (!open) return;

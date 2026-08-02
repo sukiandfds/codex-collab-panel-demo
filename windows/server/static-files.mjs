@@ -9,8 +9,16 @@ const mimeTypes = new Map([
   [".jpeg", "image/jpeg"], [".webp", "image/webp"],
 ]);
 
+const pageAliases = new Map([
+  ["/progress", "project-management.html"],
+  ["/progress/", "project-management.html"],
+  ["/project-management", "project-management.html"],
+  ["/project-management/", "project-management.html"],
+]);
+
 export const createStaticFileServer = (webRoot) => async (url, response) => {
-  const relative = url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname).replace(/^\/+/, "");
+  const relative = pageAliases.get(url.pathname)
+    || (url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname).replace(/^\/+/, ""));
   const file = path.resolve(webRoot, relative);
   if (file !== webRoot && !file.startsWith(`${webRoot}${path.sep}`)) {
     response.writeHead(403);

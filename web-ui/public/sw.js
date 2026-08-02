@@ -4,6 +4,9 @@ const CACHE_NAME = `${CACHE_PREFIX}${BUILD_ID}`;
 const APP_SHELL = [
   "/index.html",
   "/group.html",
+  "/project-management.html",
+  "/progress",
+  "/project-management",
   "/manifest.webmanifest",
   "/icons/app-icon-192.png",
   "/icons/app-icon-512.png",
@@ -33,14 +36,28 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/") || url.pathname === "/events") return;
 
   if (request.mode === "navigate") {
+    const canonicalPath = url.pathname === "/"
+      ? "/index.html"
+      : url.pathname === "/group.html"
+        ? "/group.html"
+        : (url.pathname === "/progress" || url.pathname === "/progress/" || url.pathname === "/project-management" || url.pathname === "/project-management/"
+          ? "/progress"
+          : "/index.html");
+    const refresh = fetch(request).then((response) => {
+      if (!response.ok) throw new Error(`navigation HTTP ${response.status}`);
+      return caches.open(CACHE_NAME).then((cache) => {
+        void cache.put(canonicalPath, response.clone());
+        return response;
+      });
+    });
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const canonicalPath = url.pathname === "/" ? "/index.html" : url.pathname;
-          if (response.ok) void caches.open(CACHE_NAME).then((cache) => cache.put(canonicalPath, response.clone()));
-          return response;
-        })
-        .catch(() => caches.match(url.pathname === "/group.html" ? "/group.html" : "/index.html")),
+      caches.match(canonicalPath).then((cached) => {
+        if (cached) {
+          event.waitUntil(refresh.catch(() => undefined));
+          return cached;
+        }
+        return refresh.catch(() => caches.match(canonicalPath));
+      }),
     );
     return;
   }

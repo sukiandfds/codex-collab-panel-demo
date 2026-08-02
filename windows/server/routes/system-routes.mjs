@@ -1,6 +1,7 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import { sendJson } from "../http/request-utils.mjs";
+import { readProjectManagement, readProjectManagementEntry } from "../project-management-store.mjs";
+import { readProjectProgress } from "../project-progress-store.mjs";
 
 const createObserverReader = (observerPort) => async (threadId = "") => {
   try {
@@ -30,11 +31,16 @@ export const createSystemRoutes = ({ token, project, projectRoot, device, observ
       return true;
     }
     if (url.pathname === "/api/project-progress" && request.method === "GET") {
-      const [markdown, stat] = await Promise.all([
-        fs.readFile(progressFile, "utf8"),
-        fs.stat(progressFile),
-      ]);
-      sendJson(response, { markdown, updatedAt: stat.mtime.toISOString() });
+      sendJson(response, await readProjectProgress({ project, projectRoot, progressFile }));
+      return true;
+    }
+    if (url.pathname === "/api/project-management" && request.method === "GET") {
+      sendJson(response, await readProjectManagement({ project, projectRoot }));
+      return true;
+    }
+    const projectManagementEntryMatch = /^\/api\/project-management\/entries\/([A-Z][A-Z0-9]+-\d{3})$/u.exec(url.pathname);
+    if (projectManagementEntryMatch && request.method === "GET") {
+      sendJson(response, await readProjectManagementEntry({ projectRoot, entryId: projectManagementEntryMatch[1] }));
       return true;
     }
     if (url.pathname === "/api/uploads" && request.method === "POST") {

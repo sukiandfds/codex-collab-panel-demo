@@ -1,7 +1,7 @@
 ---
 document_type: feature_development_log_spec
 schema_version: 1
-last_updated: 2026-07-25 23:58 +08:00
+last_updated: 2026-08-02 18:00 +08:00
 audience: ai_assistants_and_maintainers
 ---
 
@@ -27,6 +27,10 @@ audience: ai_assistants_and_maintainers
 | `PROCESS_ISSUES.md` | 记录能跨功能复用的开发方法、误判和防再犯规则 | 发现普适问题后立即更新 |
 | 根目录日期日志 | 保存当日原始过程与详细证据 | 保留旧文件，不再作为主要入口 |
 | Git | 保存可核对的代码变化 | 功能记录引用提交，不复制完整 diff |
+
+项目管理条目的过程复盘不放在本目录重复维护。与项目计划、条目状态直接相关的过程记录放在
+`docs/project-management/items/<ITEM-ID>/process.md`；只有能跨功能复用的经验才在本文件夹登记为
+`PROC-*`。两处通过编号和链接互相引用，避免特定问题被误写成通用规则，也避免同一条规则出现多个正文版本。
 
 ## 功能文件固定结构
 

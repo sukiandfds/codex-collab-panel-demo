@@ -15,7 +15,7 @@
 }
 
 .conversation { top: calc(var(--windowbar-height, 42px) + var(--topbar-height, 50px) + 12px); }
-.group { top: 66px; }
+.group { top: calc(66px + env(safe-area-inset-top)); }
 
 .copy {
   display: grid;
@@ -43,7 +43,7 @@
 .notice button:disabled { cursor: default; opacity: .62; }
 
 @media (max-width: 760px) {
-  .conversation { top: calc(var(--topbar-height, 50px) + 10px); }
+  .conversation { top: calc(var(--topbar-height, 50px) + env(safe-area-inset-top) + 10px); }
 }
 
 @media (max-width: 520px) {

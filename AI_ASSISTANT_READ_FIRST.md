@@ -2,7 +2,7 @@
 
 > 本文是 `codex-collab-panel-demo` 的 AI 开发交接入口。任何 AI 助手准备分析、修改或运行本项目之前，应先完整阅读本文，再按需查看具体代码和开发日志。
 
-更新日期：2026-07-29
+更新日期：2026-08-02
 项目路径：`D:\codingproject\codex-collab-panel-demo`
 当前分支：`codex/publish-current-panel`
 当前阶段：优先收尾单人 Codex Web 对话与控制的基础体验和稳定性；项目群聊、多 Agent、固定公网入口和 Desktop/Web 统一控制继续保留，但暂不抢在单人基础能力之前扩展
@@ -14,9 +14,12 @@
 1. [`docs/feature-development/FEATURE_INDEX.md`](./docs/feature-development/FEATURE_INDEX.md)：定位功能编号、当前状态、最新版本和记录入口。
 2. 与当前任务直接相关的一个或多个 `docs/feature-development/features/FEAT-*.md`：了解原计划、实际实现、历史版本、特例问题和当前边界。
 3. [`docs/feature-development/PROCESS_ISSUES.md`](./docs/feature-development/PROCESS_ISSUES.md) 中状态为 `active` 的普适问题：直接复用正确路径和防再犯规则。
-4. 只有需要证据、复盘或定位旧实现时，才读取根目录中的日期日志和对应 Git 提交。
+4. 如果任务涉及计划、进度、条目状态或过程复盘，再读取 [`docs/project-management/README.md`](./docs/project-management/README.md)、`PROJECT.md`、`INDEX.md`，然后进入对应 `items/<ITEM-ID>/`。
+5. 只有需要证据、复盘或定位旧实现时，才读取根目录中的日期日志和对应 Git 提交。
 
 完整字段、编号和维护方式见 [`docs/feature-development/README.md`](./docs/feature-development/README.md)。旧日期日志保留为原始证据，不再作为 AI 的首要阅读入口。
+
+项目管理条目的当前快照在 `docs/project-management/items/<ITEM-ID>/item.md`，状态历史在 `updates.md`，条目专属的弯路和决策在 `process.md`。跨功能、可复用的问题只在 `docs/feature-development/PROCESS_ISSUES.md` 保留完整记录，避免多处复制后互相漂移。
 
 每次功能开发、修复或技术路径变更结束前，必须更新对应 `FEAT-*.md` 的当前快照、问题状态和版本时间线；功能状态或版本变化时同步更新 `FEATURE_INDEX.md`。如果发现会影响其他功能的普适问题，还必须登记或更新 `PROCESS_ISSUES.md`。只写日期日志、不回写功能记录，视为记录未完成。
 
@@ -450,6 +453,8 @@ codex/publish-current-panel
 - `docs/feature-development/FEATURE_INDEX.md`：全部功能的当前状态、版本和记录入口。
 - `docs/feature-development/PROCESS_ISSUES.md`：跨功能复用的错误路径、正确路径和防再犯规则。
 - `docs/feature-development/features/`：每个功能从计划、实现、问题到多个版本的连续记录。
+- `docs/project-management/README.md`：项目管理数据源的阅读顺序、条目目录和字段边界。
+- `docs/project-management/items/<ITEM-ID>/process.md`：单个项目条目的专属弯路、阻塞、决策和效率复盘；跨功能问题回链 `PROC-*`。
 - `docs/architecture/MODULE_BOUNDARIES.md`：前后端目录、依赖方向和长文件拆分规则。
 - `PROJECT.md`：项目愿景、早期右侧面板和长期方向。
 - `DEVELOPMENT_BUG_LOG_2026-07-21.md`：入口、JSONL、启动、错误处理和开发效率问题的详细记录。

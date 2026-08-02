@@ -24,7 +24,12 @@ export default defineConfig(({ command }) => {
     },
     build: {
       rollupOptions: {
-        input: { main: "index.html", group: "group.html", progress: "progress.html" },
+        input: {
+          main: "index.html",
+          group: "group.html",
+          progress: "progress.html",
+          projectManagement: "project-management.html",
+        },
       },
     },
     server: {
