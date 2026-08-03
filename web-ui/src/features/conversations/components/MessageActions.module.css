@@ -1,0 +1,39 @@
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 24px;
+  margin-top: 5px;
+  color: var(--color-text-muted);
+}
+
+.button {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-text-secondary);
+  outline-offset: 1px;
+}
+
+.button:disabled { cursor: default; opacity: .55; }
+.button svg { width: 14px; height: 14px; stroke-width: 1.8; }
+
+.spinning { animation: message-action-spin .9s linear infinite; }
+
+@keyframes message-action-spin {
+  to { transform: rotate(360deg); }
+}

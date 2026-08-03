@@ -23,6 +23,8 @@ export interface SessionMessage {
   text: string;
   blocks?: ContentBlock[];
   createdAt?: string;
+  turnId?: string;
+  itemId?: string;
 }
 
 export interface SessionSummary {
@@ -33,6 +35,8 @@ export interface SessionSummary {
   messageCount: number | null;
   latestUser: string;
   latestAssistant: string;
+  archived?: boolean;
+  forkedFromId?: string | null;
 }
 
 export interface SessionDetail extends SessionSummary {

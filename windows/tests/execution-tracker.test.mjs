@@ -294,3 +294,36 @@ test("restores an unfinished persisted run as interrupted", async () => {
     await fs.rm(directory, { recursive: true, force: true });
   }
 });
+
+test("normalizes a persisted recovery failure after the service restarts", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "execution-tracker-recovery-"));
+  const stateFile = path.join(directory, "runs.json");
+  try {
+    await fs.writeFile(stateFile, `${JSON.stringify({
+      version: 1,
+      statuses: [{
+        type: "execution_status",
+        threadId: "thread-recovery-failed",
+        turnId: "turn-1",
+        phase: "systemError",
+        label: "Codex 自动恢复失败",
+        detail: "app-server exited",
+        streamingItemId: "answer-1",
+        streamingText: "partial reply",
+        active: false,
+        updatedAt: "2026-08-03T06:48:27.000Z",
+      }],
+    }, null, 2)}\n`, "utf8");
+
+    const tracker = createExecutionTracker({ broadcast: () => {}, stateFile });
+    const status = tracker.getStatus("thread-recovery-failed");
+    assert.equal(status.phase, "interrupted");
+    assert.equal(status.label, "项目服务已重启，上一任务已中断");
+    assert.equal(status.active, false);
+    assert.equal(status.streamingItemId, "");
+    assert.equal(status.streamingText, "");
+    await tracker.close();
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});

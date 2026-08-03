@@ -21,13 +21,17 @@ AI 助手应先根据任务定位功能编号，再读取对应文件。不要�
 | `FEAT-007` | Agent 交付物生成、预览与版本管理 | `implemented_uncommitted` | `v0.2.1` | 2026-07-27 22:23 +08:00 | M1 已实现交付物发布、预览、版本和审核；功能问题与防再犯记录已整理，等待用户体验 | [`FEAT-007-agent-artifacts.md`](./features/FEAT-007-agent-artifacts.md) |
 | `FEAT-008` | HTML 网页生成与 PDF 双文件交付 | `implemented_uncommitted` | `v0.2.0` | 2026-07-27 23:47 +08:00 | 已完成静态 HTML、Edge 转 PDF、安全网页打开和群聊双文件发布；基本检查通过，等待用户体验 | [`FEAT-008-html-page-pdf-generation.md`](./features/FEAT-008-html-page-pdf-generation.md) |
 | `FEAT-009` | 原开发电脑远程运行、开发与应急恢复 | `in_progress` | `v0.4.0` | 2026-07-28 17:43 +08:00 | 已完成无 UAC 的只读环境检查器；原电脑真实开发链路和独立紧急启动入口仍待验证/确认，向日葵继续作为兜底 | [`FEAT-009-remote-development-host.md`](./features/FEAT-009-remote-development-host.md) |
+| `FEAT-010` | Orca 群聊执行运行时适配技术试验（非路线 2） | `paused_experiment` | `v0.1.0` | 2026-07-29 18:34 +08:00 | 仅完成可选 Orca CLI 执行器及离线测试，没有迁移产品功能；因范围偏离用户目标而冻结，不计入路线 2 进度 | [`FEAT-010-orca-group-runtime-adapter.md`](./features/FEAT-010-orca-group-runtime-adapter.md) |
 | `FEAT-011` | 浮生云算用量监控 | `implemented_uncommitted` | `v0.1.0` | 2026-08-03 00:22 +08:00 | 单人 Codex 标题栏已接入今日用量、固定 GPT 分组倍率、更新时间和点击详情；页面打开不查询，真实回复完成后按 Turn 更新，等待服务重启和用户体验 | [`FEAT-011-fusheng-usage-monitor.md`](./features/FEAT-011-fusheng-usage-monitor.md) |
+| `FEAT-012` | 消息内容快捷复制 | `implemented_uncommitted` | `v0.1.0` | 2026-08-03 14:47 +08:00 | 消息下方可复制原始 Markdown/文本；等待手机和电脑浏览器点击确认 | [`FEAT-012-conversation-copy.md`](./features/FEAT-012-conversation-copy.md) |
+| `FEAT-013` | 从当前消息分叉继续 | `implemented_uncommitted` | `v0.1.0` | 2026-08-03 14:47 +08:00 | 已接入官方 `thread/fork` 路由和 Turn 边界；本机运行时能力待探测 | [`FEAT-013-conversation-fork.md`](./features/FEAT-013-conversation-fork.md) |
+| `FEAT-014` | 项目对话归档与恢复 | `implemented_uncommitted` | `v0.1.0` | 2026-08-03 14:47 +08:00 | 活动/归档列表、恢复和 JSONL fallback 隔离已接入；本机运行时和移动端体验待确认 | [`FEAT-014-conversation-archive.md`](./features/FEAT-014-conversation-archive.md) |
 
 `FEAT-010` 曾用于已暂停的 Orca 路线实验，本轮不复用该编号。
 
 ## 完整需求表（按实际使用链路合并）
 
-本表覆盖当前正式功能 `FEAT-001` 至 `FEAT-009` 及 `FEAT-011`。相互影响的功能放在同一行；当前状态和目标体验严格分开。
+本表覆盖当前正式功能 `FEAT-001` 至 `FEAT-009`、`FEAT-011` 至 `FEAT-014`，并保留已冻结的 `FEAT-010` 技术试验记录。相互影响的功能放在同一行；当前状态和目标体验严格分开。
 
 | 编号 | 合并后的需求 | 对应功能与状态 | 当前实际使用体验 | 预计开发后体验 |
 | --- | --- | --- | --- | --- |

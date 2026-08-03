@@ -86,6 +86,10 @@ export function useConversationSession(initial: InitialConversationState) {
     selectedIdRef.current = "";
     setSelectedId("");
     setSession(null);
+    const params = new URLSearchParams(window.location.search);
+    params.delete("thread");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
   }, []);
 
   const setCreatedSession = useCallback((detail: SessionDetail) => {

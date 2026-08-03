@@ -83,6 +83,50 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
     sendJson(response, { threadId, turnId: status.turnId, status: "interrupting" }, 202);
     return true;
   }
+  if (url.pathname === "/api/session/fork" && request.method === "POST") {
+    const body = await readJson(request);
+    const threadId = String(body.threadId || "").trim();
+    const lastTurnId = String(body.lastTurnId || "").trim();
+    if (!threadId || !lastTurnId) {
+      sendJson(response, { error: "threadId and lastTurnId are required" }, 400);
+      return true;
+    }
+    if (execution.getStatus(threadId).active) {
+      sendJson(response, { error: "当前任务运行中，请完成后再从这里继续" }, 409);
+      return true;
+    }
+    const session = await conversations.forkSession(threadId, lastTurnId);
+    sendJson(response, {
+      session,
+      sourceThreadId: threadId,
+      forkedFromTurnId: lastTurnId,
+    }, 201);
+    return true;
+  }
+  if (url.pathname === "/api/session/archive" && request.method === "POST") {
+    const body = await readJson(request);
+    const threadId = String(body.threadId || "").trim();
+    if (!threadId) {
+      sendJson(response, { error: "threadId is required" }, 400);
+      return true;
+    }
+    if (execution.getStatus(threadId).active) {
+      sendJson(response, { error: "当前任务运行中，请完成后再归档" }, 409);
+      return true;
+    }
+    sendJson(response, await conversations.archiveSession(threadId), 202);
+    return true;
+  }
+  if (url.pathname === "/api/session/unarchive" && request.method === "POST") {
+    const body = await readJson(request);
+    const threadId = String(body.threadId || "").trim();
+    if (!threadId) {
+      sendJson(response, { error: "threadId is required" }, 400);
+      return true;
+    }
+    sendJson(response, await conversations.unarchiveSession(threadId), 202);
+    return true;
+  }
   if (url.pathname === "/api/session/context" && request.method === "GET") {
     const threadId = url.searchParams.get("threadId") || "";
     if (!threadId) {
@@ -131,7 +175,8 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
     return true;
   }
   if (url.pathname === "/api/sessions") {
-    const sessions = await conversations.listSessions(url.searchParams.get("source") || "all");
+    const archived = url.searchParams.get("archived") === "1";
+    const sessions = await conversations.listSessions(url.searchParams.get("source") || "all", archived);
     sendJson(response, sessions.map(({ messages, file, ...summary }) => summary));
     return true;
   }

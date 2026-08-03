@@ -14,6 +14,7 @@ import styles from "./ConversationComposer.module.css";
 interface ConversationComposerProps {
   connected: boolean;
   selected: boolean;
+  archived: boolean;
   sending: boolean;
   sendingSlow: boolean;
   status: ExecutionStatusValue;
@@ -32,7 +33,7 @@ interface ConversationComposerProps {
 }
 
 export function ConversationComposer({
-  connected, selected, sending, sendingSlow, status, commentary, contextStatus,
+  connected, selected, archived, sending, sendingSlow, status, commentary, contextStatus,
   models, modelsLoading, modelChanging, modelError,
   onSend, onInterrupt, onCompactContext, onAutoCompactThresholdChange, onModelChange,
   onReasoningEffortChange,
@@ -41,7 +42,7 @@ export function ConversationComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submittingRef = useRef(false);
   const draft = useAttachmentDraft();
-  const inputDisabled = !selected || sending || draft.uploading;
+  const inputDisabled = !selected || archived || sending || draft.uploading;
   const hasContent = Boolean(text.trim() || draft.attachments.length);
   const sendDisabled = inputDisabled || !hasContent;
   const submit = async () => {
@@ -85,7 +86,7 @@ export function ConversationComposer({
           ref={textareaRef}
           rows={2}
           value={text}
-          placeholder={!selected ? "请选择一个对话" : status.active ? "追加指令，引导当前任务" : "给 Codex 发送指令"}
+          placeholder={!selected ? "请选择一个对话" : archived ? "已归档，请先恢复对话" : status.active ? "追加指令，引导当前任务" : "给 Codex 发送指令"}
           disabled={inputDisabled}
           onChange={(event) => setText(event.target.value)}
           onPaste={(event) => {
@@ -122,13 +123,13 @@ export function ConversationComposer({
               loading={modelsLoading}
               changing={modelChanging}
               error={modelError}
-              disabled={!connected || !selected || status.active}
+              disabled={!connected || !selected || archived || status.active}
               onModelChange={onModelChange}
               onReasoningEffortChange={onReasoningEffortChange}
             />
             <ContextControl
               status={contextStatus}
-              disabled={!connected || !selected}
+              disabled={!connected || !selected || archived}
               onCompact={onCompactContext}
               onThresholdChange={onAutoCompactThresholdChange}
             />

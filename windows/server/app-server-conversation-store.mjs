@@ -101,17 +101,21 @@ export const createAppServerConversationStore = ({
     : null;
   monitorTimer?.unref?.();
 
-  const listThreads = async () => {
+  const listThreads = async ({ archived = false } = {}) => {
     const threads = [];
     let cursor = null;
     do {
-      const result = await client.request("thread/list", {
+      const params = {
         cursor,
         limit: 100,
         sortKey: "updated_at",
         sortDirection: "desc",
         cwd: projectRoot,
-      });
+      };
+      // Older app-server versions omit the archived filter and return active threads by default.
+      // Only send the new field when the caller explicitly requests the archive view.
+      if (archived) params.archived = true;
+      const result = await client.request("thread/list", params);
       threads.push(...result.data);
       cursor = result.nextCursor;
     } while (cursor);
@@ -119,7 +123,13 @@ export const createAppServerConversationStore = ({
     return threads;
   };
 
-  const summaryFromThread = (thread) => ({
+  const archivedFromThread = (thread) => {
+    if (thread?.archived === true) return true;
+    const threadPath = String(thread?.path || "").replaceAll("\\", "/").toLowerCase();
+    return threadPath.includes("/archived_sessions/") || threadPath.endsWith("/archived_sessions");
+  };
+
+  const summaryFromThread = (thread, archived = archivedFromThread(thread)) => ({
     threadId: thread.id,
     source: sourceFromThread(thread),
     title: thread.name?.trim() || "未命名会话",
@@ -127,13 +137,15 @@ export const createAppServerConversationStore = ({
     messageCount: null,
     latestUser: "",
     latestAssistant: "",
+    archived,
+    forkedFromId: thread.forkedFromId || null,
   });
 
-  const listSessions = async (source = "all") => {
-    const threads = await listThreads();
+  const listSessions = async (source = "all", archived = false) => {
+    const threads = await listThreads({ archived });
     return threads
       .filter((thread) => source === "all" || sourceFromThread(thread) === source)
-      .map(summaryFromThread);
+      .map((thread) => summaryFromThread(thread, archived));
   };
 
   const createSession = async (model = "") => {
@@ -179,9 +191,10 @@ export const createAppServerConversationStore = ({
         const message = messageFromThreadItem(item, registerMedia);
         if (!message) return null;
         const timestamp = message.role === "user" ? turn.startedAt : turn.completedAt;
+        const withTurn = turn.id ? { ...message, turnId: turn.id } : message;
         return Number.isFinite(timestamp)
-          ? { ...message, createdAt: new Date(timestamp * 1000).toISOString() }
-          : message;
+          ? { ...withTurn, createdAt: new Date(timestamp * 1000).toISOString() }
+          : withTurn;
       }))
       .filter(Boolean);
     const latestUser = messages.findLast((item) => item.role === "user")?.text || "";
@@ -199,16 +212,54 @@ export const createAppServerConversationStore = ({
     };
   };
 
-  const resumeThread = async (threadId) => {
-    const thread = threadCache.get(threadId)
-      || (await client.request("thread/read", { threadId, includeTurns: false })).thread;
+  const getThread = async (threadId) => threadCache.get(threadId)
+    || (await client.request("thread/read", { threadId, includeTurns: false })).thread;
+
+  const ensureProjectThread = async (threadId) => {
+    const thread = await getThread(threadId);
     if (!thread?.cwd || path.resolve(thread.cwd).toLowerCase() !== path.resolve(projectRoot).toLowerCase()) {
       throw new Error("This conversation does not belong to the current project.");
     }
     threadCache.set(thread.id, thread);
+    return thread;
+  };
+
+  const resumeThread = async (threadId) => {
+    const thread = await ensureProjectThread(threadId);
     const freshRuntime = freshThreadRuntime.get(threadId);
     if (freshRuntime) return freshRuntime;
     return client.request("thread/resume", { threadId, persistExtendedHistory: true });
+  };
+
+  const forkSession = async (threadId, lastTurnId) => {
+    await ensureProjectThread(threadId);
+    if (!lastTurnId) throw new Error("请选择一个已完成的对话位置再继续");
+    const result = await client.request("thread/fork", {
+      threadId,
+      lastTurnId,
+      cwd: projectRoot,
+    });
+    if (!result?.thread) throw new Error("Codex 未返回新的分支会话");
+    threadCache.set(result.thread.id, result.thread);
+    return summaryFromThread(result.thread, false);
+  };
+
+  const archiveSession = async (threadId) => {
+    await ensureProjectThread(threadId);
+    await client.request("thread/archive", { threadId });
+    threadCache.delete(threadId);
+    freshThreadRuntime.delete(threadId);
+    return { threadId, archived: true };
+  };
+
+  const unarchiveSession = async (threadId) => {
+    const result = await client.request("thread/unarchive", { threadId });
+    if (!result?.thread) throw new Error("Codex 未返回恢复后的会话");
+    if (result.thread.cwd && path.resolve(result.thread.cwd).toLowerCase() !== path.resolve(projectRoot).toLowerCase()) {
+      throw new Error("This conversation does not belong to the current project.");
+    }
+    threadCache.set(result.thread.id, result.thread);
+    return summaryFromThread(result.thread, false);
   };
 
   const sendMessage = async (threadId, text, attachments = []) => {
@@ -286,6 +337,7 @@ export const createAppServerConversationStore = ({
 
   return {
     listSessions, createSession, findSession, sendMessage, steerMessage, interrupt,
+    forkSession, archiveSession, unarchiveSession,
     listModels, updateModel, updateReasoningEffort, getRuntimeContext, getThreadStatus,
     compactContext, close,
   };

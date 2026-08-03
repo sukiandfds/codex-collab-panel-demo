@@ -19,11 +19,15 @@ export function useConversationCatalog(
   selection: ConversationSelection,
   currentModel: string,
 ) {
+  const initialArchivedView = new URLSearchParams(window.location.search).get("archived") === "1";
   const [project, setProject] = useState<ProjectInfo | null>(null);
-  const [sessions, setSessions] = useState<SessionSummary[]>(initial.sessions);
-  const [loadingList, setLoadingList] = useState(!initial.sessions.length);
+  const [sessions, setSessions] = useState<SessionSummary[]>(initialArchivedView ? [] : initial.sessions);
+  const [loadingList, setLoadingList] = useState(initialArchivedView || !initial.sessions.length);
+  const [archivedView, setArchivedView] = useState(initialArchivedView);
   const [creating, setCreating] = useState(false);
+  const [archiveBusyId, setArchiveBusyId] = useState("");
   const [listError, setListError] = useState("");
+  const archivedViewRef = useRef(initialArchivedView);
   const creatingRef = useRef(false);
   const listRetryTimerRef = useRef(0);
   const listRequestRef = useRef(0);
@@ -35,12 +39,14 @@ export function useConversationCatalog(
     if (initialLoad) setLoadingList(true);
     setListError("");
     try {
-      const serverSessions = await conversationApi.sessions();
+      const serverSessions = await conversationApi.sessions(archivedViewRef.current);
       if (requestId !== listRequestRef.current) return;
 
       const serverIds = new Set(serverSessions.map((item) => item.threadId));
       for (const threadId of serverIds) transientSessionsRef.current.delete(threadId);
-      const transientSessions = Array.from(transientSessionsRef.current.values()).reverse();
+      const transientSessions = archivedViewRef.current
+        ? []
+        : Array.from(transientSessionsRef.current.values()).reverse();
       const nextSessions = [...transientSessions, ...serverSessions];
       setSessions(nextSessions);
       const requestedId = new URLSearchParams(window.location.search).get("thread") || "";
@@ -74,6 +80,24 @@ export function useConversationCatalog(
   }, [selection.adoptSelection, selection.clearSelection, selection.loadSession, selection.selectedIdRef]);
   refreshSessionsRef.current = refreshSessions;
 
+  const updateArchiveQuery = useCallback((archived: boolean) => {
+    const params = new URLSearchParams(window.location.search);
+    if (archived) params.set("archived", "1");
+    else params.delete("archived");
+    params.delete("thread");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+  }, []);
+
+  const setArchiveViewMode = useCallback(async (archived: boolean) => {
+    if (archived === archivedViewRef.current) return;
+    archivedViewRef.current = archived;
+    setArchivedView(archived);
+    selection.clearSelection();
+    updateArchiveQuery(archived);
+    await refreshSessions(true, undefined, false);
+  }, [refreshSessions, selection.clearSelection, updateArchiveQuery]);
+
   useEffect(() => {
     if (!hasAccessToken) {
       setLoadingList(false);
@@ -103,6 +127,13 @@ export function useConversationCatalog(
     setCreating(true);
     setListError("");
     try {
+      if (archivedViewRef.current) {
+        archivedViewRef.current = false;
+        setArchivedView(false);
+        setSessions([]);
+        selection.clearSelection();
+        updateArchiveQuery(false);
+      }
       const created = await conversationApi.create(currentModel);
       const detail: SessionDetail = { ...created, messages: [] };
       transientSessionsRef.current.set(created.threadId, created);
@@ -116,9 +147,78 @@ export function useConversationCatalog(
       creatingRef.current = false;
       setCreating(false);
     }
-  }, [currentModel, selection.setCreatedSession]);
+  }, [currentModel, selection.clearSelection, selection.setCreatedSession, updateArchiveQuery]);
+
+  const forkSession = useCallback(async (threadId: string, lastTurnId: string) => {
+    setListError("");
+    try {
+      const result = await conversationApi.fork(threadId, lastTurnId);
+      const created = result.session;
+      const detail: SessionDetail = { ...created, archived: false, messages: [] };
+      transientSessionsRef.current.set(created.threadId, created);
+      archivedViewRef.current = false;
+      setArchivedView(false);
+      updateArchiveQuery(false);
+      setSessions((current) => [created, ...current.filter((item) => item.threadId !== created.threadId)]);
+      selection.setCreatedSession(detail);
+      await selection.loadSession(created.threadId, { quiet: false });
+      return true;
+    } catch (reason) {
+      setListError(reason instanceof Error ? reason.message : String(reason));
+      return false;
+    }
+  }, [selection.loadSession, selection.setCreatedSession, updateArchiveQuery]);
+
+  const archiveSession = useCallback(async (threadId: string) => {
+    if (archiveBusyId) return false;
+    setArchiveBusyId(threadId);
+    setListError("");
+    try {
+      await conversationApi.archive(threadId);
+      transientSessionsRef.current.delete(threadId);
+      if (selection.selectedIdRef.current === threadId) selection.clearSelection();
+      await refreshSessions(false, threadId, false);
+      return true;
+    } catch (reason) {
+      setListError(reason instanceof Error ? reason.message : String(reason));
+      return false;
+    } finally {
+      setArchiveBusyId("");
+    }
+  }, [archiveBusyId, refreshSessions, selection.clearSelection, selection.selectedIdRef]);
+
+  const unarchiveSession = useCallback(async (threadId: string) => {
+    if (archiveBusyId) return false;
+    setArchiveBusyId(threadId);
+    setListError("");
+    try {
+      await conversationApi.unarchive(threadId);
+      if (selection.selectedIdRef.current === threadId) selection.clearSelection();
+      await refreshSessions(false, threadId, false);
+      return true;
+    } catch (reason) {
+      setListError(reason instanceof Error ? reason.message : String(reason));
+      return false;
+    } finally {
+      setArchiveBusyId("");
+    }
+  }, [archiveBusyId, refreshSessions, selection.clearSelection, selection.selectedIdRef]);
 
   useEffect(() => () => window.clearTimeout(listRetryTimerRef.current), []);
 
-  return { project, sessions, loadingList, creating, listError, refreshSessions, createSession };
+  return {
+    project,
+    sessions,
+    archivedView,
+    loadingList,
+    creating,
+    archiveBusyId,
+    listError,
+    refreshSessions,
+    setArchiveViewMode,
+    createSession,
+    forkSession,
+    archiveSession,
+    unarchiveSession,
+  };
 }

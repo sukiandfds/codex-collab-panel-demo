@@ -10,7 +10,7 @@ last_updated: 2026-08-03 11:46 +08:00
 
 ## 目标
 
-把一次有用户影响的开发变更固定成一条可复查链路：
+把一次有用户影响的开发变更固定成一条可复查链路。通用规则见根目录 [`PROJECT_OPERATING_RULES.md`](../../PROJECT_OPERATING_RULES.md)，本文件只记录本项目的项目管理面板和分支实现：
 
 ```text
 任务条目 -> 产品提交 -> 文档同步 -> 同一提交审计 -> 合入 main
@@ -18,17 +18,16 @@ last_updated: 2026-08-03 11:46 +08:00
 
 所有状态必须绑定可验证的完整 commit SHA。聊天中的“已完成”或无法在 Git 中找到的短 SHA 不算交付。
 
+每次研究、修改、测试、提交和交接必须执行 [`ASSISTANT_DELIVERY_CHECKLIST.md`](./ASSISTANT_DELIVERY_CHECKLIST.md)。本清单是执行层规则；本文件负责状态、分支和审计边界，清单负责逐项交付核对。
+
 ## 长期分支职责
 
 | 分支 | 唯一职责 |
 | --- | --- |
-| `codex/publish-current-panel` | 产品代码真实状态；功能开发和修复最终进入这里 |
-| `codex/project-docs-and-audits` | 项目条目、开发日志、研究资料和审计报告 |
+| `codex/publish-current-panel` | 产品代码、项目条目、开发日志、研究资料和审计报告 |
 | `main` | 已完成闭环、可发布的稳定版本 |
 
-`codex/remote-work-web-reliability` 仅作为历史文档分支保留，不再作为当前文档来源。
-
-临时审计分支或 worktree 必须从指定产品提交创建，不能从旧文档分支创建，也不能成为长期代码来源。
+临时审计分支或 worktree 必须从指定产品提交创建，不能成为长期代码来源。
 
 ## 条目当前字段
 
@@ -46,7 +45,7 @@ next_action: <下一步动作>
 last_user_visible_change: <用户实际看到的变化>
 ```
 
-`item.md` 保存当前快照；`updates.md` 只追加里程碑；`process.md` 只记录该条目的弯路、阻塞、决策和效率复盘；审计正文放在 `docs/architecture/audits/`。
+`item.md` 保存当前快照；`updates.md` 只追加里程碑；`process.md` 只记录该条目的弯路、阻塞、决策和效率复盘。正文按内容归属存放：功能正文在 `docs/feature-development/`，架构和架构审计在 `docs/architecture/`，技术研究在 `docs/research/`，新的开发和事故记录在 `docs/records/`。
 
 ## 状态流转
 
@@ -74,6 +73,8 @@ planned
 
 先创建或定位 `FEAT-*`、`BUG-*` 或 `RESEARCH-*` 条目，记录用户原话、预计体验、范围、负责人和产品基线 SHA，状态设为 `in_progress`。
 
+如果没有任务编号、产品基线 SHA 或明确范围，不进入代码修改、研究正文或提交阶段；先将条目补齐，或把状态保持为 `handoff_pending`。
+
 ### 2. 产品开发
 
 在 `codex/publish-current-panel` 上完成最小变更。需要并行分析时，临时 worktree 必须基于准确的产品 SHA；最终代码必须回到产品分支。
@@ -90,17 +91,17 @@ planned
 
 ### 3. 文档同步
 
-在 `codex/project-docs-and-audits` 追加或更新文档，不复制生产代码。每次同步必须写明：
+在 `codex/publish-current-panel` 的对应文档目录追加或更新文档。代码和文档属于同一提交链，不建立独立文档分支。每次同步必须写明：
 
 ```text
 本记录对应产品提交：<完整 SHA>
 ```
 
-文档分支的 HEAD 不需要等于产品 SHA；以文档中的 `product_commit` 为绑定依据。文档提交完成后填写 `docs_commit`，状态改为 `docs_synced`。
+文档提交和产品提交属于同一开发分支；以文档中的 `product_commit` 为绑定依据。文档提交完成后填写 `docs_commit`，状态改为 `docs_synced`。
 
 ### 4. 独立审计
 
-审计人员从产品提交 `product_commit` 创建独立 worktree。审计报告必须记录：
+审计人员从产品提交 `product_commit` 创建独立 worktree。技术架构审计写入 `docs/architecture/audits/`，其他研究或产品审计写入 `docs/research/`，并使用 `_AUDIT_YYYY-MM-DD.md` 命名。审计报告必须记录：
 
 ```text
 代码基线：<产品完整 SHA>
@@ -118,7 +119,7 @@ planned
 - 文档记录引用正确的产品完整 SHA；
 - 审计针对同一个产品 SHA；
 - 没有未处理的 `audit_findings` 或 `blocked`；
-- 文档分支已经推送；
+- 当前开发分支已经推送；
 - 工作区没有未说明的改动。
 
 合入后把 `main_commit` 和最终用户影响追加到 `updates.md`，状态改为 `completed`。

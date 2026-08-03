@@ -16,7 +16,9 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
       const stored = JSON.parse(fs.readFileSync(stateFile, "utf8"));
       for (const status of stored.statuses || []) {
         if (!status?.threadId) continue;
-        statuses.set(status.threadId, status.active ? {
+        const needsRestartNormalization = status.phase === "systemError"
+          && status.label === "Codex 自动恢复失败";
+        statuses.set(status.threadId, status.active || needsRestartNormalization ? {
           ...status,
           phase: "interrupted",
           label: "项目服务已重启，上一任务已中断",
