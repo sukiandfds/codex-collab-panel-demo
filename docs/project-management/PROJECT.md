@@ -30,9 +30,15 @@ windows/server/project-management-store.mjs  项目管理数据读取器
 ## 记录分层
 
 ```text
-AI_ASSISTANT_READ_FIRST.md                          项目入口、技术栈、硬性维护规则
+PROJECT_OPERATING_RULES.md                          通用开发、命名、交接和面板同步规则
+PROJECT_RULES.md                                    本项目专属分支、安全和资料边界
+AI_ASSISTANT_READ_FIRST.md                          AI 项目入口、当前阶段和硬性维护规则
 docs/feature-development/PROCESS_ISSUES.md         跨功能通用错误、正确路径和防再犯规则（PROC-*）
 docs/feature-development/features/FEAT-*.md        功能目标、架构、问题和版本时间线（FEAT-*）
+docs/architecture/                                   技术架构职责、依赖边界和架构审计
+docs/research/                                       日期化技术研究和证据记录
+项目战略与多角色评审/                                 产品、竞品、Orca 和外部评估历史资料
+docs/records/                                        新的开发日志、验证记录和事故复盘
 docs/project-management/items/<ITEM-ID>/item.md   条目当前摘要、用户原话和预计效果
 docs/project-management/items/<ITEM-ID>/updates.md 条目状态与版本更新
 docs/project-management/items/<ITEM-ID>/process.md 条目专属弯路、阻塞、决策和效率复盘

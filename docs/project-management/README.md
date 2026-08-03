@@ -7,7 +7,7 @@ last_updated: 2026-08-03 11:46 +08:00
 
 # 项目管理资料
 
-这是独立于 `docs/feature-development/` 的项目管理数据源。
+这是独立于功能、架构和研究正文的项目管理数据源，也是项目管理面板的文件来源。
 
 ## AI 阅读顺序
 
@@ -38,13 +38,15 @@ project-management/
 `INDEX.md` 只负责定位和排序，不复制条目的长内容。条目的当前字段由 `item.md` 管理，历史变更由 `updates.md` 追加记录。
 `process.md` 只记录该条目独有的弯路、阻塞、决策和效率复盘；没有独立过程记录的条目不创建空文件。
 
-研究、审计、开发和事故正文不放入条目目录，统一放在项目根目录的 `docs/` 分类目录中；条目通过 `source` 字段关联正文文件。
+研究、审计、开发和事故正文不放入条目目录，条目通过 `source` 字段关联正文文件。各类正文按内容归属存放，不用项目管理目录替代正文。
 
 当前分类：
 
-- `docs/requirements/`：需求和功能说明
-- `docs/research/`：研究和审计结果
-- `docs/records/`：开发日志、验证记录和事故复盘
+- `docs/feature-development/`：需求、功能状态和功能问题
+- `docs/architecture/`：技术架构、文件边界和架构审计
+- `docs/research/`：日期化技术研究和证据记录
+- `docs/records/`：新的开发日志、验证记录和事故复盘
+- `项目战略与多角色评审/`：产品、竞品、Orca 和外部评估历史资料
 - `docs/project-management/`：条目、状态和流程数据
 
 ## 数据原则
@@ -63,4 +65,4 @@ project-management/
 - 读取器：`windows/server/project-management-store.mjs`
 - 前端模块：`web-ui/src/features/project-management/`
 
-页面只在打开或点击“刷新”时读取一次，不使用后台轮询；服务端每次从本目录重新生成 JSON。
+页面只在打开或点击“刷新”时读取一次，不使用后台轮询；服务端每次从本目录重新生成 JSON。页面不读取架构目录或研究目录推断状态。

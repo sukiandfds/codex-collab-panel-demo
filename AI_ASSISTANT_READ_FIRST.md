@@ -11,11 +11,13 @@
 
 本项目的开发记忆已经按功能规整。AI 助手开始任何开发前，必须按以下顺序读取：
 
-1. [`docs/feature-development/FEATURE_INDEX.md`](./docs/feature-development/FEATURE_INDEX.md)：定位功能编号、当前状态、最新版本和记录入口。
-2. 与当前任务直接相关的一个或多个 `docs/feature-development/features/FEAT-*.md`：了解原计划、实际实现、历史版本、特例问题和当前边界。
-3. [`docs/feature-development/PROCESS_ISSUES.md`](./docs/feature-development/PROCESS_ISSUES.md) 中状态为 `active` 的普适问题：直接复用正确路径和防再犯规则。
-4. 如果任务涉及计划、进度、条目状态或过程复盘，再读取 [`docs/project-management/README.md`](./docs/project-management/README.md)、`PROJECT.md`、`INDEX.md`，然后进入对应 `items/<ITEM-ID>/`。
-5. 只有需要证据、复盘或定位旧实现时，才读取根目录中的日期日志和对应 Git 提交。
+1. [`PROJECT_OPERATING_RULES.md`](./PROJECT_OPERATING_RULES.md)：了解通用开发、命名和项目管理同步规则。
+2. [`PROJECT_RULES.md`](./PROJECT_RULES.md)：了解本项目专属分支、安全和资料边界。
+3. [`docs/feature-development/FEATURE_INDEX.md`](./docs/feature-development/FEATURE_INDEX.md)：定位功能编号、当前状态、最新版本和记录入口。
+4. 与当前任务直接相关的一个或多个 `docs/feature-development/features/FEAT-*.md`：了解原计划、实际实现、历史版本、特例问题和当前边界。
+5. [`docs/feature-development/PROCESS_ISSUES.md`](./docs/feature-development/PROCESS_ISSUES.md) 中状态为 `active` 的普适问题：直接复用正确路径和防再犯规则。
+6. 如果任务涉及计划、进度、条目状态或过程复盘，再读取 [`docs/project-management/README.md`](./docs/project-management/README.md)、`PROJECT.md`、`INDEX.md`，然后进入对应 `items/<ITEM-ID>/`。
+7. 只有需要证据、复盘或定位旧实现时，才读取根目录中的日期日志和对应 Git 提交。
 
 完整字段、编号和维护方式见 [`docs/feature-development/README.md`](./docs/feature-development/README.md)。旧日期日志保留为原始证据，不再作为 AI 的首要阅读入口。
 
@@ -40,7 +42,7 @@
 1. **当前优先收尾单人 Codex Web 基础体验，群聊与多 Agent 保留为后续重点。** 单人页稳定后仍以一个项目群继续真实讨论：默认项目经理参与，其他 Agent 通过 `@` 加入；不要扩展跨项目聚合、完整多人权限或企业协作系统。
 2. **所有展示内容必须来自这个项目的真实数据。** 不要用虚构会话、占位成员、假进度或演示文案替代真实内容。
 3. **UI、内容和功能必须分开维护。** UI 文件只负责视觉；内容解析只负责数据；功能组件按功能归属拆分。
-   具体目录和依赖规则见 [`docs/architecture/MODULE_BOUNDARIES.md`](./docs/architecture/MODULE_BOUNDARIES.md)。
+   具体目录和依赖规则先看 [`docs/architecture/README.md`](./docs/architecture/README.md)，再按需查看 [`docs/architecture/MODULE_BOUNDARIES.md`](./docs/architecture/MODULE_BOUNDARIES.md)。
 4. **没有用户明确许可，不要修改 UI 样式文件。** 当前样式是否符合 Codex 复刻要求，由用户亲自验收。
 5. **不要默认执行浏览器截图、像素对比或视觉验收。** 默认只做与改动风险相匹配的代码、构建和接口检查。
 6. **保持快速、轻量和小步修改。** 不增加无关依赖，不做大范围重构，不在一个问题上持续钻牛角尖。
@@ -439,7 +441,7 @@ codex/publish-current-panel
 ## 16. AI 助手开始工作前的检查清单
 
 1. 先读本文，再读与当前任务直接相关的源码。
-   文件归属不确定时先读 [`docs/architecture/MODULE_BOUNDARIES.md`](./docs/architecture/MODULE_BOUNDARIES.md)。
+   文件归属不确定时先读 [`docs/architecture/README.md`](./docs/architecture/README.md)，再查看详细边界说明。
 2. 查看 `git status --short --branch`，保留用户已有改动。
 3. 确认用户要求属于 UI、内容、功能、性能、运行还是公网访问中的哪一层。
 4. 如涉及 UI，确认用户是否明确允许修改样式文件。
@@ -456,6 +458,8 @@ codex/publish-current-panel
 - `docs/feature-development/PROCESS_ISSUES.md`：跨功能复用的错误路径、正确路径和防再犯规则。
 - `docs/feature-development/features/`：每个功能从计划、实现、问题到多个版本的连续记录。
 - `docs/project-management/README.md`：项目管理数据源的阅读顺序、条目目录和字段边界。
+- `PROJECT_OPERATING_RULES.md`：跨项目复用的开发、命名、交接和项目管理同步规则。
+- `PROJECT_RULES.md`：本项目专属的分支、安全和资料边界。
 - `docs/project-management/items/<ITEM-ID>/process.md`：单个项目条目的专属弯路、阻塞、决策和效率复盘；跨功能问题回链 `PROC-*`。
 - `docs/architecture/README.md`：架构领域、调用边界和跨领域文件的梳理入口。
 - `docs/architecture/audits/`：实时事件链路和 Codex 原生读取能力审计；阅读时以报告中的产品基线 SHA 为准。

@@ -23,7 +23,7 @@ git status --short
 
 然后：
 
-1. 读取 AI_ASSISTANT_READ_FIRST.md、PROJECT_RULES.md、docs/project-management/README.md 和 WORKFLOW_RULES.md。
+1. 读取 AI_ASSISTANT_READ_FIRST.md、PROJECT_OPERATING_RULES.md、PROJECT_RULES.md、docs/project-management/README.md 和 WORKFLOW_RULES.md。
 2. 读取 docs/feature-development/FEATURE_INDEX.md，定位相关 FEAT-*、BUG-* 或 RESEARCH-*。
 3. 读取对应 items/<ITEM-ID>/item.md；需要历史时再读取 updates.md 和 process.md。
 4. 没有现成条目时，先创建条目并记录用户原话、范围、产品基线 SHA，再开始修改。
@@ -110,10 +110,11 @@ git status --short
 
 审计必须基于准确的 product_commit 创建独立 worktree，不能基于聊天中出现的短 SHA 或旧分支。
 
-审计正文使用：
+审计正文按领域存放：
 
 ~~~text
-docs/research/<TOPIC>_AUDIT_YYYY-MM-DD.md
+技术架构审计：docs/architecture/audits/<TOPIC>_AUDIT_YYYY-MM-DD.md
+其他技术或产品研究审计：docs/research/<TOPIC>_AUDIT_YYYY-MM-DD.md
 ~~~
 
 必须记录：

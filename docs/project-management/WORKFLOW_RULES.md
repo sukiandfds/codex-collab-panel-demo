@@ -10,7 +10,7 @@ last_updated: 2026-08-03 11:46 +08:00
 
 ## 目标
 
-把一次有用户影响的开发变更固定成一条可复查链路：
+把一次有用户影响的开发变更固定成一条可复查链路。通用规则见根目录 [`PROJECT_OPERATING_RULES.md`](../../PROJECT_OPERATING_RULES.md)，本文件只记录本项目的项目管理面板和分支实现：
 
 ```text
 任务条目 -> 产品提交 -> 文档同步 -> 同一提交审计 -> 合入 main
@@ -45,7 +45,7 @@ next_action: <下一步动作>
 last_user_visible_change: <用户实际看到的变化>
 ```
 
-`item.md` 保存当前快照；`updates.md` 只追加里程碑；`process.md` 只记录该条目的弯路、阻塞、决策和效率复盘；研究和审计正文按根目录命名规则放在 `docs/research/`，开发和事故记录放在 `docs/records/`。
+`item.md` 保存当前快照；`updates.md` 只追加里程碑；`process.md` 只记录该条目的弯路、阻塞、决策和效率复盘。正文按内容归属存放：功能正文在 `docs/feature-development/`，架构和架构审计在 `docs/architecture/`，技术研究在 `docs/research/`，新的开发和事故记录在 `docs/records/`。
 
 ## 状态流转
 
@@ -91,7 +91,7 @@ planned
 
 ### 3. 文档同步
 
-在 `codex/publish-current-panel` 的 `docs/` 目录追加或更新文档。代码和文档属于同一提交链，不建立独立文档分支。每次同步必须写明：
+在 `codex/publish-current-panel` 的对应文档目录追加或更新文档。代码和文档属于同一提交链，不建立独立文档分支。每次同步必须写明：
 
 ```text
 本记录对应产品提交：<完整 SHA>
@@ -101,7 +101,7 @@ planned
 
 ### 4. 独立审计
 
-审计人员从产品提交 `product_commit` 创建独立 worktree。审计报告写入当前开发分支的 `docs/research/`，并使用 `_AUDIT_YYYY-MM-DD.md` 命名。审计报告必须记录：
+审计人员从产品提交 `product_commit` 创建独立 worktree。技术架构审计写入 `docs/architecture/audits/`，其他研究或产品审计写入 `docs/research/`，并使用 `_AUDIT_YYYY-MM-DD.md` 命名。审计报告必须记录：
 
 ```text
 代码基线：<产品完整 SHA>
