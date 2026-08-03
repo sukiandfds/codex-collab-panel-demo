@@ -4,16 +4,16 @@ type: research
 title: 文档分支内容迁移与归档核对
 category: research
 priority: P1
-status: in_progress
+status: completed
 updated_at: 2026-08-03
 source: docs/research/DOCUMENTATION_BRANCH_MIGRATION_RESEARCH_2026-08-03.md
 related: [PM-001, RESEARCH-001, RESEARCH-002, FEAT-010]
 product_base_commit: d382a469d9670743f82142b3b0408f2b9f0471b4
-product_commit: pending
-docs_commit: pending
+product_commit: d382a469d9670743f82142b3b0408f2b9f0471b4
+docs_commit: f1ad197
 audited_product_commit: pending
-sync_status: docs_pending
-next_action: 提交并推送迁移记录，复核后删除文档分支
+sync_status: synced
+next_action: 删除已完成迁移的来源文档分支
 last_user_visible_change: 文档分支内容已按架构、功能、项目管理和战略资料归档到当前开发分支
 ---
 
@@ -29,7 +29,7 @@ last_user_visible_change: 文档分支内容已按架构、功能、项目管理
 
 ## 当前状态
 
-迁移文件已经准备，待提交、推送、复核和分支清理。
+迁移文件已提交，待推送并完成来源分支清理。
 
 ## 证据
 

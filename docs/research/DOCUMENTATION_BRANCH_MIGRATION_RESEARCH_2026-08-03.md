@@ -6,7 +6,8 @@ product_commit: d382a469d9670743f82142b3b0408f2b9f0471b4
 source_branch: codex/project-docs-and-audits
 source_commit: 12155fca55aea45436656713c065a21c5cdef8ca
 target_branch: codex/publish-current-panel
-status: completed_pending_commit
+target_commit: f1ad197
+status: completed
 ---
 
 # 文档分支内容迁移记录
@@ -69,8 +70,9 @@ FEAT-010 保留为已暂停的历史技术试验，不把它描述为路线 2 �
 - 已核对来源分支完整 SHA：`12155fca55aea45436656713c065a21c5cdef8ca`。
 - 已核对目标分支迁移前完整 SHA：`d382a469d9670743f82142b3b0408f2b9f0471b4`。
 - 已确认迁移清单不包含生产代码、UI、测试和构建配置。
-- 待运行：`git diff --check`、工作区状态核对、提交后两分支内容复核。
+- 已运行：`git diff --check`、工作区状态核对、提交后文件清单核对。
+- 迁移提交：`f1ad197`。
 
 ## 6. 后续清理
 
-迁移提交推送并完成内容复核后，删除本地和远程 `codex/project-docs-and-audits`。删除前不得再从该分支读取文档作为当前规则来源。
+迁移提交推送并完成内容复核后，删除本地和远程 `codex/project-docs-and-audits`。删除前不得再从该分支读取文档作为当前规则来源。本记录完成后，来源分支仅作为 Git 历史对象保留，不再作为工作入口。
