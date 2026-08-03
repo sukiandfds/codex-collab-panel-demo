@@ -457,6 +457,9 @@ codex/publish-current-panel
 - `docs/feature-development/features/`：每个功能从计划、实现、问题到多个版本的连续记录。
 - `docs/project-management/README.md`：项目管理数据源的阅读顺序、条目目录和字段边界。
 - `docs/project-management/items/<ITEM-ID>/process.md`：单个项目条目的专属弯路、阻塞、决策和效率复盘；跨功能问题回链 `PROC-*`。
+- `docs/architecture/README.md`：架构领域、调用边界和跨领域文件的梳理入口。
+- `docs/architecture/audits/`：实时事件链路和 Codex 原生读取能力审计；阅读时以报告中的产品基线 SHA 为准。
+- `docs/research/DOCUMENTATION_BRANCH_MIGRATION_RESEARCH_2026-08-03.md`：文档分支内容迁移范围、来源和未迁移原因。
 - `docs/architecture/MODULE_BOUNDARIES.md`：前后端目录、依赖方向和长文件拆分规则。
 - `PROJECT.md`：项目愿景、早期右侧面板和长期方向。
 - `DEVELOPMENT_BUG_LOG_2026-07-21.md`：入口、JSONL、启动、错误处理和开发效率问题的详细记录。

@@ -14,6 +14,7 @@ last_updated: 2026-08-03
 - `PM-001`
 - `RESEARCH-001`
 - `RESEARCH-002`
+- `RESEARCH-003`
 - `FEAT-001`
 - `FEAT-011`
 - `FEAT-005`
@@ -36,16 +37,17 @@ last_updated: 2026-08-03
 | `PM-001` | feature | development | `items/PM-001/` | 1 |
 | `RESEARCH-001` | research | research | `items/RESEARCH-001/` | 2 |
 | `RESEARCH-002` | research | research | `items/RESEARCH-002/` | 3 |
-| `FEAT-001` | feature | development | `items/FEAT-001/` | 4 |
-| `FEAT-002` | feature | development | `items/FEAT-002/` | 5 |
-| `FEAT-003` | feature | development | `items/FEAT-003/` | 6 |
-| `FEAT-004` | feature | delivery | `items/FEAT-004/` | 7 |
-| `FEAT-005` | research | research | `items/FEAT-005/` | 8 |
-| `FEAT-006` | maintenance | maintenance | `items/FEAT-006/` | 9 |
-| `FEAT-007` | delivery | delivery | `items/FEAT-007/` | 10 |
-| `FEAT-008` | delivery | delivery | `items/FEAT-008/` | 11 |
-| `FEAT-009` | feature | development | `items/FEAT-009/` | 12 |
-| `FEAT-011` | feature | development | `items/FEAT-011/` | 13 |
+| `RESEARCH-003` | research | research | `items/RESEARCH-003/` | 4 |
+| `FEAT-001` | feature | development | `items/FEAT-001/` | 5 |
+| `FEAT-002` | feature | development | `items/FEAT-002/` | 6 |
+| `FEAT-003` | feature | development | `items/FEAT-003/` | 7 |
+| `FEAT-004` | feature | delivery | `items/FEAT-004/` | 8 |
+| `FEAT-005` | research | research | `items/FEAT-005/` | 9 |
+| `FEAT-006` | maintenance | maintenance | `items/FEAT-006/` | 10 |
+| `FEAT-007` | delivery | delivery | `items/FEAT-007/` | 11 |
+| `FEAT-008` | delivery | delivery | `items/FEAT-008/` | 12 |
+| `FEAT-009` | feature | development | `items/FEAT-009/` | 13 |
+| `FEAT-011` | feature | development | `items/FEAT-011/` | 14 |
 
 条目的摘要、级别、状态和更新时间均从对应 `item.md` 读取；不要在本表重复维护。
 
