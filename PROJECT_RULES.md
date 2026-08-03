@@ -74,3 +74,5 @@ docs/records/<主题>_INCIDENT_YYYY-MM-DD.md
 - `item.md` 保存当前状态，`updates.md` 只追加里程碑，`process.md` 只记录该条目的过程问题。
 - 项目管理条目的 `source` 必须指向对应的需求、研究或记录文件。
 - 项目管理页面读取条目文件，不根据分支名称或聊天内容推断状态。
+- AI 助手每次研究、修改、测试、提交和交接必须执行 [`docs/project-management/ASSISTANT_DELIVERY_CHECKLIST.md`](./docs/project-management/ASSISTANT_DELIVERY_CHECKLIST.md)。
+- 缺少任务编号、完整 SHA、工作区状态、测试结果或项目管理回写时，交付状态只能是 `handoff_pending`。

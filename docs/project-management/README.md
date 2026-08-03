@@ -13,10 +13,11 @@ last_updated: 2026-08-03 11:46 +08:00
 
 1. 先读 [`PROJECT.md`](./PROJECT.md)，了解项目目标和资料边界。
 2. 再读 [`WORKFLOW_RULES.md`](./WORKFLOW_RULES.md)，了解代码、文档、审计和合入规则。
-3. 再读 [`INDEX.md`](./INDEX.md)，按条目编号定位对应文件夹。
-4. 读取 `items/<条目编号>/item.md`，了解条目的当前快照。
-5. 需要知道状态如何变化时，读取同一目录下的 `updates.md`。
-6. 需要复盘该条目的弯路、阻塞或决策时，读取同一目录下的 `process.md`；跨功能问题再跳转到 `docs/feature-development/PROCESS_ISSUES.md` 的 `PROC-*`。
+3. 再读 [`ASSISTANT_DELIVERY_CHECKLIST.md`](./ASSISTANT_DELIVERY_CHECKLIST.md)，了解每次工作如何与条目、提交和状态联动。
+4. 再读 [`INDEX.md`](./INDEX.md)，按条目编号定位对应文件夹。
+5. 读取 `items/<条目编号>/item.md`，了解条目的当前快照。
+6. 需要知道状态如何变化时，读取同一目录下的 `updates.md`。
+7. 需要复盘该条目的弯路、阻塞或决策时，读取同一目录下的 `process.md`；跨功能问题再跳转到 `docs/feature-development/PROCESS_ISSUES.md` 的 `PROC-*`。
 
 ## 目录约定
 
@@ -24,6 +25,7 @@ last_updated: 2026-08-03 11:46 +08:00
 project-management/
 ├─ PROJECT.md
 ├─ WORKFLOW_RULES.md
+├─ ASSISTANT_DELIVERY_CHECKLIST.md
 ├─ INDEX.md
 ├─ SCHEMA.md
 └─ items/

@@ -18,6 +18,8 @@ last_updated: 2026-08-03 11:46 +08:00
 
 所有状态必须绑定可验证的完整 commit SHA。聊天中的“已完成”或无法在 Git 中找到的短 SHA 不算交付。
 
+每次研究、修改、测试、提交和交接必须执行 [`ASSISTANT_DELIVERY_CHECKLIST.md`](./ASSISTANT_DELIVERY_CHECKLIST.md)。本清单是执行层规则；本文件负责状态、分支和审计边界，清单负责逐项交付核对。
+
 ## 长期分支职责
 
 | 分支 | 唯一职责 |
@@ -70,6 +72,8 @@ planned
 ### 1. 建立任务
 
 先创建或定位 `FEAT-*`、`BUG-*` 或 `RESEARCH-*` 条目，记录用户原话、预计体验、范围、负责人和产品基线 SHA，状态设为 `in_progress`。
+
+如果没有任务编号、产品基线 SHA 或明确范围，不进入代码修改、研究正文或提交阶段；先将条目补齐，或把状态保持为 `handoff_pending`。
 
 ### 2. 产品开发
 

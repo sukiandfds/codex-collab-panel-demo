@@ -2,8 +2,8 @@
 
 > 本文是 `codex-collab-panel-demo` 的 AI 开发交接入口。任何 AI 助手准备分析、修改或运行本项目之前，应先完整阅读本文，再按需查看具体代码和开发日志。
 
-更新日期：2026-08-02
-项目路径：`D:\codingproject\codex-collab-panel-demo`
+更新日期：2026-08-03
+项目路径：以 `git rev-parse --show-toplevel` 返回的实际仓库根目录为准；本文不再把历史路径作为工作目录
 当前分支：`codex/publish-current-panel`
 当前阶段：优先收尾单人 Codex Web 对话与控制的基础体验和稳定性；项目群聊、多 Agent、固定公网入口和 Desktop/Web 统一控制继续保留，但暂不抢在单人基础能力之前扩展
 
@@ -22,6 +22,8 @@
 项目管理条目的当前快照在 `docs/project-management/items/<ITEM-ID>/item.md`，状态历史在 `updates.md`，条目专属的弯路和决策在 `process.md`。跨功能、可复用的问题只在 `docs/feature-development/PROCESS_ISSUES.md` 保留完整记录，避免多处复制后互相漂移。
 
 每次功能开发、修复或技术路径变更结束前，必须更新对应 `FEAT-*.md` 的当前快照、问题状态和版本时间线；功能状态或版本变化时同步更新 `FEATURE_INDEX.md`。如果发现会影响其他功能的普适问题，还必须登记或更新 `PROCESS_ISSUES.md`。只写日期日志、不回写功能记录，视为记录未完成。
+
+每次研究、修改、测试、提交和交接必须执行 [`docs/project-management/ASSISTANT_DELIVERY_CHECKLIST.md`](./docs/project-management/ASSISTANT_DELIVERY_CHECKLIST.md)。该清单是项目管理联动的执行入口；缺少任务编号、完整 SHA、测试结果或条目回写时，状态只能是 `handoff_pending`，不得描述为已完成。
 
 ## 0.1 用户偏好与沟通记忆（强制）
 
