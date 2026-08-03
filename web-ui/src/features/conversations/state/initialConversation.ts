@@ -9,9 +9,11 @@ export interface InitialConversationState {
 
 export const readInitialConversationState = (): InitialConversationState => {
   const snapshot = readConversationSnapshot();
-  const selectedId = new URLSearchParams(window.location.search).get("thread")
+  const params = new URLSearchParams(window.location.search);
+  const archivedView = params.get("archived") === "1";
+  const selectedId = archivedView ? "" : params.get("thread")
     || snapshot?.selectedId
     || "";
-  const session = snapshot?.session?.threadId === selectedId ? snapshot.session : null;
+  const session = !archivedView && snapshot?.session?.threadId === selectedId ? snapshot.session : null;
   return { selectedId, session, sessions: snapshot?.sessions || [] };
 };

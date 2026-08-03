@@ -27,8 +27,15 @@ const fetchConversationJson = async <T,>(pathname: string, signal?: AbortSignal)
 
 export const conversationApi = {
   project: (signal?: AbortSignal) => fetchConversationJson<ProjectInfo>("/api/project", signal),
-  sessions: (signal?: AbortSignal) => fetchConversationJson<SessionSummary[]>("/api/sessions?source=all", signal),
+  sessions: (archived = false, signal?: AbortSignal) => fetchConversationJson<SessionSummary[]>(`/api/sessions?source=all${archived ? "&archived=1" : ""}`, signal),
   create: (model = "", signal?: AbortSignal) => postJson<SessionSummary>("/api/session", { model }, signal),
+  fork: (threadId: string, lastTurnId: string, signal?: AbortSignal) => postJson<{
+    session: SessionSummary;
+    sourceThreadId: string;
+    forkedFromTurnId: string;
+  }>("/api/session/fork", { threadId, lastTurnId }, signal),
+  archive: (threadId: string, signal?: AbortSignal) => postJson<{ threadId: string; archived: boolean }>("/api/session/archive", { threadId }, signal),
+  unarchive: (threadId: string, signal?: AbortSignal) => postJson<SessionSummary>("/api/session/unarchive", { threadId }, signal),
   session: (threadId: string, before?: number, signal?: AbortSignal) => {
     const beforeQuery = before === undefined ? "" : `&before=${before}`;
     return fetchConversationJson<SessionDetail>(

@@ -11,6 +11,7 @@ import { createOptimisticMessage } from "../state/optimisticMessage";
 import { readInitialConversationState } from "../state/initialConversation";
 import { useConversationCatalog } from "./useConversationCatalog";
 import { useConversationSession } from "./useConversationSession";
+import type { SessionMessage } from "../model/types";
 
 export function useProjectConversations() {
   const [initial] = useState(readInitialConversationState);
@@ -22,6 +23,7 @@ export function useProjectConversations() {
     }
   }, [selection.loadSession, selection.selectedIdRef]);
   const execution = useCodexExecution(selection.selectedId, onMessageAccepted);
+  const [forkingMessageId, setForkingMessageId] = useState("");
   const contextManagement = useContextManagement(selection.selectedId);
   const onModelChanged = useCallback(() => {
     void contextManagement.refresh();
@@ -69,6 +71,17 @@ export function useProjectConversations() {
     return sent;
   }, [execution.sendMessage, selection.selectedIdRef, selection.updateCurrentSession]);
 
+  const forkFromMessage = useCallback(async (message: SessionMessage) => {
+    const threadId = selection.selectedIdRef.current;
+    if (!threadId || !message.turnId || execution.status.active || selection.session?.archived) return false;
+    setForkingMessageId(message.id);
+    try {
+      return await catalog.forkSession(threadId, message.turnId);
+    } finally {
+      setForkingMessageId("");
+    }
+  }, [catalog.forkSession, execution.status.active, selection.selectedIdRef, selection.session?.archived]);
+
   const onSessionsChanged = useCallback((threadId?: string, clearStreaming = true) => {
     if (threadId) selection.invalidate(threadId);
     const selected = selection.selectedIdRef.current;
@@ -105,6 +118,7 @@ export function useProjectConversations() {
   return {
     project: catalog.project,
     sessions: catalog.sessions,
+    archivedView: catalog.archivedView,
     selectedId: selection.selectedId,
     session: selection.session,
     loadingList: catalog.loadingList,
@@ -117,6 +131,12 @@ export function useProjectConversations() {
     selectSession: selection.selectSession,
     createSession: catalog.createSession,
     creating: catalog.creating,
+    setArchiveViewMode: catalog.setArchiveViewMode,
+    archiveSession: catalog.archiveSession,
+    unarchiveSession: catalog.unarchiveSession,
+    archiveBusyId: catalog.archiveBusyId,
+    forkFromMessage,
+    forkingMessageId,
     loadOlder: selection.loadOlder,
     executionStatus: execution.status,
     streamingText: execution.streamingText,

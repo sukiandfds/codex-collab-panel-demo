@@ -4,8 +4,8 @@ type: feature
 title: 单人 Codex Web 对话与控制
 category: development
 priority: P1
-status: pending_review
-updated_at: 2026-08-02 18:00 +08:00
+status: paused
+updated_at: 2026-08-03 11:32 +08:00
 source: docs/feature-development/features/FEAT-001-single-codex-web.md
 related: [FEAT-005]
 ---
@@ -42,9 +42,12 @@ related: [FEAT-005]
 
 ## 当前状态
 
-待体验。
+旧性能与实时状态问题已完成架构定位；代码修复暂缓，等待后续专门修复窗口。新功能开发先进入准备阶段，不在本条目内擅自启动。
 
 ## 当前证据
 
 - `docs/feature-development/features/FEAT-001-single-codex-web.md`
 - `docs/feature-development/FEATURE_INDEX.md`
+- 远程分支 `codex/remote-work-web-reliability` 提交 `deaa5c5999d96c0e3a01cd53669a315ba663823b`
+- `docs/architecture/audits/REALTIME_CONVERSATION_ARCHITECTURE_AUDIT_2026-08-03.md`
+- `docs/architecture/audits/CODEX_NATIVE_READ_AND_REGRESSION_REVIEW_2026-08-03.md`

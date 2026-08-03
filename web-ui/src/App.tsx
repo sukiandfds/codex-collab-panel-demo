@@ -33,10 +33,15 @@ export function App() {
           loading={conversations.loadingList}
           connected={conversations.connected}
           creating={conversations.creating}
+          archivedView={conversations.archivedView}
+          archiveBusyId={conversations.archiveBusyId}
           error={conversations.listError}
           onSelect={selectSession}
           onCreate={conversations.createSession}
           onRefresh={conversations.refresh}
+          onArchiveViewChange={conversations.setArchiveViewMode}
+          onArchive={conversations.archiveSession}
+          onUnarchive={conversations.unarchiveSession}
         />
       }
       header={
@@ -67,6 +72,8 @@ export function App() {
           streamingText={conversations.streamingText}
           executionStatus={conversations.executionStatus}
           onLoadOlder={conversations.loadOlder}
+          onForkMessage={conversations.forkFromMessage}
+          forkingMessageId={conversations.forkingMessageId}
         />
       }
       composer={
@@ -74,6 +81,7 @@ export function App() {
           key={conversations.selectedId}
           connected={conversations.connected}
           selected={Boolean(conversations.selectedId)}
+          archived={Boolean(conversations.session?.archived)}
           sending={conversations.sending}
           sendingSlow={conversations.sendingSlow}
           status={conversations.executionStatus}

@@ -30,6 +30,7 @@
 
 .iconButton svg { width: 15px; height: 15px; stroke-width: 1.7; }
 .iconButton:disabled { opacity: .45; }
+.activeAction { background: var(--color-surface-active); color: var(--color-text); }
 .projectHeader { gap: 9px; min-height: 38px; margin: 0 7px 5px; padding: 0 9px; border-radius: 6px; color: var(--color-text); font-size: 13px; font-weight: 600; }
 .projectHeader svg { width: 16px; height: 16px; flex: 0 0 16px; color: var(--color-text-secondary); stroke-width: 1.7; }
 .projectHeader span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

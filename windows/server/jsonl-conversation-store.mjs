@@ -18,6 +18,7 @@ const walkJsonl = async (directory) => {
 const threadIdFromFile = (file) => path.basename(file).match(/[0-9a-f]{8}-[0-9a-f-]{27,}/iu)?.[0] || path.basename(file);
 
 export const createJsonlConversationStore = ({ sessionRoot, projectRoot, registerMedia, onChange }) => {
+  const archivedRoot = path.join(path.dirname(sessionRoot), "archived_sessions");
   const headerCache = new Map();
   const projectHeaders = new Map();
   const sessionCache = new Map();
@@ -27,6 +28,12 @@ export const createJsonlConversationStore = ({ sessionRoot, projectRoot, registe
   const sameProject = (cwd) => {
     if (!cwd) return false;
     try { return path.resolve(cwd).toLowerCase() === projectRoot.toLowerCase(); } catch { return false; }
+  };
+
+  const isArchivedFile = (file) => {
+    const root = path.resolve(archivedRoot).toLowerCase();
+    const candidate = path.resolve(file).toLowerCase();
+    return candidate === root || candidate.startsWith(`${root}${path.sep}`);
   };
 
   const readHeader = async (file, refresh = false) => {
@@ -54,6 +61,7 @@ export const createJsonlConversationStore = ({ sessionRoot, projectRoot, registe
               cliVersion: item.payload?.cli_version || "",
               threadId: item.payload?.id || item.payload?.session_id || threadIdFromFile(file),
               title: item.payload?.name || item.payload?.title || null,
+              archived: isArchivedFile(file),
             };
             headerCache.set(file, header);
             return header;
@@ -74,7 +82,10 @@ export const createJsonlConversationStore = ({ sessionRoot, projectRoot, registe
   };
 
   const reconcile = async () => {
-    const files = await walkJsonl(sessionRoot);
+    const files = [
+      ...(await walkJsonl(sessionRoot)),
+      ...(await walkJsonl(archivedRoot)),
+    ];
     const existing = new Set(files);
     for (const file of projectHeaders.keys()) {
       if (!existing.has(file)) {
@@ -208,15 +219,18 @@ export const createJsonlConversationStore = ({ sessionRoot, projectRoot, registe
       messageCount: state.messages.length,
       latestUser: previewText(latestUser, 260),
       latestAssistant: previewText(latestAssistant, 260),
+      archived: Boolean(header.archived),
       messages: state.messages,
     };
   };
 
-  const listSessions = async (source = "all") => {
+  const listSessions = async (source = "all", archived = false) => {
     await initialize();
     const sessions = await Promise.all([...projectHeaders.values()].map(readSession));
     return sessions
-      .filter((session) => session.messages.length && (source === "all" || session.source === source))
+      .filter((session) => session.messages.length
+        && Boolean(session.archived) === Boolean(archived)
+        && (source === "all" || session.source === source))
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   };
 

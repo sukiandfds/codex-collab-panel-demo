@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { JumpToLatest } from "../../../components/JumpToLatest/JumpToLatest";
 import type { SessionDetail, SessionMessage } from "../model/types";
+import { MessageActions } from "./MessageActions";
 import { ContentRenderer } from "../rendering/ContentRenderer";
 import { ExecutionTimeline } from "../../execution/components/ExecutionTimeline";
 import type { ExecutionStatus } from "../../execution/model/types";
@@ -19,13 +20,26 @@ const messageTime = (value?: string) => {
     : `${date.getFullYear()}-${monthDayTime}`;
 };
 
-function Message({ message, streaming = false }: { message: SessionMessage; streaming?: boolean }) {
+function Message({
+  message,
+  streaming = false,
+  forkable = false,
+  forking = false,
+  onFork,
+}: {
+  message: SessionMessage;
+  streaming?: boolean;
+  forkable?: boolean;
+  forking?: boolean;
+  onFork: () => Promise<boolean>;
+}) {
   const formattedTime = messageTime(message.createdAt);
   return (
     <article className={`${styles.message} ${message.role === "user" ? styles.user : styles.assistant}`}>
       {formattedTime ? <time className={styles.timestamp} dateTime={message.createdAt}>{formattedTime}</time> : null}
       <div className={styles.body}>
         {streaming ? <div className={styles.streamingText}>{message.text}<i className={styles.cursor} /></div> : <ContentRenderer message={message} />}
+        {!streaming ? <MessageActions text={message.text} forkable={forkable} forking={forking} onFork={onFork} /> : null}
       </div>
     </article>
   );
@@ -41,13 +55,27 @@ interface ConversationViewProps {
   streamingText: string;
   executionStatus: ExecutionStatus;
   onLoadOlder: () => Promise<void>;
+  onForkMessage: (message: SessionMessage) => Promise<boolean>;
+  forkingMessageId: string;
 }
 
 type ConversationItem =
   | { id: string; type: "message"; message: SessionMessage; streaming: boolean }
   | { id: string; type: "execution" };
 
-export function ConversationView({ session, loading, syncing, loadingOlder, error, listAvailable, streamingText, executionStatus, onLoadOlder }: ConversationViewProps) {
+export function ConversationView({
+  session,
+  loading,
+  syncing,
+  loadingOlder,
+  error,
+  listAvailable,
+  streamingText,
+  executionStatus,
+  onLoadOlder,
+  onForkMessage,
+  forkingMessageId,
+}: ConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingOlderRef = useRef(false);
   const stickToBottomRef = useRef(true);
@@ -175,7 +203,18 @@ export function ConversationView({ session, loading, syncing, loadingOlder, erro
                 >
                   {item.type === "execution"
                     ? <ExecutionTimeline status={executionStatus} />
-                    : <Message message={item.message} streaming={item.streaming} />}
+                    : (
+                      <Message
+                        message={item.message}
+                        streaming={item.streaming}
+                        forkable={item.message.role === "assistant"
+                          && Boolean(item.message.turnId)
+                          && !executionStatus.active
+                          && !session?.archived}
+                        forking={forkingMessageId === item.message.id}
+                        onFork={() => onForkMessage(item.message)}
+                      />
+                    )}
                 </div>
               );
             })}

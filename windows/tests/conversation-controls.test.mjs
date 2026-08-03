@@ -218,6 +218,66 @@ test("maps turn timestamps onto user and assistant messages", async () => {
     "1970-01-01T00:01:40.000Z",
     "1970-01-01T00:02:10.000Z",
   ]);
+  assert.deepEqual(session.messages.map((message) => message.turnId), ["turn-1", "turn-1"]);
+});
+
+test("forks, archives, and restores a project thread through app-server actions", async () => {
+  const calls = [];
+  const sourceThread = {
+    id: "thread-source",
+    cwd: "D:\\project",
+    source: "appServer",
+    name: "Source",
+    updatedAt: 100,
+    path: "D:\\codex\\sessions\\source.jsonl",
+  };
+  const forkedThread = {
+    ...sourceThread,
+    id: "thread-forked",
+    name: "Source fork",
+    forkedFromId: sourceThread.id,
+    updatedAt: 110,
+  };
+  const client = {
+    subscribe: () => () => {},
+    close: () => {},
+    request: async (method, params) => {
+      calls.push({ method, params });
+      if (method === "thread/read") return { thread: sourceThread };
+      if (method === "thread/fork") return { thread: forkedThread };
+      if (method === "thread/archive") return {};
+      if (method === "thread/unarchive") return { thread: sourceThread };
+      throw new Error(`Unexpected request: ${method}`);
+    },
+  };
+  const store = createAppServerConversationStore({
+    projectRoot: "D:\\project",
+    registerMedia: () => null,
+    client,
+  });
+
+  const forked = await store.forkSession("thread-source", "turn-1");
+  assert.equal(forked.threadId, "thread-forked");
+  assert.equal(forked.forkedFromId, "thread-source");
+  assert.deepEqual(calls[1], {
+    method: "thread/fork",
+    params: { threadId: "thread-source", lastTurnId: "turn-1", cwd: "D:\\project" },
+  });
+
+  assert.deepEqual(await store.archiveSession("thread-source"), { threadId: "thread-source", archived: true });
+  assert.deepEqual(await store.unarchiveSession("thread-source"), {
+    threadId: "thread-source",
+    source: "codex",
+    title: "Source",
+    updatedAt: "1970-01-01T00:01:40.000Z",
+    messageCount: null,
+    latestUser: "",
+    latestAssistant: "",
+    archived: false,
+    forkedFromId: null,
+  });
+  assert.deepEqual(calls.slice(-2).map((call) => call.method), ["thread/archive", "thread/unarchive"]);
+  store.close();
 });
 
 test("supervises an active turn without depending on a browser request", async () => {
