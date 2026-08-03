@@ -8,5 +8,5 @@
 - 产品基线：5f817f0143368c98619011f0b1eaf050baf0efea
 - 文档：docs/research/RUNTIME_CALL_GRAPH_AND_PROJECT_DATA_RESEARCH_2026-08-03.md
 - 项目管理同步：新增 RESEARCH-002 条目并加入 docs/project-management/INDEX.md。
-- docs_commit：pending
-
+- docs_commit：2969534d66d0cc341f3022fae62aa170873c6966
+- sync_status：synced

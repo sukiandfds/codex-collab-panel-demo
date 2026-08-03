@@ -10,9 +10,9 @@ source: docs/research/RUNTIME_CALL_GRAPH_AND_PROJECT_DATA_RESEARCH_2026-08-03.md
 related: [RESEARCH-001, PM-001, FEAT-001, FEAT-005]
 product_base_commit: 5f817f0143368c98619011f0b1eaf050baf0efea
 product_commit: 5f817f0143368c98619011f0b1eaf050baf0efea
-docs_commit: pending
+docs_commit: 2969534d66d0cc341f3022fae62aa170873c6966
 audited_product_commit: pending
-sync_status: docs_pending
+sync_status: synced
 next_action: 等待后续开发或审计引用本调研结果
 last_user_visible_change: 新增一份可按编号定位的核心运行链路与项目数据源调研记录
 ---
@@ -51,7 +51,7 @@ last_user_visible_change: 新增一份可按编号定位的核心运行链路与
 
 ## 当前状态
 
-调研结果已保存，项目管理索引已登记，等待文档提交号回写。
+调研结果已保存，项目管理索引已登记，文档提交号已回写。
 
 ## 当前证据
 
@@ -63,4 +63,3 @@ last_user_visible_change: 新增一份可按编号定位的核心运行链路与
 - web-ui/src/features/execution/hooks/useCodexExecution.ts
 - windows/tests/execution-tracker.test.mjs
 - windows/tests/realtime-hub.test.mjs
-
