@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleDollarSign, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import type { FushengUsageSnapshot } from "../model/types";
 import styles from "./UsageSummaryControl.module.css";
 
@@ -34,7 +34,7 @@ const formatUpdatedAt = (value: string) => {
 
 const compactAmount = (value: number | null) => value === null ? "--" : `$${value.toFixed(2)}`;
 const preciseAmount = (value: number) => `$${value.toFixed(6)}`;
-const formatRatio = (value: number | null) => value === null ? "--" : `${value}×`;
+const formatRatio = (value: number | null) => value === null ? "--" : `${value.toFixed(2)}×`;
 const formatCount = (value: number) => new Intl.NumberFormat("en-US").format(value);
 
 export function UsageSummaryControl({ snapshot, loading, error, onRefresh }: UsageSummaryControlProps) {
@@ -64,6 +64,12 @@ export function UsageSummaryControl({ snapshot, loading, error, onRefresh }: Usa
   const featuredRatio = snapshot?.featuredGroup.ratio ?? null;
   const groupEntries = Object.entries(snapshot?.groupRatios || {}).sort(([left], [right]) => left.localeCompare(right, "zh-CN"));
 
+  const toggleDetails = () => {
+    const nextOpen = !open;
+    setOpen(nextOpen);
+    if (nextOpen && !snapshot && !loading) onRefresh();
+  };
+
   return (
     <div className={styles.root} ref={rootRef}>
       <button
@@ -71,14 +77,22 @@ export function UsageSummaryControl({ snapshot, loading, error, onRefresh }: Usa
         type="button"
         aria-expanded={open}
         aria-haspopup="dialog"
-        title="查看浮生云算用量"
-        onClick={() => setOpen((current) => !current)}
+        title="查看今日用量和分组倍率"
+        onClick={toggleDetails}
       >
-        <CircleDollarSign aria-hidden="true" />
-        <span className={styles.desktopSummary}>
-          GPT {formatRatio(featuredRatio)} · 今日 {compactAmount(currentTodayAmount)} · {updatedAt}
+        <span className={styles.summaryValues}>
+          <span className={styles.metric}>
+            <span className={styles.metricLabel}>今日</span>
+            <strong>{compactAmount(currentTodayAmount)}</strong>
+          </span>
+          <span className={styles.divider} aria-hidden="true" />
+          <span className={styles.metric}>
+            <span className={`${styles.metricLabel} ${styles.desktopGroupLabel}`}>gpt 易燃易爆炸</span>
+            <span className={`${styles.metricLabel} ${styles.compactGroupLabel}`}>倍率</span>
+            <strong>{formatRatio(featuredRatio)}</strong>
+          </span>
         </span>
-        <span className={styles.mobileSummary}>今日 {compactAmount(currentTodayAmount)}</span>
+        {loading ? <span className={styles.loadingText}>更新中</span> : null}
       </button>
 
       {open ? (
@@ -113,7 +127,7 @@ export function UsageSummaryControl({ snapshot, loading, error, onRefresh }: Usa
                 ))}
               </div>
             </>
-          ) : <p className={styles.empty}>等待下一次 Codex 回复完成后更新。</p>}
+          ) : <p className={styles.empty}>{loading ? "正在读取真实用量..." : "回复完成后自动更新，也可以点击右上角刷新。"}</p>}
           {error ? <p className={styles.error}>{error}</p> : null}
         </section>
       ) : null}

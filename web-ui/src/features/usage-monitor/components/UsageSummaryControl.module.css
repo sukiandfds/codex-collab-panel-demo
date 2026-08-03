@@ -1,23 +1,28 @@
-.root { position: relative; flex: 0 0 auto; }
+.root { position: relative; min-width: 0; flex: 0 1 auto; }
 
 .summaryButton {
   display: inline-flex;
-  height: 32px;
-  max-width: 330px;
+  height: 18px;
+  max-width: 280px;
+  min-width: 0;
   align-items: center;
-  gap: 6px;
-  padding: 0 9px;
-  border: 1px solid var(--color-border);
-  border-radius: 7px;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
   background: transparent;
   color: var(--color-text-secondary);
   font-size: 11px;
   white-space: nowrap;
 }
 
-.summaryButton svg { width: 15px; height: 15px; flex: 0 0 15px; stroke-width: 1.8; }
-.desktopSummary { overflow: hidden; text-overflow: ellipsis; }
-.mobileSummary { display: none; }
+.summaryValues,
+.metric { display: inline-flex; min-width: 0; align-items: baseline; gap: 4px; }
+.metricLabel { color: var(--color-text-muted); }
+.metric strong { color: var(--color-text); font-variant-numeric: tabular-nums; font-weight: 600; }
+.divider { width: 1px; height: 12px; flex: 0 0 1px; background: var(--color-border-strong); }
+.loadingText { color: var(--color-text-muted); }
+.compactGroupLabel { display: none; }
 
 .popover {
   position: absolute;
@@ -69,14 +74,20 @@
 .error { margin: 12px 0 0; color: var(--color-danger, #e36b6b); font-size: 11px; }
 
 @media (hover: hover) {
-  .summaryButton:hover,
+  .summaryButton:hover { color: var(--color-text); }
   .refreshButton:hover:not(:disabled) { background: var(--color-surface-hover); color: var(--color-text); }
 }
 
+@media (max-width: 1100px) {
+  .desktopGroupLabel { display: none; }
+  .compactGroupLabel { display: inline; }
+}
+
 @media (max-width: 760px) {
-  .summaryButton { max-width: 92px; padding: 0 7px; }
-  .desktopSummary { display: none; }
-  .mobileSummary { display: inline; overflow: hidden; text-overflow: ellipsis; }
+  .summaryButton { max-width: 142px; }
+  .loadingText { display: none; }
+  .summaryValues { gap: 5px; overflow: hidden; }
+  .metric { flex: 0 0 auto; }
   .popover {
     position: fixed;
     top: calc(env(safe-area-inset-top) + var(--topbar-height) + 8px);
@@ -88,9 +99,13 @@
 }
 
 @media (max-width: 420px) {
-  .summaryButton { max-width: 76px; }
-  .summaryButton svg { display: none; }
+  .summaryButton { max-width: 134px; }
   .metrics { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 360px) {
+  .summaryButton { max-width: 116px; }
+  .compactGroupLabel { display: none; }
 }
 
 @keyframes usage-spin { to { transform: rotate(360deg); } }

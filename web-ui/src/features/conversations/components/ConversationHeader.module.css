@@ -1,12 +1,14 @@
-.topbar { display: flex; align-items: center; gap: 9px; min-width: 0; height: var(--topbar-height); padding: 0 12px 0 15px; border-bottom: 1px solid var(--color-border); background: var(--color-bg); }
+.header { display: grid; grid-template-rows: var(--topbar-height) 28px; min-width: 0; height: 78px; border-bottom: 1px solid var(--color-border); background: var(--color-bg); }
+.topbar { display: flex; align-items: center; gap: 9px; min-width: 0; height: var(--topbar-height); padding: 0 12px 0 15px; }
 .titleIcon { width: 17px; height: 17px; flex: 0 0 17px; color: var(--color-text-secondary); stroke-width: 1.8; }
 .heading { display: grid; min-width: 0; overflow: hidden; gap: 1px; }
 .title,
 .meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .title { min-width: 0; margin: 0; color: var(--color-text); font-size: 14px; font-weight: 600; }
-.metaRow { display: flex; min-width: 0; align-items: center; gap: 8px; }
 .meta { flex: 0 1 auto; color: var(--color-text-muted); font-size: 11px; }
 .spacer { flex: 1; }
+.statusbar { display: flex; min-width: 0; height: 28px; align-items: center; gap: 7px; overflow: hidden; padding: 0 13px 0 41px; color: var(--color-text-muted); }
+.statusDivider { flex: 0 0 auto; color: var(--color-text-muted); font-size: 11px; }
 .iconButton { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 32px; border: 0; border-radius: 8px; background: transparent; color: var(--color-text-secondary); text-decoration: none; }
 .iconButton svg { width: 16px; height: 16px; stroke-width: 1.8; }
 .mobileOnly { display: none; }
@@ -17,6 +19,7 @@
 
 @media (max-width: 760px) {
   .topbar { position: relative; gap: 7px; padding-right: 112px; }
+  .statusbar { padding: 0 12px 0 54px; }
   .mobileOnly { display: grid; }
   .titleIcon { display: none; }
   .meta { display: none; }
