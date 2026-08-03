@@ -48,3 +48,29 @@
 - 不把 UI 重构、群聊扩展、UAC 处理等无关事项混入当前补丁。
 - 不覆盖用户已有未提交改动。
 - 删除分支、worktree 或重要文件前，先确认内容已经迁移并可恢复。
+
+## 7. 文档命名规则
+
+新文档统一使用主题、类型和日期命名：
+
+```text
+docs/research/<主题>_RESEARCH_YYYY-MM-DD.md
+docs/research/<主题>_AUDIT_YYYY-MM-DD.md
+docs/records/<主题>_DEVLOG_YYYY-MM-DD.md
+docs/records/<主题>_INCIDENT_YYYY-MM-DD.md
+```
+
+命名要求：
+
+- `<主题>` 使用简短、稳定、可检索的英文大写单词和下划线。
+- 日期使用 `YYYY-MM-DD`，例如 `2026-08-03`。
+- 文件头必须记录 `document_type`、`title`、`date`、`product_commit` 和 `status`。
+- 研究、审计和开发记录必须绑定产品开发分支的完整 commit SHA。
+- 同一主题的新版本使用新日期文件，不覆盖历史结果。
+
+## 8. 项目管理同步规则
+
+- 有独立任务编号的需求、研究或事故，在 `docs/project-management/items/<ITEM-ID>/` 建立条目。
+- `item.md` 保存当前状态，`updates.md` 只追加里程碑，`process.md` 只记录该条目的过程问题。
+- 项目管理条目的 `source` 必须指向对应的需求、研究或记录文件。
+- 项目管理页面读取条目文件，不根据分支名称或聊天内容推断状态。

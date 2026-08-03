@@ -36,6 +36,15 @@ project-management/
 `INDEX.md` 只负责定位和排序，不复制条目的长内容。条目的当前字段由 `item.md` 管理，历史变更由 `updates.md` 追加记录。
 `process.md` 只记录该条目独有的弯路、阻塞、决策和效率复盘；没有独立过程记录的条目不创建空文件。
 
+研究、审计、开发和事故正文不放入条目目录，统一放在项目根目录的 `docs/` 分类目录中；条目通过 `source` 字段关联正文文件。
+
+当前分类：
+
+- `docs/requirements/`：需求和功能说明
+- `docs/research/`：研究和审计结果
+- `docs/records/`：开发日志、验证记录和事故复盘
+- `docs/project-management/`：条目、状态和流程数据
+
 ## 数据原则
 
 - Markdown + YAML frontmatter 是人工和 AI 的维护源。
