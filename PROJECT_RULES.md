@@ -37,6 +37,14 @@
 - 不覆盖用户已有未提交改动。
 - 删除分支、worktree 或重要文件前，先确认内容已迁移并可恢复。
 
+### 4.1 GitHub 分支同步
+
+- 开始拉取前先运行 `git status --short --branch`，确认工作区状态；不得用 `reset`、强制切换或覆盖操作隐藏用户改动。
+- 远程分支同步使用 `git fetch origin <branch>`；已有本地分支切换后用 `git merge --ff-only origin/<branch>`，没有本地分支则用 `git switch --track origin/<branch>`。
+- 同步后核对 `git rev-parse HEAD`、`git rev-parse origin/<branch>` 和 `git log -1`，确认本地确实落在目标提交后再开始开发。
+- Git 网络失败时只做一次有边界的重试；可用官方 `gh api` 或 `git ls-remote`核对远程 SHA，但 API 能看到提交不等于 Git 对象已拉到本地，不得把“已查到”报告成“已拉取”。
+- 归档下载只能作为临时内容检查或明确授权的回退方案，不能直接覆盖 `.git` 或把非 Git 工作树冒充为已同步分支。
+
 ## 5. 本项目的轻量归档边界
 
 - 本项目使用 `FEAT-*`、`BUG-*` 和 `RESEARCH-*` 关联开发、问题和研究；普通闲聊不自动创建条目。
