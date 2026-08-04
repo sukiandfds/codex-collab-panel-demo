@@ -178,8 +178,17 @@ export const messageFromItem = (item, registerMedia) => {
   const text = visibleText(blocks);
   if (role === "user" && !isUsefulUserMessage(text, blocks)) return null;
   if (!blocks.length) return null;
-  const idSource = item.id || payload?.id || `${role}:${JSON.stringify(blocks)}`;
-  return { id: blockId("message", idSource), role, text, blocks };
+  const metadata = payload?.internal_chat_message_metadata_passthrough || {};
+  const itemId = item.id || payload?.id || payload?.client_id || "";
+  const idSource = itemId || `${role}:${JSON.stringify(blocks)}`;
+  return {
+    id: blockId("message", idSource),
+    role,
+    text,
+    blocks,
+    ...(itemId ? { itemId } : {}),
+    ...(metadata.turn_id || item.turnId ? { turnId: metadata.turn_id || item.turnId } : {}),
+  };
 };
 
 export const previewText = (value, limit = 180) => cleanText(value).replace(/\s+/g, " ").slice(0, limit);

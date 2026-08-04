@@ -1,26 +1,25 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
   min-height: 24px;
-  margin-top: 5px;
   color: var(--color-text-muted);
 }
 
 .button {
   display: grid;
-  width: 25px;
-  height: 25px;
+  width: 24px;
+  height: 24px;
   place-items: center;
   border: 0;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   cursor: pointer;
 }
 
 .button:hover:not(:disabled) {
-  background: var(--color-surface-hover);
+  background: rgba(255, 255, 255, .06);
   color: var(--color-text);
 }
 
@@ -30,7 +29,7 @@
 }
 
 .button:disabled { cursor: default; opacity: .55; }
-.button svg { width: 14px; height: 14px; stroke-width: 1.8; }
+.button svg { width: 17px; height: 17px; stroke-width: 1.7; }
 
 .spinning { animation: message-action-spin .9s linear infinite; }
 

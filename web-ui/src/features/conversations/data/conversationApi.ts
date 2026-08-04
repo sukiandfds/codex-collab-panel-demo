@@ -1,4 +1,4 @@
-import type { ProjectInfo, SessionDetail, SessionSummary } from "../model/types";
+import type { ProjectInfo, SessionResponse, SessionSummary } from "../model/types";
 import { fetchJson, postJson } from "../../../shared/api/http";
 
 const PAGE_SIZE = 60;
@@ -36,10 +36,16 @@ export const conversationApi = {
   }>("/api/session/fork", { threadId, lastTurnId }, signal),
   archive: (threadId: string, signal?: AbortSignal) => postJson<{ threadId: string; archived: boolean }>("/api/session/archive", { threadId }, signal),
   unarchive: (threadId: string, signal?: AbortSignal) => postJson<SessionSummary>("/api/session/unarchive", { threadId }, signal),
-  session: (threadId: string, before?: number, signal?: AbortSignal) => {
+  session: (threadId: string, { before, cursor, contentVersion }: {
+    before?: number;
+    cursor?: string;
+    contentVersion?: number;
+  } = {}, signal?: AbortSignal) => {
     const beforeQuery = before === undefined ? "" : `&before=${before}`;
-    return fetchConversationJson<SessionDetail>(
-      `/api/session?threadId=${encodeURIComponent(threadId)}&limit=${PAGE_SIZE}${beforeQuery}`,
+    const cursorQuery = cursor === undefined ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+    const contentVersionQuery = contentVersion === undefined ? "" : `&contentVersion=${contentVersion}`;
+    return fetchConversationJson<SessionResponse>(
+      `/api/session?threadId=${encodeURIComponent(threadId)}&limit=${PAGE_SIZE}${beforeQuery}${cursorQuery}${contentVersionQuery}`,
       signal,
     );
   },

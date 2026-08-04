@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { uploadAttachment } from "../data/attachmentApi";
+import { prepareAttachmentForUpload, uploadAttachment } from "../data/attachmentApi";
 import type { MediaFile } from "../../../shared/model/media";
 
 export interface DraftAttachment {
@@ -86,7 +86,8 @@ export function useAttachmentDraft() {
     const operation = Promise.all(attachmentsRef.current.map(async (attachment) => {
         const uploaded = uploadedRef.current.get(attachment.id);
         if (uploaded) return uploaded;
-        const result = await uploadAttachment(attachment.file, controller.signal);
+        const prepared = await prepareAttachmentForUpload(attachment.file, controller.signal);
+        const result = await uploadAttachment(prepared, controller.signal);
         uploadedRef.current.set(attachment.id, result);
         return result;
       })).catch((reason) => {

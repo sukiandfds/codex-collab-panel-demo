@@ -1,8 +1,27 @@
 import path from "node:path";
-import { messageFromThreadItem, previewText } from "./content-blocks.mjs";
+import { previewText } from "./content-blocks.mjs";
 import { createAppServerClient } from "./app-server-client.mjs";
+import { messagesFromTurns, readRecentThreadPage } from "./codex-thread-history.mjs";
 
 const sourceFromThread = (thread) => thread.source === "cli" && thread.cliVersion === "0.122.0" ? "happy" : "codex";
+
+const isoFromUnixSeconds = (value) => {
+  if (value === null || value === undefined) return "";
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds)) return "";
+  const date = new Date(seconds * 1000);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : "";
+};
+
+const latestIsoFromEpochMilliseconds = (values, fallback = "") => {
+  const latest = values.filter(Number.isFinite).reduce(
+    (current, value) => Math.max(current, value),
+    Number.NEGATIVE_INFINITY,
+  );
+  if (!Number.isFinite(latest)) return fallback;
+  const date = new Date(latest);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : fallback;
+};
 
 export const inputFromAttachments = (text, attachments = []) => {
   const input = [];
@@ -36,11 +55,31 @@ export const createAppServerConversationStore = ({
     const threadId = params.threadId;
     if (threadId) {
       const current = activeRuns.get(threadId) || {};
-      if (method === "turn/completed" || (method === "thread/status/changed" && params.status?.type === "idle")) {
-        activeRuns.delete(threadId);
-      } else if (method === "turn/started" || activeRuns.has(threadId)) {
+      const eventTurnId = String(params.turnId || params.turn?.id || params.item?.turnId || params.item?.turn?.id || "");
+      const hasConflictingTurn = Boolean(current.turnId && eventTurnId && current.turnId !== eventTurnId);
+      if (method === "turn/started") {
         activeRuns.set(threadId, {
           ...current,
+          turnId: eventTurnId || current.turnId || "",
+          lastEventAt: Date.now(),
+          nextProbeAt: 0,
+          finalAnswerCompleted: false,
+        });
+      } else if (hasConflictingTurn) {
+        // Keep the current run monitor alive; the tracker handles the same
+        // stale protocol event for the browser-facing state.
+      } else if (method === "turn/completed") {
+        // A terminal notification without a turn id cannot prove that the
+        // currently monitored turn is the one that completed.
+        if (!current.turnId || eventTurnId === current.turnId) activeRuns.delete(threadId);
+      } else if (method === "thread/status/changed" && params.status?.type === "idle") {
+        // An idle notification has no turn id. Keep a known run until its
+        // turn/completed event or an authoritative probe confirms the end.
+        if (!current.turnId) activeRuns.delete(threadId);
+      } else if (activeRuns.has(threadId)) {
+        activeRuns.set(threadId, {
+          ...current,
+          turnId: current.turnId || eventTurnId,
           lastEventAt: Date.now(),
           nextProbeAt: 0,
           finalAnswerCompleted: method === "turn/started"
@@ -133,7 +172,7 @@ export const createAppServerConversationStore = ({
     threadId: thread.id,
     source: sourceFromThread(thread),
     title: thread.name?.trim() || "未命名会话",
-    updatedAt: new Date(thread.updatedAt * 1000).toISOString(),
+    updatedAt: isoFromUnixSeconds(thread.updatedAt),
     messageCount: null,
     latestUser: "",
     latestAssistant: "",
@@ -179,37 +218,86 @@ export const createAppServerConversationStore = ({
     }));
   };
 
-  const findSession = async (threadId, source = "all", { before, limit } = {}) => {
+  const detailFromMessages = (thread, messages, {
+    messageCount = messages.length,
+    hasMore = false,
+    nextBefore = null,
+    nextCursor = null,
+    preferMessageUpdatedAt = false,
+  } = {}) => {
+    const latestUser = messages.findLast((item) => item.role === "user")?.text || "";
+    const latestAssistant = messages.findLast((item) => item.role === "assistant")?.text || "";
+    const summary = summaryFromThread(thread);
+    const messageTimes = messages
+      .map((message) => Date.parse(message.createdAt || ""))
+      .filter(Number.isFinite);
+    const updatedAt = preferMessageUpdatedAt && messageTimes.length
+      ? latestIsoFromEpochMilliseconds([Date.parse(summary.updatedAt), ...messageTimes], summary.updatedAt)
+      : summary.updatedAt;
+    return {
+      ...summary,
+      updatedAt,
+      messageCount,
+      latestUser: previewText(latestUser, 260),
+      latestAssistant: previewText(latestAssistant, 260),
+      messages,
+      hasMore,
+      nextBefore,
+      nextCursor,
+    };
+  };
+
+  const readThreadMetadata = async (threadId) => {
+    const cached = threadCache.get(threadId);
+    if (cached) return cached;
+    const result = await client.request("thread/read", { threadId, includeTurns: false });
+    if (!result?.thread) throw new Error("Codex did not return the requested thread");
+    threadCache.set(result.thread.id, result.thread);
+    return result.thread;
+  };
+
+  const findSession = async (threadId, source = "all", { before, cursor, limit } = {}) => {
     const cached = threadCache.get(threadId);
     if (cached && source !== "all" && sourceFromThread(cached) !== source) return null;
+
+    // A bounded native page avoids expanding the complete rollout history for the common Web request.
+    // Numeric `before` remains the legacy JSONL/app-server fallback contract.
+    if (cursor !== undefined || (before === undefined && Number.isSafeInteger(limit) && limit > 0)) {
+      try {
+        const thread = await readThreadMetadata(threadId);
+        if (source !== "all" && sourceFromThread(thread) !== source) return null;
+        const page = await readRecentThreadPage({
+          client,
+          threadId,
+          limit,
+          cursor,
+          registerMedia,
+        });
+        return detailFromMessages(thread, page.messages, {
+          messageCount: null,
+          hasMore: Boolean(page.nextCursor),
+          nextCursor: page.nextCursor,
+          preferMessageUpdatedAt: before === undefined && cursor === undefined,
+        });
+      } catch (error) {
+        if (cursor !== undefined) throw error;
+        console.warn(`[conversation-store] native paginated history unavailable, using thread/read: ${error.message}`);
+      }
+    }
+
     const result = await client.request("thread/read", { threadId, includeTurns: true });
     const thread = result.thread;
     if (source !== "all" && sourceFromThread(thread) !== source) return null;
     threadCache.set(thread.id, thread);
-    const messages = thread.turns
-      .flatMap((turn) => turn.items.map((item) => {
-        const message = messageFromThreadItem(item, registerMedia);
-        if (!message) return null;
-        const timestamp = message.role === "user" ? turn.startedAt : turn.completedAt;
-        const withTurn = turn.id ? { ...message, turnId: turn.id } : message;
-        return Number.isFinite(timestamp)
-          ? { ...withTurn, createdAt: new Date(timestamp * 1000).toISOString() }
-          : withTurn;
-      }))
-      .filter(Boolean);
-    const latestUser = messages.findLast((item) => item.role === "user")?.text || "";
-    const latestAssistant = messages.findLast((item) => item.role === "assistant")?.text || "";
+    const messages = messagesFromTurns(thread.turns, registerMedia);
     const end = Math.min(Number.isSafeInteger(before) ? before : messages.length, messages.length);
     const start = limit ? Math.max(0, end - limit) : 0;
-    return {
-      ...summaryFromThread(thread),
+    return detailFromMessages(thread, messages.slice(start, end), {
       messageCount: messages.length,
-      latestUser: previewText(latestUser, 260),
-      latestAssistant: previewText(latestAssistant, 260),
-      messages: messages.slice(start, end),
       hasMore: start > 0,
       nextBefore: start || null,
-    };
+      preferMessageUpdatedAt: before === undefined,
+    });
   };
 
   const getThread = async (threadId) => threadCache.get(threadId)

@@ -27,10 +27,15 @@ export const readJson = async (request, limit = 64 * 1024) => {
 export const paginationFrom = (url) => {
   const limitValue = url.searchParams.get("limit");
   const beforeValue = url.searchParams.get("before");
+  const cursorValue = url.searchParams.get("cursor");
+  const contentVersionValue = url.searchParams.get("contentVersion");
   const limit = limitValue === null ? NaN : Number(limitValue);
   const before = beforeValue === null ? NaN : Number(beforeValue);
+  const contentVersion = contentVersionValue === null ? NaN : Number(contentVersionValue);
   return {
     limit: Number.isSafeInteger(limit) && limit > 0 ? Math.min(limit, 200) : undefined,
     before: Number.isSafeInteger(before) && before >= 0 ? before : undefined,
+    cursor: cursorValue && cursorValue.length <= 2048 ? cursorValue : undefined,
+    contentVersion: Number.isSafeInteger(contentVersion) && contentVersion >= 0 ? contentVersion : undefined,
   };
 };

@@ -5,7 +5,7 @@ import { useContextManagement } from "../../context-management/hooks/useContextM
 import { useCodexExecution } from "../../execution/hooks/useCodexExecution";
 import type { ProjectEvent } from "../../execution/model/types";
 import { useModels } from "../../models/hooks/useModels";
-import { writeConversationSnapshot } from "../data/conversationSnapshot";
+import { readConversationSnapshotAsync, writeConversationSnapshot } from "../data/conversationSnapshot";
 import { useConversationEvents } from "../realtime/useConversationEvents";
 import { createOptimisticMessage } from "../state/optimisticMessage";
 import { readInitialConversationState } from "../state/initialConversation";
@@ -17,12 +17,17 @@ export function useProjectConversations() {
   const [initial] = useState(readInitialConversationState);
   const selection = useConversationSession(initial);
 
-  const onMessageAccepted = useCallback(() => {
-    if (selection.selectedIdRef.current) {
-      void selection.loadSession(selection.selectedIdRef.current, { quiet: true });
-    }
-  }, [selection.loadSession, selection.selectedIdRef]);
-  const execution = useCodexExecution(selection.selectedId, onMessageAccepted);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("archived") === "1") return;
+    let cancelled = false;
+    void readConversationSnapshotAsync().then((snapshot) => {
+      if (cancelled || !snapshot?.session) return;
+      selection.hydrateSnapshot(snapshot.session);
+    });
+    return () => { cancelled = true; };
+  }, [initial, selection.hydrateSnapshot]);
+
+  const execution = useCodexExecution(selection.selectedId);
   const [forkingMessageId, setForkingMessageId] = useState("");
   const contextManagement = useContextManagement(selection.selectedId);
   const onModelChanged = useCallback(() => {
@@ -82,24 +87,21 @@ export function useProjectConversations() {
     }
   }, [catalog.forkSession, execution.status.active, selection.selectedIdRef, selection.session?.archived]);
 
-  const onSessionsChanged = useCallback((threadId?: string, clearStreaming = true) => {
-    if (threadId) selection.invalidate(threadId);
+  const onSessionsChanged = useCallback((threadId?: string) => {
     const selected = selection.selectedIdRef.current;
     if (selected && (!threadId || threadId === selected)) {
-      void selection.loadSession(selected, { quiet: true }).then((loaded) => {
-        if (loaded && clearStreaming) execution.clearStreaming();
-      });
+      void selection.loadSession(selected, { quiet: true });
     }
     void catalog.refreshSessions(false, threadId, false);
-  }, [catalog.refreshSessions, execution.clearStreaming, selection.invalidate, selection.loadSession, selection.selectedIdRef]);
+  }, [catalog.refreshSessions, selection.loadSession, selection.selectedIdRef]);
 
   const handleEvent = useCallback((event: ProjectEvent) => {
     execution.handleEvent(event);
     if (event.type === "context_status") contextManagement.handleEvent(event);
   }, [contextManagement.handleEvent, execution.handleEvent]);
   const recoverRealtime = useCallback((_reason: RealtimeRecoveryReason) => {
-    void execution.refreshStatus(undefined, true).then((latest) => {
-      onSessionsChanged(selection.selectedIdRef.current || undefined, latest ? !latest.active : false);
+    void execution.refreshStatus(undefined, true).then(() => {
+      onSessionsChanged(selection.selectedIdRef.current || undefined);
     });
   }, [execution.refreshStatus, onSessionsChanged, selection.selectedIdRef]);
   const connected = useConversationEvents(
@@ -110,10 +112,6 @@ export function useProjectConversations() {
     execution.status.active,
     execution.status.phase === "submitted",
   );
-
-  useEffect(() => {
-    if (connected && selection.selectedId) void execution.refreshStatus(undefined, true);
-  }, [connected, execution.refreshStatus, selection.selectedId]);
 
   return {
     project: catalog.project,

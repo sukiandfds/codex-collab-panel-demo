@@ -18,9 +18,9 @@ export const executionApi = {
     `/api/execution-status?threadId=${encodeURIComponent(threadId)}${reconcile ? "&reconcile=1" : ""}`,
     signal,
   ),
-  sendMessage: (threadId: string, text: string, attachmentIds: string[] = [], signal?: AbortSignal) => postJson<SendMessageResult>(
+  sendMessage: (threadId: string, text: string, attachmentIds: string[] = [], submissionId = "", signal?: AbortSignal) => postJson<SendMessageResult>(
     "/api/session/message",
-    { threadId, text, attachmentIds },
+    { threadId, text, attachmentIds, submissionId },
     signal,
   ),
   interrupt: (threadId: string, signal?: AbortSignal) => postJson<InterruptResult>(

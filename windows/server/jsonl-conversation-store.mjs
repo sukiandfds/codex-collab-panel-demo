@@ -169,12 +169,13 @@ export const createJsonlConversationStore = ({ sessionRoot, projectRoot, registe
       }
 
       const previous = state.messages.at(-1);
-      if (previous?.role === message.role && previous.text === message.text) {
+      const logicalKey = `${message.role}:${message.text}:${item.timestamp || ""}`;
+      if (previous?.role === message.role && previous.text === message.text && state.lastKey.startsWith(`${logicalKey}:`)) {
         previous.blocks = mergeBlocks(previous.blocks, message.blocks);
-        state.lastKey = `${previous.role}:${previous.text}:${previous.blocks.map(blockKey).join("|")}`;
+        state.lastKey = `${logicalKey}:${previous.blocks.map(blockKey).join("|")}`;
         return;
       }
-      const key = `${message.role}:${message.text}:${message.blocks.map((block) => `${block.type}:${block.source || block.text || ""}`).join("|")}`;
+      const key = `${logicalKey}:${message.blocks.map((block) => `${block.type}:${block.source || block.text || ""}`).join("|")}`;
       if (key !== state.lastKey) state.messages.push(message);
       state.lastKey = key;
     } catch {}

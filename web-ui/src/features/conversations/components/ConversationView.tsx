@@ -20,6 +20,14 @@ const messageTime = (value?: string) => {
     : `${date.getFullYear()}-${monthDayTime}`;
 };
 
+const finalMessageContainsStream = (message: SessionMessage, streamingText: string) => {
+  const persistedText = message.text.trim();
+  const bufferedText = streamingText.trim();
+  if (!persistedText && !message.blocks?.length) return false;
+  if (!bufferedText) return true;
+  return persistedText.length >= bufferedText.length && persistedText.includes(bufferedText);
+};
+
 function Message({
   message,
   streaming = false,
@@ -39,8 +47,12 @@ function Message({
       {formattedTime ? <time className={styles.timestamp} dateTime={message.createdAt}>{formattedTime}</time> : null}
       <div className={styles.body}>
         {streaming ? <div className={styles.streamingText}>{message.text}<i className={styles.cursor} /></div> : <ContentRenderer message={message} />}
-        {!streaming ? <MessageActions text={message.text} forkable={forkable} forking={forking} onFork={onFork} /> : null}
       </div>
+      {!streaming ? (
+        <div className={styles.actionRow}>
+          <MessageActions text={message.text} forkable={forkable} forking={forking} onFork={onFork} />
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -88,7 +100,15 @@ export function ConversationView({
     || executionStatus.activities.length > 0
     || (completedExecution && Boolean(executionStatus.startedAt))
   );
-  const visibleStreamingText = executionMatchesSession ? streamingText : "";
+  const finalMessageLoaded = executionMatchesSession
+    && Boolean(executionStatus.turnId)
+    && messages.some((message) => message.role === "assistant"
+      && message.turnId === executionStatus.turnId
+      && (!executionStatus.streamingItemId
+        || message.itemId === executionStatus.streamingItemId
+        || (!message.itemId && message.text === streamingText))
+      && finalMessageContainsStream(message, streamingText));
+  const visibleStreamingText = executionMatchesSession && !finalMessageLoaded ? streamingText : "";
   const executionIndex = !executionStatus.active && messages.at(-1)?.role === "assistant"
     ? messages.length - 1
     : messages.length;
@@ -104,6 +124,8 @@ export function ConversationView({
         role: "assistant" as const,
         text: visibleStreamingText,
         createdAt: executionStatus.startedAt || undefined,
+        turnId: executionStatus.turnId || undefined,
+        itemId: executionStatus.streamingItemId || undefined,
       },
       streaming: true,
     }] : []),

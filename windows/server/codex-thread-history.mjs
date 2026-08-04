@@ -1,0 +1,94 @@
+import { messageFromThreadItem } from "./content-blocks.mjs";
+
+const cursorValue = (value) => typeof value === "string" && value ? value : null;
+
+// With descending history, nextCursor advances toward older entries. The
+// backwards cursor includes the current anchor and would replay this page.
+const olderCursorFrom = (result) => cursorValue(result?.nextCursor);
+
+const itemListMethods = ["thread/items/list", "thread/turns/items/list"];
+const itemListMethodByClient = new WeakMap();
+const unsupportedMethodPattern = /(?:method\s+not\s+found|unknown\s+method|unsupported\s+method|not\s+implemented|unrecognized\s+method)/iu;
+
+const turnPageLimit = (messageLimit) => {
+  const safeLimit = Number.isSafeInteger(messageLimit) && messageLimit > 0 ? messageLimit : 60;
+  return Math.min(100, Math.max(20, Math.ceil(safeLimit / 2) + 4));
+};
+
+const messagesFromTurn = (turn, registerMedia) => (Array.isArray(turn?.items) ? turn.items : [])
+  .map((item) => {
+    const message = messageFromThreadItem(item, registerMedia);
+    if (!message) return null;
+    const timestamp = message.role === "user" ? turn.startedAt : turn.completedAt;
+    const withTurn = turn.id
+      ? { ...message, turnId: turn.id, itemId: item.id || message.itemId }
+      : { ...message, itemId: item.id || message.itemId };
+    return Number.isFinite(timestamp)
+      ? { ...withTurn, createdAt: new Date(timestamp * 1000).toISOString() }
+      : withTurn;
+  })
+  .filter(Boolean);
+
+const messagesFromItems = (entries, registerMedia) => (Array.isArray(entries) ? entries : [])
+  .map((entry) => {
+    const item = entry?.item || entry?.threadItem || entry;
+    const message = messageFromThreadItem(item, registerMedia);
+    if (!message) return null;
+    const turnId = item?.turnId || entry?.turnId || entry?.turn?.id || "";
+    return turnId
+      ? { ...message, turnId, itemId: item.id || message.itemId }
+      : { ...message, itemId: item.id || message.itemId };
+  })
+  .filter(Boolean);
+
+export const messagesFromTurns = (turns, registerMedia) => (Array.isArray(turns) ? turns : [])
+  .flatMap((turn) => messagesFromTurn(turn, registerMedia));
+
+const readItemPage = async ({ client, threadId, limit, cursor, registerMedia }) => {
+  const rememberedMethod = itemListMethodByClient.get(client);
+  const methods = rememberedMethod ? [rememberedMethod] : itemListMethods;
+  let lastError;
+  for (const method of methods) {
+    try {
+      const result = await client.request(method, {
+        threadId,
+        cursor: cursor || null,
+        limit: Math.min(100, Math.max(20, Number.isSafeInteger(limit) && limit > 0 ? limit : 60)),
+        sortDirection: "desc",
+      });
+      if (!Array.isArray(result?.data)) throw new Error("Codex returned an invalid paginated item response");
+      itemListMethodByClient.set(client, method);
+      return {
+        messages: messagesFromItems([...result.data].reverse(), registerMedia),
+        nextCursor: olderCursorFrom(result),
+      };
+    } catch (error) {
+      lastError = error;
+      if (rememberedMethod || !unsupportedMethodPattern.test(String(error?.message || error))) throw error;
+    }
+  }
+  throw lastError || new Error("Codex item pagination is unavailable");
+};
+
+export const readRecentThreadPage = async ({ client, threadId, limit, cursor, registerMedia }) => {
+  try {
+    const result = await client.request("thread/turns/list", {
+      threadId,
+      cursor: cursor || null,
+      limit: turnPageLimit(limit),
+      sortDirection: "desc",
+      itemsView: "full",
+    });
+    if (!Array.isArray(result?.data)) throw new Error("Codex returned an invalid paginated thread response");
+
+    // Codex returns the newest turns first for desc; the UI model remains chronological.
+    const turns = [...result.data].reverse();
+    return {
+      messages: messagesFromTurns(turns, registerMedia),
+      nextCursor: olderCursorFrom(result),
+    };
+  } catch (error) {
+    if (!unsupportedMethodPattern.test(String(error?.message || error))) throw error;
+    return readItemPage({ client, threadId, limit, cursor, registerMedia });
+  }
+};

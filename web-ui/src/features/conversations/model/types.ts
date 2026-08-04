@@ -41,6 +41,25 @@ export interface SessionSummary {
 
 export interface SessionDetail extends SessionSummary {
   messages: SessionMessage[];
+  contentVersion?: number;
   hasMore?: boolean;
   nextBefore?: number | null;
+  nextCursor?: string | null;
 }
+
+export type SessionPatch = Partial<SessionSummary> & {
+  hasMore?: boolean;
+  nextBefore?: number | null;
+  nextCursor?: string | null;
+};
+
+export interface SessionDelta {
+  threadId: string;
+  contentVersion: number;
+  unchanged: boolean;
+  upserts: SessionMessage[];
+  deletes: string[];
+  sessionPatch?: SessionPatch;
+}
+
+export type SessionResponse = SessionDetail | SessionDelta;

@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { createJsonlConversationStore } from "../server/jsonl-conversation-store.mjs";
 import { createAppServerConversationStore } from "../server/app-server-conversation-store.mjs";
 import { createConversationService } from "../server/conversation-service.mjs";
+import { createConversationVersionStore } from "../server/conversation-version-store.mjs";
 import { createMediaService } from "../server/media-service.mjs";
 import { createRealtimeHub } from "../server/realtime-hub.mjs";
 import { createExecutionTracker } from "../server/execution-tracker.mjs";
@@ -58,7 +59,14 @@ const appServerConversations = createAppServerConversationStore({
   onFailed: execution.markFailed,
   onHealthState: execution.handleHealthState,
 });
-const conversations = createConversationService({ primary: appServerConversations, fallback: jsonlConversations });
+const conversationVersions = createConversationVersionStore({
+  stateFile: path.join(projectRoot, "runtime", "conversation-versions.json"),
+});
+const conversations = createConversationService({
+  primary: appServerConversations,
+  fallback: jsonlConversations,
+  contentVersionStore: conversationVersions,
+});
 contextManagement = await createContextManagementService({
   stateFile: path.join(projectRoot, "runtime", "context-settings.json"),
   broadcast: realtime.broadcast,

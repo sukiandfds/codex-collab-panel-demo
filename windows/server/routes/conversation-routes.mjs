@@ -1,6 +1,43 @@
 import { paginationFrom, readJson, sendJson } from "../http/request-utils.mjs";
 
-export const createConversationRoutes = ({ conversations, execution, contextManagement, media }) => async (request, response, url) => {
+export const createConversationRoutes = ({ conversations, execution, contextManagement, media }) => {
+  const submissions = new Map();
+  const submissionTtlMs = 60000;
+  const maxSubmissions = 200;
+
+  const rememberSubmission = (submissionId, fingerprint, promise) => {
+    if (!submissionId) return promise;
+    const existing = submissions.get(submissionId);
+    if (existing) {
+      if (existing.fingerprint !== fingerprint) {
+        const error = new Error("submissionId was already used for a different message");
+        error.statusCode = 409;
+        throw error;
+      }
+      return existing.promise;
+    }
+    const timer = setTimeout(() => {
+      if (submissions.get(submissionId)?.promise === promise) submissions.delete(submissionId);
+    }, submissionTtlMs);
+    timer.unref?.();
+    submissions.set(submissionId, { fingerprint, promise, timer });
+    while (submissions.size > maxSubmissions) {
+      const oldestId = submissions.keys().next().value;
+      const oldest = submissions.get(oldestId);
+      clearTimeout(oldest?.timer);
+      submissions.delete(oldestId);
+    }
+    void promise.catch(() => {
+      const entry = submissions.get(submissionId);
+      if (entry?.promise === promise) {
+        clearTimeout(entry.timer);
+        submissions.delete(submissionId);
+      }
+    });
+    return promise;
+  };
+
+  return async (request, response, url) => {
   if (url.pathname === "/api/models" && request.method === "GET") {
     sendJson(response, await conversations.listModels());
     return true;
@@ -18,27 +55,54 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
       sendJson(response, { error: "message is too long" }, 413);
       return true;
     }
+    const submissionId = String(body.submissionId || "").trim().slice(0, 160);
+    const fingerprint = JSON.stringify({
+      threadId,
+      text,
+      attachmentIds: Array.isArray(body.attachmentIds) ? body.attachmentIds : [],
+    });
+    const cachedSubmission = submissionId ? submissions.get(submissionId) : null;
+    if (cachedSubmission) {
+      if (cachedSubmission.fingerprint !== fingerprint) {
+        const error = new Error("submissionId was already used for a different message");
+        error.statusCode = 409;
+        throw error;
+      }
+      const cachedResult = await cachedSubmission.promise;
+      sendJson(response, cachedResult.body, cachedResult.statusCode);
+      return true;
+    }
     const status = execution.getStatus(threadId);
     if (status.active && !status.turnId) {
       sendJson(response, { error: "Codex 正在启动当前任务，请稍后再试" }, 409);
       return true;
     }
-    let result;
-    try {
-      result = status.active
-        ? await conversations.steerMessage(threadId, status.turnId, text, attachments)
-        : await conversations.sendMessage(threadId, text, attachments);
-    } catch (error) {
-      const recovered = execution.getStatus(threadId);
-      if (status.active || !recovered.turnId || recovered.turnId === status.turnId) throw error;
-      sendJson(response, { threadId, turnId: recovered.turnId, status: "inProgress", recovered: true }, 202);
-      return true;
-    }
-    sendJson(response, {
-      threadId,
-      turnId: status.active ? status.turnId : result.turn?.id || "",
-      status: status.active ? "steered" : result.turn?.status || "inProgress",
-    }, 202);
+    const submit = (async () => {
+      let result;
+      try {
+        result = status.active
+          ? await conversations.steerMessage(threadId, status.turnId, text, attachments)
+          : await conversations.sendMessage(threadId, text, attachments);
+      } catch (error) {
+        const recovered = execution.getStatus(threadId);
+        if (status.active || !recovered.turnId || recovered.turnId === status.turnId) throw error;
+        return {
+          body: { threadId, turnId: recovered.turnId, status: "inProgress", recovered: true },
+          statusCode: 202,
+        };
+      }
+      return {
+        body: {
+          threadId,
+          turnId: status.active ? status.turnId : result.turn?.id || "",
+          status: status.active ? "steered" : result.turn?.status || "inProgress",
+        },
+        statusCode: 202,
+      };
+    })();
+    const accepted = rememberSubmission(submissionId, fingerprint, submit);
+    const responsePayload = await accepted;
+    sendJson(response, responsePayload.body, responsePayload.statusCode);
     return true;
   }
   if (url.pathname === "/api/session/model" && request.method === "POST") {
@@ -199,4 +263,5 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
     return true;
   }
   return false;
+};
 };

@@ -46,6 +46,8 @@ export interface ExecutionStatus {
   durationMs?: number | null;
   lastEventAt?: string | null;
   lastProbeAt?: string | null;
+  eventEpoch?: string;
+  eventSeq?: number;
 }
 
 export interface AssistantDeltaEvent {
@@ -54,18 +56,25 @@ export interface AssistantDeltaEvent {
   turnId: string;
   itemId: string;
   delta: string;
+  eventEpoch?: string;
+  eventSeq?: number;
 }
 
 export interface AssistantCommentaryEvent {
   type: "assistant_commentary";
   threadId: string;
+  turnId?: string;
   itemId: string;
   text: string;
+  eventEpoch?: string;
+  eventSeq?: number;
 }
 
 export interface SessionsChangedEvent {
   type: "sessions_changed";
   threadId?: string;
+  eventEpoch?: string;
+  eventSeq?: number;
 }
 
 export interface HeartbeatEvent {

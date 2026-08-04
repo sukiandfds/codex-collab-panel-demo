@@ -2,6 +2,13 @@ import type { SessionDetail, SessionSummary } from "../model/types";
 
 const storageKey = "codex-collab-conversation-snapshot-v1";
 const maxSnapshotBytes = 768 * 1024;
+const maxBootstrapBytes = 64 * 1024;
+const bootstrapMessageLimit = 8;
+const databaseName = "codex-collab-conversations";
+const databaseVersion = 1;
+const objectStoreName = "snapshots";
+const objectKey = "current";
+let indexedWriteQueue = Promise.resolve();
 
 export interface ConversationSnapshot {
   version: 1;
@@ -11,14 +18,79 @@ export interface ConversationSnapshot {
   session: SessionDetail | null;
 }
 
+const validSnapshot = (value: ConversationSnapshot | null): ConversationSnapshot | null => {
+  if (!value || value.version !== 1 || !Array.isArray(value.sessions)) return null;
+  if (value.session && value.session.threadId !== value.selectedId) return null;
+  return value;
+};
+
 export const readConversationSnapshot = (): ConversationSnapshot | null => {
   try {
-    const value = JSON.parse(window.localStorage.getItem(storageKey) || "null") as ConversationSnapshot | null;
-    if (value?.version !== 1 || !Array.isArray(value.sessions)) return null;
-    if (value.session && value.session.threadId !== value.selectedId) return null;
-    return value;
+    return validSnapshot(JSON.parse(window.localStorage.getItem(storageKey) || "null") as ConversationSnapshot | null);
   } catch {
     return null;
+  }
+};
+
+const openSnapshotDatabase = () => new Promise<IDBDatabase | null>((resolve, reject) => {
+  if (typeof window === "undefined" || !window.indexedDB) {
+    resolve(null);
+    return;
+  }
+  const request = window.indexedDB.open(databaseName, databaseVersion);
+  request.onupgradeneeded = () => {
+    const database = request.result;
+    if (!database.objectStoreNames.contains(objectStoreName)) database.createObjectStore(objectStoreName);
+  };
+  request.onsuccess = () => resolve(request.result);
+  request.onerror = () => reject(request.error || new Error("IndexedDB open failed"));
+});
+
+const readIndexedSnapshot = async (): Promise<ConversationSnapshot | null> => {
+  const database = await openSnapshotDatabase();
+  if (!database) return null;
+  try {
+    return await new Promise<ConversationSnapshot | null>((resolve, reject) => {
+      const request = database.transaction(objectStoreName, "readonly").objectStore(objectStoreName).get(objectKey);
+      request.onsuccess = () => resolve(validSnapshot(request.result as ConversationSnapshot | null));
+      request.onerror = () => reject(request.error || new Error("IndexedDB read failed"));
+    });
+  } finally {
+    database.close();
+  }
+};
+
+const writeIndexedSnapshot = async (snapshot: ConversationSnapshot) => {
+  const database = await openSnapshotDatabase();
+  if (!database) return;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(objectStoreName, "readwrite");
+      transaction.objectStore(objectStoreName).put(snapshot, objectKey);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error("IndexedDB write failed"));
+      transaction.onabort = () => reject(transaction.error || new Error("IndexedDB write aborted"));
+    });
+  } finally {
+    database.close();
+  }
+};
+
+export const readConversationSnapshotAsync = async (): Promise<ConversationSnapshot | null> => {
+  const local = readConversationSnapshot();
+  try {
+    const indexed = await readIndexedSnapshot();
+    if (!indexed) return local;
+    if (!local) return indexed;
+    const indexedAt = Date.parse(indexed.savedAt) || 0;
+    const localAt = Date.parse(local.savedAt) || 0;
+    const indexedMessageCount = indexed.session?.messages.length || 0;
+    const localMessageCount = local.session?.messages.length || 0;
+    return indexedAt > localAt || (indexedAt === localAt && indexedMessageCount >= localMessageCount)
+      ? indexed
+      : local;
+  } catch {
+    return local;
   }
 };
 
@@ -43,6 +115,29 @@ export const writeConversationSnapshot = ({ selectedId, sessions, session }: {
       snapshot.session.messages = snapshot.session.messages.slice(Math.ceil(snapshot.session.messages.length / 4));
       serialized = JSON.stringify(snapshot);
     }
-    if (serialized.length <= maxSnapshotBytes) window.localStorage.setItem(storageKey, serialized);
+    if (serialized.length <= maxSnapshotBytes) {
+      let bootstrapSession = snapshot.session
+        ? {
+          ...snapshot.session,
+          contentVersion: undefined,
+          messages: snapshot.session.messages.slice(-bootstrapMessageLimit),
+        }
+        : null;
+      let bootstrapSnapshot: ConversationSnapshot = { ...snapshot, session: bootstrapSession };
+      let bootstrapSerialized = JSON.stringify(bootstrapSnapshot);
+      while (bootstrapSerialized.length > maxBootstrapBytes && bootstrapSession && bootstrapSession.messages.length > 1) {
+        bootstrapSession = {
+          ...bootstrapSession,
+          messages: bootstrapSession.messages.slice(Math.ceil(bootstrapSession.messages.length / 2)),
+        };
+        bootstrapSnapshot = { ...snapshot, session: bootstrapSession };
+        bootstrapSerialized = JSON.stringify(bootstrapSnapshot);
+      }
+      if (bootstrapSerialized.length <= maxBootstrapBytes) window.localStorage.setItem(storageKey, bootstrapSerialized);
+      indexedWriteQueue = indexedWriteQueue
+        .catch(() => {})
+        .then(() => writeIndexedSnapshot(snapshot));
+      void indexedWriteQueue.catch(() => {});
+    }
   } catch {}
 };

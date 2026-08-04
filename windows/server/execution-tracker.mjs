@@ -1,13 +1,21 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { activityFromItem, detailFromItem, maxActivities, stateFromItem, terminalPhases } from "./execution/activity.mjs";
 
 export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
   const statuses = new Map();
   const messagePhases = new Map();
+  const itemTurns = new Map();
+  const retiredTurns = new Map();
+  const completedTurns = new Map();
   const reasoningBuffers = new Map();
   const protocolEventTimes = new Map();
+  const eventSequences = new Map();
+  const eventEpoch = randomUUID();
+  const maxRetiredTurns = 20;
+  const maxItemTurns = 500;
   let persistTimer;
   let persistChain = Promise.resolve();
 
@@ -26,7 +34,9 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
           streamingItemId: "",
           streamingText: "",
           updatedAt: new Date().toISOString(),
-        } : status);
+          eventEpoch,
+          eventSeq: 0,
+        } : { ...status, eventEpoch, eventSeq: 0 });
       }
     } catch {}
   }
@@ -53,12 +63,62 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
     persistTimer.unref?.();
   };
 
+  const itemKey = (threadId, itemId) => `${threadId}:${itemId}`;
+
+  const retireTurn = (threadId, turnId) => {
+    if (!threadId || !turnId) return;
+    const turns = retiredTurns.get(threadId) || new Set();
+    turns.add(turnId);
+    while (turns.size > maxRetiredTurns) turns.delete(turns.values().next().value);
+    retiredTurns.set(threadId, turns);
+  };
+
+  const rememberCompletedTurn = (threadId, turnId) => {
+    if (!threadId || !turnId) return;
+    const turns = completedTurns.get(threadId) || new Set();
+    turns.add(turnId);
+    while (turns.size > maxRetiredTurns) turns.delete(turns.values().next().value);
+    completedTurns.set(threadId, turns);
+  };
+
+  const rememberItemTurn = (threadId, itemId, turnId) => {
+    if (!threadId || !itemId || !turnId) return;
+    itemTurns.set(itemKey(threadId, itemId), turnId);
+    while (itemTurns.size > maxItemTurns) itemTurns.delete(itemTurns.keys().next().value);
+  };
+
+  const turnIdFor = (threadId, params = {}, itemId = "") => (
+    String(params.turnId || params.turn?.id || (itemId ? itemTurns.get(itemKey(threadId, itemId)) : "") || statuses.get(threadId)?.turnId || "")
+  );
+
+  const isRetiredTurn = (threadId, turnId) => {
+    if (!turnId) return false;
+    const currentTurnId = statuses.get(threadId)?.turnId || "";
+    return retiredTurns.get(threadId)?.has(turnId) === true
+      || Boolean(currentTurnId && currentTurnId !== turnId);
+  };
+
+  const nextEventMetadata = (threadId) => {
+    const eventSeq = (eventSequences.get(threadId) || 0) + 1;
+    eventSequences.set(threadId, eventSeq);
+    return { eventEpoch, eventSeq };
+  };
+
+  const broadcastThreadEvent = (threadId, value) => {
+    broadcast({ ...value, ...nextEventMetadata(threadId) });
+  };
+
   const publish = (threadId, next) => {
     if (!threadId) return;
     const previous = statuses.get(threadId);
     const active = next.active ?? (!terminalPhases.has(next.phase) && next.phase !== "idle");
     const now = new Date().toISOString();
-    const beginsTurn = next.phase === "submitted" || (active && !previous?.active);
+    const incomingTurnId = next.turnId || "";
+    const turnChanged = Boolean(previous?.turnId && incomingTurnId && previous.turnId !== incomingTurnId);
+    const beginsTurn = next.phase === "submitted" || (active && !previous?.active) || turnChanged;
+    if (beginsTurn && previous?.turnId && previous.turnId !== incomingTurnId) {
+      retireTurn(threadId, previous.turnId);
+    }
     let activities = beginsTurn ? [] : previous?.activities || [];
     if (next.activity) {
       const index = activities.findIndex((activity) => activity.id === next.activity.id);
@@ -83,6 +143,7 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
       durationMs: beginsTurn ? next.durationMs ?? null : next.durationMs ?? previous?.durationMs ?? null,
       lastEventAt: protocolEventTimes.get(threadId) || previous?.lastEventAt || null,
       lastProbeAt: next.lastProbeAt ?? previous?.lastProbeAt ?? null,
+      ...nextEventMetadata(threadId),
     };
     statuses.set(threadId, status);
     schedulePersist();
@@ -118,7 +179,7 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
     const activities = index >= 0
       ? previous.activities.map((value, activityIndex) => activityIndex === index ? activity : value)
       : [...previous.activities, activity].slice(-maxActivities);
-    const status = { ...previous, activities, updatedAt: activity.updatedAt };
+    const status = { ...previous, activities, updatedAt: activity.updatedAt, ...nextEventMetadata(threadId) };
     statuses.set(threadId, status);
     schedulePersist();
     broadcast(status);
@@ -137,7 +198,7 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
       updatedAt: now,
     };
     const activities = [...previous.activities.filter((value) => value.id !== activity.id), activity].slice(-maxActivities);
-    const status = { ...previous, commentary: text, activities, updatedAt: now };
+    const status = { ...previous, commentary: text, activities, updatedAt: now, ...nextEventMetadata(threadId) };
     statuses.set(threadId, status);
     schedulePersist();
     broadcast(status);
@@ -172,29 +233,50 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
     const { method, params = {} } = message || {};
     const threadId = params.threadId;
     if (!threadId) return;
-    protocolEventTimes.set(threadId, new Date().toISOString());
 
     if (method === "turn/started") {
+      const turnId = String(params.turn?.id || "");
+      const current = statuses.get(threadId);
+      if (!turnId && current?.active && current.turnId && current.phase !== "submitted") return;
+      if (turnId && (retiredTurns.get(threadId)?.has(turnId) || completedTurns.get(threadId)?.has(turnId))) return;
+      protocolEventTimes.set(threadId, new Date().toISOString());
       reasoningBuffers.delete(threadId);
       publish(threadId, { phase: "working", label: "Codex 正在处理任务", turnId: params.turn?.id || "" });
-      broadcast({ type: "sessions_changed", threadId });
+      broadcastThreadEvent(threadId, { type: "sessions_changed", threadId });
       return;
     }
     if (method === "turn/completed") {
+      const turnId = String(params.turn?.id || "");
+      const current = statuses.get(threadId);
+      if (!turnId && current?.active && current.turnId && current.phase !== "submitted") return;
+      if (isRetiredTurn(threadId, turnId) || (turnId && completedTurns.get(threadId)?.has(turnId))) return;
+      protocolEventTimes.set(threadId, new Date().toISOString());
       reasoningBuffers.delete(threadId);
       const phase = params.turn?.status || "completed";
       const failed = phase === "failed";
       publish(threadId, {
         phase,
+        turnId,
         label: failed ? "Codex 执行失败" : phase === "interrupted" ? "Codex 已中断" : "Codex 已完成",
         detail: params.turn?.error?.message || "",
         durationMs: Number.isFinite(params.turn?.durationMs) ? params.turn.durationMs : null,
       });
-      broadcast({ type: "sessions_changed", threadId });
+      rememberCompletedTurn(threadId, turnId || statuses.get(threadId)?.turnId || "");
+      broadcastThreadEvent(threadId, { type: "sessions_changed", threadId });
       return;
     }
+    const eventTurnId = turnIdFor(threadId, params, params.itemId || params.item?.id || "");
+    if (isRetiredTurn(threadId, eventTurnId)) return;
+    const isCompletedTurn = Boolean(eventTurnId && completedTurns.get(threadId)?.has(eventTurnId));
+    if (isCompletedTurn && method !== "item/completed") return;
+    protocolEventTimes.set(threadId, new Date().toISOString());
     if (method === "thread/status/changed") {
       const status = params.status || {};
+      const current = statuses.get(threadId);
+      // An unscoped idle notification cannot prove that it belongs to the
+      // current turn. The turn completion event or authoritative probe owns
+      // the terminal transition once a turn has actually started.
+      if (status.type === "idle" && current?.active && current.phase !== "submitted") return;
       if (status.type === "systemError") {
         publish(threadId, { phase: "systemError", label: "Codex 连接异常" });
       } else if (status.type === "active" && status.activeFlags?.includes("waitingOnApproval")) {
@@ -209,7 +291,9 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
       return;
     }
     if (method === "item/started") {
-      if (params.item?.type === "agentMessage") messagePhases.set(params.item.id, params.item.phase);
+      const itemId = String(params.item?.id || "");
+      if (itemId) rememberItemTurn(threadId, itemId, eventTurnId);
+      if (params.item?.type === "agentMessage") messagePhases.set(itemKey(threadId, itemId), params.item.phase);
       const state = stateFromItem(params.item);
       if (state) publish(threadId, {
         ...state,
@@ -219,14 +303,25 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
       return;
     }
     if (method === "item/completed") {
+      const itemId = String(params.item?.id || "");
+      if (itemId) rememberItemTurn(threadId, itemId, eventTurnId);
+      if (isCompletedTurn) {
+        if (["userMessage", "agentMessage", "imageGeneration"].includes(params.item?.type)) {
+          broadcastThreadEvent(threadId, { type: "sessions_changed", threadId });
+        }
+        if (params.item?.type === "agentMessage") messagePhases.delete(itemKey(threadId, itemId));
+        return;
+      }
       if (params.item?.type === "agentMessage" && params.item.phase === "commentary") {
         const text = String(params.item.text || "").trim();
         if (text) {
           addCommentaryActivity(threadId, params.item.id || "", text);
-          broadcast({
+          const current = statuses.get(threadId);
+          broadcastThreadEvent(threadId, {
             type: "assistant_commentary",
             threadId,
-            itemId: params.item.id || "",
+            turnId: eventTurnId || current?.turnId || "",
+            itemId,
             text,
           });
         }
@@ -238,11 +333,11 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
             active: true,
           });
         }
-        broadcast({ type: "sessions_changed", threadId });
+        broadcastThreadEvent(threadId, { type: "sessions_changed", threadId });
       } else {
         completeActivity(threadId, params.item);
       }
-      if (params.item?.type === "agentMessage") messagePhases.delete(params.item.id);
+      if (params.item?.type === "agentMessage") messagePhases.delete(itemKey(threadId, itemId));
       return;
     }
     if (method === "item/reasoning/summaryTextDelta") {
@@ -250,21 +345,23 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
       return;
     }
     if (method === "item/agentMessage/delta") {
-      if (messagePhases.get(params.itemId) !== "commentary") {
+      const itemId = String(params.itemId || "");
+      if (messagePhases.get(itemKey(threadId, itemId)) !== "commentary") {
         const previous = statuses.get(threadId);
         if (previous) {
-          const streamingText = previous.streamingItemId === params.itemId
+          const streamingText = previous.streamingItemId === itemId
             ? previous.streamingText + String(params.delta || "")
             : String(params.delta || "");
           statuses.set(threadId, {
             ...previous,
-            streamingItemId: params.itemId || "",
+            streamingItemId: itemId,
             streamingText,
             updatedAt: new Date().toISOString(),
+            ...nextEventMetadata(threadId),
           });
           schedulePersist();
         }
-        broadcast({ type: "assistant_delta", ...params });
+        broadcastThreadEvent(threadId, { type: "assistant_delta", ...params, turnId: eventTurnId || previous?.turnId || "" });
       }
       return;
     }
@@ -294,6 +391,8 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
     durationMs: null,
     lastEventAt: null,
     lastProbeAt: null,
+    eventEpoch,
+    eventSeq: 0,
   };
 
   const handleHealthState = (event = {}) => {
@@ -348,7 +447,7 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
         active: false,
         lastProbeAt,
       });
-      broadcast({ type: "sessions_changed", threadId });
+      broadcastThreadEvent(threadId, { type: "sessions_changed", threadId });
       return;
     }
     if (event.phase === "failed") {

@@ -185,8 +185,10 @@ test("maps turn timestamps onto user and assistant messages", async () => {
   const client = {
     subscribe: () => () => {},
     close: () => {},
-    request: async (method) => {
+    request: async (method, params) => {
+      if (method === "thread/turns/list") throw new Error("pagination unsupported");
       assert.equal(method, "thread/read");
+      assert.deepEqual(params, { threadId: "thread-1", includeTurns: true });
       return {
         thread: {
           id: "thread-1",
@@ -219,6 +221,233 @@ test("maps turn timestamps onto user and assistant messages", async () => {
     "1970-01-01T00:02:10.000Z",
   ]);
   assert.deepEqual(session.messages.map((message) => message.turnId), ["turn-1", "turn-1"]);
+});
+
+test("reads recent turns with the native page and exposes its older cursor", async () => {
+  const calls = [];
+  const thread = {
+    id: "thread-1",
+    cwd: "D:\\project",
+    source: "appServer",
+    name: "Paged",
+    updatedAt: 130,
+  };
+  const client = {
+    subscribe: () => () => {},
+    close: () => {},
+    request: async (method, params) => {
+      calls.push({ method, params });
+      if (method === "thread/read") return { thread };
+      if (method === "thread/turns/list") return {
+        data: [
+          {
+            id: "turn-2",
+            startedAt: 200,
+            completedAt: 230,
+            items: [{ type: "agentMessage", id: "answer-2", phase: "final_answer", text: "Second" }],
+          },
+          {
+            id: "turn-1",
+            startedAt: 100,
+            completedAt: 130,
+            items: [{ type: "userMessage", id: "user-1", content: [{ type: "text", text: "First" }] }],
+          },
+        ],
+        nextCursor: "older-page-1",
+      };
+      throw new Error(`Unexpected request: ${method}`);
+    },
+  };
+  const store = createAppServerConversationStore({
+    projectRoot: "D:\\project",
+    registerMedia: () => null,
+    client,
+  });
+
+  const session = await store.findSession("thread-1", "all", { limit: 60 });
+
+  assert.deepEqual(session.messages.map((message) => message.text), ["First", "Second"]);
+  assert.equal(session.messageCount, null);
+  assert.equal(session.hasMore, true);
+  assert.equal(session.nextCursor, "older-page-1");
+  assert.deepEqual(calls.map((call) => call.method), ["thread/read", "thread/turns/list"]);
+  assert.deepEqual(calls[1].params, {
+    threadId: "thread-1",
+    cursor: null,
+    limit: 34,
+    sortDirection: "desc",
+    itemsView: "full",
+  });
+});
+
+test("keeps the newer message timestamp over stale thread metadata", async () => {
+  const client = {
+    subscribe: () => () => {},
+    close: () => {},
+    request: async (method) => {
+      if (method === "thread/read") return {
+        thread: {
+          id: "thread-1",
+          cwd: "D:\\project",
+          source: "appServer",
+          name: "Timestamp precedence",
+          updatedAt: 100,
+        },
+      };
+      if (method === "thread/turns/list") return {
+        data: [{
+          id: "turn-1",
+          startedAt: 110,
+          completedAt: 130,
+          items: [{ type: "agentMessage", id: "answer-1", phase: "final_answer", text: "Newer" }],
+        }],
+        nextCursor: null,
+      };
+      throw new Error(`Unexpected request: ${method}`);
+    },
+  };
+  const store = createAppServerConversationStore({
+    projectRoot: "D:\\project",
+    registerMedia: () => null,
+    client,
+  });
+
+  const session = await store.findSession("thread-1", "all", { limit: 60 });
+
+  assert.equal(session.updatedAt, "1970-01-01T00:02:10.000Z");
+});
+
+test("uses a valid message timestamp when thread metadata time is missing", async () => {
+  const client = {
+    subscribe: () => () => {},
+    close: () => {},
+    request: async (method) => {
+      if (method === "thread/read") return {
+        thread: {
+          id: "thread-1",
+          cwd: "D:\\project",
+          source: "appServer",
+          name: "Missing timestamp",
+          updatedAt: null,
+        },
+      };
+      if (method === "thread/turns/list") return {
+        data: [{
+          id: "turn-1",
+          startedAt: 100,
+          completedAt: 130,
+          items: [{ type: "agentMessage", id: "answer-1", phase: "final_answer", text: "Available" }],
+        }],
+        nextCursor: null,
+      };
+      throw new Error(`Unexpected request: ${method}`);
+    },
+  };
+  const store = createAppServerConversationStore({
+    projectRoot: "D:\\project",
+    registerMedia: () => null,
+    client,
+  });
+
+  const session = await store.findSession("thread-1", "all", { limit: 60 });
+
+  assert.equal(session.updatedAt, "1970-01-01T00:02:10.000Z");
+  store.close();
+});
+
+test("does not expose the backwards anchor as an older cursor", async () => {
+  const calls = [];
+  const client = {
+    subscribe: () => () => {},
+    close: () => {},
+    request: async (method, params) => {
+      calls.push({ method, params });
+      if (method === "thread/read") return {
+        thread: {
+          id: "thread-1",
+          cwd: "D:\\project",
+          source: "appServer",
+          name: "Exhausted page",
+          updatedAt: 130,
+        },
+      };
+      if (method === "thread/turns/list") return {
+        data: [{
+          id: "turn-1",
+          startedAt: 100,
+          completedAt: 130,
+          items: [{ type: "userMessage", id: "user-1", content: [{ type: "text", text: "Only page" }] }],
+        }],
+        nextCursor: null,
+        backwardsCursor: "{\"turnId\":\"turn-1\",\"includeAnchor\":true}",
+      };
+      throw new Error(`Unexpected request: ${method}`);
+    },
+  };
+  const store = createAppServerConversationStore({
+    projectRoot: "D:\\project",
+    registerMedia: () => null,
+    client,
+  });
+
+  const session = await store.findSession("thread-1", "all", { limit: 60 });
+
+  assert.equal(session.hasMore, false);
+  assert.equal(session.nextCursor, null);
+  assert.deepEqual(calls.map((call) => call.method), ["thread/read", "thread/turns/list"]);
+});
+
+test("falls back to the installed item pagination method when turns pagination is unavailable", async () => {
+  const calls = [];
+  const client = {
+    subscribe: () => () => {},
+    close: () => {},
+    request: async (method, params) => {
+      calls.push({ method, params });
+      if (method === "thread/read") return {
+        thread: {
+          id: "thread-1",
+          cwd: "D:\\project",
+          source: "appServer",
+          name: "Item paged",
+          updatedAt: 130,
+        },
+      };
+      if (method === "thread/turns/list") throw new Error("Method not found: thread/turns/list");
+      if (method === "thread/items/list") throw new Error("Method not found: thread/items/list");
+      if (method === "thread/turns/items/list") return {
+        data: [
+          {
+            turnId: "turn-2",
+            item: { type: "agentMessage", id: "answer-2", phase: "final_answer", text: "Second" },
+          },
+          {
+            turnId: "turn-1",
+            item: { type: "userMessage", id: "user-1", content: [{ type: "text", text: "First" }] },
+          },
+        ],
+         nextCursor: "older-item-page-1",
+      };
+      throw new Error(`Unexpected request: ${method}`);
+    },
+  };
+  const store = createAppServerConversationStore({
+    projectRoot: "D:\\project",
+    registerMedia: () => null,
+    client,
+  });
+
+  const session = await store.findSession("thread-1", "all", { limit: 60 });
+
+  assert.deepEqual(session.messages.map((message) => message.text), ["First", "Second"]);
+  assert.deepEqual(session.messages.map((message) => message.turnId), ["turn-1", "turn-2"]);
+  assert.equal(session.nextCursor, "older-item-page-1");
+  assert.deepEqual(calls.map((call) => call.method), [
+    "thread/read",
+    "thread/turns/list",
+    "thread/items/list",
+    "thread/turns/items/list",
+  ]);
 });
 
 test("forks, archives, and restores a project thread through app-server actions", async () => {
@@ -331,4 +560,50 @@ test("supervises an active turn without depending on a browser request", async (
     options: { timeoutMs: 5000, threadId: "thread-1" },
   });
   assert.equal(healthEvents.some((event) => event.phase === "authoritative" && event.status.type === "idle"), true);
+});
+
+test("keeps newer turn supervision after an older turn completes late", async () => {
+  let protocolListener = () => {};
+  const probeCalls = [];
+  const client = {
+    subscribe: (listener) => {
+      protocolListener = listener;
+      return () => {};
+    },
+    subscribeHealth: () => () => {},
+    close: () => {},
+    probe: async (method, params, options) => {
+      probeCalls.push({ method, params, options });
+      return { thread: { id: "thread-1", status: { type: "active" } } };
+    },
+    request: async () => { throw new Error("Unexpected request"); },
+  };
+  const store = createAppServerConversationStore({
+    projectRoot: "D:\\project",
+    registerMedia: () => null,
+    client,
+    supervision: {
+      intervalMs: 5,
+      staleAfterMs: 20,
+      finalizingAfterMs: 5,
+      retryAfterMs: 5,
+    },
+  });
+
+  protocolListener({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-1" } },
+  });
+  protocolListener({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-2" } },
+  });
+  protocolListener({
+    method: "turn/completed",
+    params: { threadId: "thread-1", turn: { id: "turn-1", status: "completed" } },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 45));
+  store.close();
+
+  assert.equal(probeCalls.length >= 1, true);
 });

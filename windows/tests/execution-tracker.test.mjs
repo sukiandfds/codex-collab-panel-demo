@@ -62,6 +62,166 @@ test("tracks the active turn id and completed tool activity", () => {
   ]);
 });
 
+test("ignores delayed protocol events from a retired turn", () => {
+  const events = [];
+  const tracker = createExecutionTracker({ broadcast: (event) => events.push(event) });
+
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-1" } },
+  });
+  tracker.handleProtocolMessage({
+    method: "item/completed",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-1",
+      item: { id: "commentary-1", type: "agentMessage", phase: "commentary", text: "old commentary" },
+    },
+  });
+
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-2" } },
+  });
+  tracker.handleProtocolMessage({
+    method: "item/started",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-2",
+      item: { id: "answer-2", type: "agentMessage", phase: "final_answer" },
+    },
+  });
+  tracker.handleProtocolMessage({
+    method: "item/agentMessage/delta",
+    params: { threadId: "thread-1", turnId: "turn-2", itemId: "answer-2", delta: "new answer" },
+  });
+
+  tracker.handleProtocolMessage({
+    method: "turn/completed",
+    params: { threadId: "thread-1", turn: { id: "turn-1", status: "completed" } },
+  });
+  tracker.handleProtocolMessage({
+    method: "item/completed",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-1",
+      item: { id: "commentary-1", type: "agentMessage", phase: "commentary", text: "late old commentary" },
+    },
+  });
+  tracker.handleProtocolMessage({
+    method: "item/agentMessage/delta",
+    params: { threadId: "thread-1", turnId: "turn-1", itemId: "answer-1", delta: "late old answer" },
+  });
+
+  const status = tracker.getStatus("thread-1");
+  assert.equal(status.turnId, "turn-2");
+  assert.equal(status.phase, "responding");
+  assert.equal(status.active, true);
+  assert.equal(status.commentary, "");
+  assert.equal(status.streamingText, "new answer");
+  assert.equal(events.some((event) => event.type === "assistant_commentary" && event.text === "late old commentary"), false);
+  assert.equal(events.some((event) => event.type === "assistant_delta" && event.delta === "late old answer"), false);
+});
+
+test("does not let an unscoped idle event reset a newer active turn", () => {
+  const tracker = createExecutionTracker({ broadcast: () => {} });
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-1" } },
+  });
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-2" } },
+  });
+
+  tracker.handleProtocolMessage({
+    method: "thread/status/changed",
+    params: { threadId: "thread-1", status: { type: "idle" } },
+  });
+
+  const status = tracker.getStatus("thread-1");
+  assert.equal(status.turnId, "turn-2");
+  assert.equal(status.active, true);
+  assert.equal(status.phase, "working");
+});
+
+test("does not let an unscoped turn completion reset a newer active turn", () => {
+  const tracker = createExecutionTracker({ broadcast: () => {} });
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-1" } },
+  });
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-2" } },
+  });
+
+  tracker.handleProtocolMessage({
+    method: "turn/completed",
+    params: { threadId: "thread-1", turn: { status: "completed" } },
+  });
+
+  const status = tracker.getStatus("thread-1");
+  assert.equal(status.turnId, "turn-2");
+  assert.equal(status.active, true);
+  assert.equal(status.phase, "working");
+});
+
+test("keeps a completed turn terminal when its final item completion arrives late", () => {
+  const events = [];
+  const tracker = createExecutionTracker({ broadcast: (event) => events.push(event) });
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-1" } },
+  });
+  tracker.handleProtocolMessage({
+    method: "turn/completed",
+    params: { threadId: "thread-1", turn: { id: "turn-1", status: "completed" } },
+  });
+  tracker.handleProtocolMessage({
+    method: "item/completed",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-1",
+      item: { id: "answer-1", type: "agentMessage", phase: "final_answer", text: "Done" },
+    },
+  });
+
+  const status = tracker.getStatus("thread-1");
+  assert.equal(status.phase, "completed");
+  assert.equal(status.active, false);
+  assert.equal(events.filter((event) => event.type === "sessions_changed").length, 3);
+});
+
+test("assigns monotonic per-thread event sequences", () => {
+  const events = [];
+  const tracker = createExecutionTracker({ broadcast: (event) => events.push(event) });
+  tracker.markSubmitted("thread-1");
+  tracker.handleProtocolMessage({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-1" } },
+  });
+  tracker.handleProtocolMessage({
+    method: "item/started",
+    params: { threadId: "thread-1", turnId: "turn-1", item: { id: "answer-1", type: "agentMessage", phase: "final_answer" } },
+  });
+  tracker.handleProtocolMessage({
+    method: "item/agentMessage/delta",
+    params: { threadId: "thread-1", turnId: "turn-1", itemId: "answer-1", delta: "Done" },
+  });
+
+  const sequenced = events.filter((event) => event.eventEpoch && Number.isSafeInteger(event.eventSeq));
+  assert.ok(sequenced.length >= 4);
+  assert.equal(new Set(sequenced.map((event) => event.eventEpoch)).size, 1);
+  assert.equal(sequenced.every((event, index) => index === 0 || event.eventSeq > sequenced[index - 1].eventSeq), true);
+});
+
 test("resets startedAt for a new turn", async () => {
   const tracker = createExecutionTracker({ broadcast: () => {} });
   tracker.markSubmitted("thread-1");

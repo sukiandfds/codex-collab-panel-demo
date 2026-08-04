@@ -33,8 +33,15 @@ export function useConversationCatalog(
   const listRequestRef = useRef(0);
   const transientSessionsRef = useRef(new Map<string, SessionSummary>());
   const refreshSessionsRef = useRef<(initialLoad?: boolean, changedThreadId?: string, reloadSelected?: boolean, retry?: boolean) => Promise<void>>(async () => {});
+  const listRequestInFlightRef = useRef<Promise<void> | null>(null);
+  const pendingListRefreshRef = useRef<{
+    initialLoad: boolean;
+    changedThreadId?: string;
+    reloadSelected: boolean;
+    retry: boolean;
+  } | null>(null);
 
-  const refreshSessions = useCallback(async (initialLoad = false, changedThreadId?: string, reloadSelected = true, retry = true) => {
+  const refreshSessionsOnce = useCallback(async (initialLoad = false, changedThreadId?: string, reloadSelected = true, retry = true) => {
     const requestId = ++listRequestRef.current;
     if (initialLoad) setLoadingList(true);
     setListError("");
@@ -78,6 +85,44 @@ export function useConversationCatalog(
       if (initialLoad) setLoadingList(false);
     }
   }, [selection.adoptSelection, selection.clearSelection, selection.loadSession, selection.selectedIdRef]);
+
+  const refreshSessions = useCallback((initialLoad = false, changedThreadId?: string, reloadSelected = true, retry = true) => {
+    const inFlight = listRequestInFlightRef.current;
+    if (inFlight) {
+      const pending = pendingListRefreshRef.current || {
+        initialLoad: false,
+        changedThreadId,
+        reloadSelected: false,
+        retry: false,
+      };
+      pending.initialLoad ||= initialLoad;
+      pending.changedThreadId = pending.changedThreadId === changedThreadId ? changedThreadId : undefined;
+      pending.reloadSelected ||= reloadSelected;
+      pending.retry ||= retry;
+      pendingListRefreshRef.current = pending;
+      return inFlight;
+    }
+
+    const request = refreshSessionsOnce(initialLoad, changedThreadId, reloadSelected, retry);
+    listRequestInFlightRef.current = request;
+    void request.finally(() => {
+      if (listRequestInFlightRef.current !== request) return;
+      listRequestInFlightRef.current = null;
+      const pending = pendingListRefreshRef.current;
+      pendingListRefreshRef.current = null;
+      if (pending) {
+        window.setTimeout(() => {
+          void refreshSessionsRef.current(
+            pending.initialLoad,
+            pending.changedThreadId,
+            pending.reloadSelected,
+            pending.retry,
+          );
+        }, 0);
+      }
+    }).catch(() => {});
+    return request;
+  }, [refreshSessionsOnce]);
   refreshSessionsRef.current = refreshSessions;
 
   const updateArchiveQuery = useCallback((archived: boolean) => {

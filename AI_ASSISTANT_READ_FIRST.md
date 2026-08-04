@@ -27,6 +27,14 @@
 
 每次研究、修改、测试、提交和交接必须执行 [`docs/project-management/ASSISTANT_DELIVERY_CHECKLIST.md`](./docs/project-management/ASSISTANT_DELIVERY_CHECKLIST.md)。该清单是项目管理联动的执行入口；缺少任务编号、完整 SHA、测试结果或条目回写时，状态只能是 `handoff_pending`，不得描述为已完成。
 
+## 0.2 规则层级与快速路由
+
+- 全局 `AGENTS.md` 规定所有项目通用的沟通、确认、资源和轻量工作原则。
+- `PROJECT_OPERATING_RULES.md` 规定跨项目可复用的开发、交接和记录规则。
+- 本文件与 `PROJECT_RULES.md` 只规定 `codex-collab-panel-demo` 的目录、编号、分支、端口和资料边界。
+- 收到新请求时先判断是想法、Bug、研究、功能修改、复盘还是状态查询，再按当前任务一次性读取相关索引、文档和源码；普通闲聊不自动建条目。
+- 完成后只回写必要文件，并报告用户可见变化、检查结果和未验证部分；不要用新的规则或额外文件替代项目已有记录。
+
 ## 0.1 用户偏好与沟通记忆（强制）
 
 用户已经明确、反复强调的长期偏好，不得只依赖当前对话记忆，必须立即写入本操作手册或 `PROCESS_ISSUES.md`，并在后续每次开始工作前执行。

@@ -1,4 +1,6 @@
-export const createConversationService = ({ primary, fallback }) => {
+export const createConversationService = ({ primary, fallback, contentVersionStore }) => {
+  const inFlightFinds = new Map();
+
   const withFallback = async (operation, ...args) => {
     try {
       return await primary[operation](...args);
@@ -8,48 +10,32 @@ export const createConversationService = ({ primary, fallback }) => {
     }
   };
 
-  const mediaTypes = new Set(["image", "audio", "video"]);
-  const enrichWithFallbackMedia = (session, fallbackSession) => {
-    if (!session?.messages || !fallbackSession?.messages) return session;
-    const fallbackMessages = [...fallbackSession.messages];
-    return {
-      ...session,
-      messages: session.messages.map((message) => {
-        const index = fallbackMessages.findIndex((candidate) => (
-          candidate.role === message.role && candidate.text === message.text
-        ));
-        if (index < 0) return message;
-        const [candidate] = fallbackMessages.splice(index, 1);
-        const createdAt = message.createdAt || candidate.createdAt;
-        const extra = (candidate.blocks || []).filter((block) => mediaTypes.has(block.type));
-        if (!extra.length) return createdAt ? { ...message, createdAt } : message;
-        const blocks = message.blocks || [];
-        const existing = new Set(blocks.map((block) => `${block.type}:${block.source || ""}`));
-        return {
-          ...message,
-          createdAt,
-          blocks: [...blocks, ...extra.filter((block) => !existing.has(`${block.type}:${block.source || ""}`))],
-        };
-      }),
-    };
-  };
+  const findSession = (...args) => {
+    const key = JSON.stringify({
+      threadId: String(args[0] || ""),
+      source: String(args[1] || "all"),
+      options: args[2] || {},
+    });
+    const existing = inFlightFinds.get(key);
+    if (existing) return existing;
 
-  const findSession = async (...args) => {
-    const [primaryResult, fallbackResult] = await Promise.allSettled([
-      primary.findSession(...args),
-      fallback.findSession(...args),
-    ]);
-    if (primaryResult.status === "fulfilled") {
-      return enrichWithFallbackMedia(
-        primaryResult.value,
-        fallbackResult.status === "fulfilled" ? fallbackResult.value : null,
-      );
-    }
-    if (fallbackResult.status === "fulfilled") {
-      console.warn(`[conversation-service] app-server request failed, using JSONL fallback: ${primaryResult.reason?.message || primaryResult.reason}`);
-      return fallbackResult.value;
-    }
-    throw primaryResult.reason;
+    const request = (async () => {
+      const session = await withFallback("findSession", ...args);
+      if (!session || !contentVersionStore) return session;
+      const threadId = String(args[0] || "");
+      const options = args[2] || {};
+      const recentWindow = options.before === undefined && options.cursor === undefined;
+      if (!recentWindow) return contentVersionStore.decorate(threadId, session);
+      return contentVersionStore.sync(threadId, session, {
+        requestedVersion: options.contentVersion,
+        incremental: Number.isSafeInteger(options.contentVersion),
+      });
+    })();
+    inFlightFinds.set(key, request);
+    void request.finally(() => {
+      if (inFlightFinds.get(key) === request) inFlightFinds.delete(key);
+    }).catch(() => {});
+    return request;
   };
 
   return {
@@ -69,8 +55,10 @@ export const createConversationService = ({ primary, fallback }) => {
     getThreadStatus: (...args) => primary.getThreadStatus(...args),
     compactContext: (...args) => primary.compactContext(...args),
     close: () => {
+      inFlightFinds.clear();
       primary.close();
       fallback.close();
+      void contentVersionStore?.close?.();
     },
   };
 };

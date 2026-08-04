@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Clipboard, GitBranch } from "lucide-react";
+import { Check, Copy, GitBranch } from "lucide-react";
 import styles from "./MessageActions.module.css";
 
 interface MessageActionsProps {
@@ -62,7 +62,7 @@ export function MessageActions({ text, forkable, forking, onFork }: MessageActio
         disabled={!text.trim()}
         onClick={() => void handleCopy()}
       >
-        {copied ? <Check aria-hidden="true" /> : <Clipboard aria-hidden="true" />}
+        {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
       </button>
       {forkable ? (
         <button
