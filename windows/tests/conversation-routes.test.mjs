@@ -64,3 +64,40 @@ test("reuses the in-flight result for a repeated submission id", async () => {
   assert.equal(events.length, 1);
   assert.deepEqual(JSON.parse(first.response.body), JSON.parse(third.response.body));
 });
+
+test("routes explicit image commands to Negus Image without starting a Codex turn", async () => {
+  let codexCalls = 0;
+  const starts = [];
+  const route = createConversationRoutes({
+    conversations: {
+      sendMessage: async () => { codexCalls += 1; },
+      steerMessage: async () => { codexCalls += 1; },
+    },
+    execution: { getStatus: () => ({ active: false, turnId: "" }) },
+    contextManagement: {},
+    media: { resolveMany: () => [] },
+    imageGeneration: {
+      isActive: () => false,
+      intentFor: () => ({ operation: "generate", prompt: "直播图片", resolution: "2K", size: "16:9", n: 1 }),
+      start: async (request) => {
+        starts.push(request);
+        return { runId: "run-1", turnId: "negus-image-run-1", status: "inProgress" };
+      },
+    },
+  });
+  const call = invoke(route, {
+    threadId: "thread-1",
+    text: "生成一张 16:9 2K 的直播图片",
+    attachmentIds: [],
+    submissionId: "image-submission",
+  });
+  await call.promise;
+
+  assert.equal(call.response.status, 202);
+  assert.equal(codexCalls, 0);
+  assert.equal(starts.length, 1);
+  const body = JSON.parse(call.response.body);
+  assert.equal(body.capability, "negus_image");
+  assert.equal(body.runId, "run-1");
+  assert.equal(body.turnId, "negus-image-run-1");
+});

@@ -1,7 +1,7 @@
-# Codex Dream Skin
+# negus
 
-> 本仓库是基于 Codex Dream Skin 的私有实验分支，当前正在开发
-> **Codex Collab Panel**：Codex 右侧实时总结与跨设备项目协作面板。
+> 本仓库是 **negus** 的开发仓库，早期基于 Codex Dream Skin，当前正在开发
+> 面向 Codex 的多端 AI 协作与创作工作台。
 > 项目目标、当前进度和下一步见 [`PROJECT.md`](./PROJECT.md)。
 
 ---

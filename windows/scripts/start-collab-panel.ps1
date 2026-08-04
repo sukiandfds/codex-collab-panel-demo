@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $node = "C:\Users\Hans\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
 $profile = Join-Path $env:LOCALAPPDATA "CodexDreamSkin\collab-profile"
-$logRoot = Join-Path $env:TEMP "codex-collab-panel"
+$logRoot = Join-Path $env:TEMP "negus"
 
 if (-not (Test-Path -LiteralPath $node)) {
   throw "Bundled Node.js 24 was not found at $node"

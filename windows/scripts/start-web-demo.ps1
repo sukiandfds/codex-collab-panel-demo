@@ -64,7 +64,7 @@ function Test-DemoReady {
     $contentType = [string]$response.Headers["Content-Type"]
     if (($response.StatusCode -eq 200) -and $contentType.StartsWith("application/json")) {
       $project = $response.Content | ConvertFrom-Json
-      $ready = $project.name -eq "codex-collab-panel-demo"
+      $ready = $project.name -eq "negus"
     }
   }
   catch {}
@@ -105,7 +105,7 @@ $arguments = @(
   $serverScript,
   "--port", [string]$Port,
   "--observer-port", "9350",
-  "--project", "codex-collab-panel-demo",
+  "--project", "negus",
   "--project-root", $projectRoot,
   "--web-root", $webRoot,
   "--token", $Token,
@@ -148,7 +148,7 @@ if (-not $ready) {
   throw "Web demo did not become ready within 12 seconds ($exitText)."
 }
 
-$logRoot = Join-Path $env:TEMP "codex-collab-panel"
+$logRoot = Join-Path $env:TEMP "negus"
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
 $pidFile = Join-Path $logRoot "web-demo-$Port.pid"
 [string]$process.Id | Set-Content -LiteralPath $pidFile -Encoding ASCII

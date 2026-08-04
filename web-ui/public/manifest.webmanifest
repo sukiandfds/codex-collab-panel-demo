@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Codex 协作",
-  "short_name": "Codex 协作",
-  "description": "从手机或平板查看项目对话并控制本地 Codex。",
+  "name": "negus",
+  "short_name": "negus",
+  "description": "面向 Codex 的多端 AI 协作与创作工作台。",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

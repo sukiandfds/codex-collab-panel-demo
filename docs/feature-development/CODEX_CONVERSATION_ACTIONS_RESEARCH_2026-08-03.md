@@ -2,7 +2,7 @@
 document_type: feature_research
 schema_version: 1
 research_id: RESEARCH-2026-08-03-CODEX-CONVERSATION-ACTIONS
-project_id: codex-collab-panel-demo
+project_id: negus
 status: discovery
 last_updated: 2026-08-03 14:18:01 +08:00
 product_branch: codex/publish-current-panel

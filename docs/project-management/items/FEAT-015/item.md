@@ -4,18 +4,18 @@ type: feature
 title: 自然语言生图与自动化工作台
 category: development
 priority: P2
-status: planned
-updated_at: 2026-08-04 15:18 +08:00
+status: in_progress
+updated_at: 2026-08-04 18:39 +08:00
 source: docs/feature-development/features/FEAT-015-image-generation-and-automation-workbench.md
 related: [FEAT-001, FEAT-002, FEAT-003, FEAT-007, FEAT-008]
 owner: product_and_runtime
-product_base_commit: 45b445da2e9d1fe4f363577a5270a8d6e1bc355f
+product_base_commit: 267a27cd9c6c8ab141dcc1e743d38d38a9d7f611
 product_commit: pending
 docs_commit: pending
 audited_product_commit: pending
-sync_status: docs_pending
-next_action: 定义 M1 Capability 与 HappyEvering Provider Schema，建立 Mock 合同测试并确定首个 Codex 工具适配器
-last_user_visible_change: 已完成 HappyEvering 官方协议与临时 Skill 点检并写入正式调研，尚未开发或改变现有页面
+sync_status: implementation_uncommitted
+next_action: 推送当前开发分支；用户在目标电脑拉取后确认 LYNN_IMAGE_API_KEY 环境变量并验收网页版生图
+last_user_visible_change: 网页单人 Codex 已可用明确自然语言触发 Negus Image，显示生成状态和图片，服务重启后会话与图片仍保留
 ---
 
 # 自然语言生图与自动化工作台
@@ -31,6 +31,18 @@ last_user_visible_change: 已完成 HappyEvering 官方协议与临时 Skill 点
 > 这和codex、gpt、gemini、claude等工具的方式和逻辑是一样的吗？做个快速调研。
 
 > 同时，之后可能会有专门生图的自动化工作台。而不只是一个简单的skills。请你知悉。给一个初步方案。列为正式需求，记录在我们的项目管理和项目进度中。就是那个能写下我原话的那个系统。调研报告也总结好。
+
+> 目前也是用中转站在用codex，你给的这个方案能在codex中用吗？而不是我们的单人网页版codex？
+
+> 怎么处理比较好？又高效又通用又便于维护？
+
+> 会不会太复杂了。还能精简吗？会损失什么？难度排序呢？
+
+> 也就是先在原生codex跑通是吗？能直接迁移到我们的网页codex吗？
+
+> 那请你开始。可以适当参考之前的别的项目的成果。
+
+> 我期待的是，相关功能有对应文件拆分管理，目前已有文件只负责调用，避免造成一个文件巨大不好维护。其实用关键词也可以吧？
 
 ## 助手初步理解
 
@@ -62,11 +74,20 @@ last_user_visible_change: 已完成 HappyEvering 官方协议与临时 Skill 点
 
 ## 当前状态
 
-正式需求已建立；跨厂商机制、HappyEvering 官方图片 API 合同、临时 `lynn-image-generate` Skill 点检和目标架构均已记录。尚未修改产品代码、接入中转站、增加工作台页面或创建定时任务。
+开发中。原生 `negus_image` MCP、HappyEvering Provider、Skill、网页版关键词分流、异步运行状态、Media 图片展示和持久运行记录均已接入。已完成一次 16:9、2K 原生真实生图和一次 1:1、1K 网页真实生图；服务重启后生图会话和图片仍可从侧栏恢复。API Key 只保存在 Windows 用户环境变量中。Artifact、完整 `CapabilityRun`、自动化工作台和定时任务尚未实现。
 
 ## 当前证据
 
 - `docs/feature-development/features/FEAT-015-image-generation-and-automation-workbench.md`
 - `docs/research/IMAGE_GENERATION_CAPABILITY_AND_AUTOMATION_WORKBENCH_RESEARCH_2026-08-04.md`
+- `.codex/config.toml`
+- `windows/server/image-generation/happyevering-client.mjs`
+- `windows/server/image-generation/image-output.mjs`
+- `windows/server/image-generation/mcp-server.mjs`
+- `windows/server/image-generation/web-image-intent.mjs`
+- `windows/server/image-generation/web-image-generation-service.mjs`
+- `windows/server/image-generation/image-generation-run-store.mjs`
+- `windows/tests/web-image-generation.test.mjs`
+- `windows/tests/image-generation-mcp.test.mjs`
 - HappyEvering 官方文档：`https://api.happyevering.xyz/docs/`
-- 产品基线：`45b445da2e9d1fe4f363577a5270a8d6e1bc355f`
+- 产品基线：`267a27cd9c6c8ab141dcc1e743d38d38a9d7f611`

@@ -1,9 +1,9 @@
 ---
 document_type: project_workflow_rules
 schema_version: 1
-project_id: codex-collab-panel-demo
+project_id: negus
 status: active
-last_updated: 2026-08-03 11:46 +08:00
+last_updated: 2026-08-04 16:11:15 +08:00
 ---
 
 # 开发、文档与审计协同规则

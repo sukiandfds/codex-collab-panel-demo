@@ -1,0 +1,18 @@
+[mcp_servers.negus_image]
+command = "node"
+args = ["windows/server/image-generation/mcp-server.mjs"]
+cwd = ".."
+enabled = true
+required = false
+enabled_tools = ["generate_image", "edit_image"]
+env_vars = [
+  "LYNN_IMAGE_API_KEY",
+  "LYNN_IMAGE_BASE_URL",
+  "LYNN_IMAGE_MODEL",
+  "LYNN_IMAGE_DEFAULT_SIZE",
+  "LYNN_IMAGE_OUTPUT_DIR",
+  "LYNN_IMAGE_TIMEOUT_MS",
+  "LYNN_IMAGE_POLL_INTERVAL_MS",
+]
+startup_timeout_sec = 20
+tool_timeout_sec = 900

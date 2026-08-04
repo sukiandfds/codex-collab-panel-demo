@@ -106,7 +106,7 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
       cwd: projectRoot,
       developerInstructions: agent.instructions,
       ephemeral: false,
-      serviceName: "codex-collab-panel-demo",
+      serviceName: "negus",
     });
     const threadId = result.thread.id;
     threadAgents.set(threadId, agent.id);

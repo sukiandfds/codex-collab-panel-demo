@@ -9,13 +9,15 @@ import { createVersionRoutes } from "./routes/version-routes.mjs";
 
 export const createRequestHandler = ({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
-  contextManagement, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
+  contextManagement, imageGeneration, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
 }) => {
   const routes = [
     createVersionRoutes({ readWebVersion }),
     createArtifactRoutes({ groupRoom, artifacts, webOutputs }),
     createGroupRoutes({ groupRoom, media, multiAgent, webOutputs }),
-    createConversationRoutes({ conversations, execution, contextManagement, media, broadcast: realtime.broadcast }),
+    createConversationRoutes({
+      conversations, execution, contextManagement, media, imageGeneration, broadcast: realtime.broadcast,
+    }),
     createUsageRoutes({ fushengUsage }),
     createSystemRoutes({ token, project, projectRoot, device, observerPort, media, realtime }),
   ];

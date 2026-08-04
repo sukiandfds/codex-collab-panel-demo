@@ -424,7 +424,7 @@
       aiSummary.innerHTML = '<div class="summary-label">研发记录</div><div id="summary-ai-text" class="summary-preview">等待本地总结服务</div><div id="summary-ai-meta" class="summary-label" style="margin-top:7px">尚未调用模型</div>';
       const topic = document.createElement("div");
       topic.className = "summary-card";
-      topic.innerHTML = '<div class="summary-label">讨论主题</div><div class="summary-value">Codex 协作面板 Demo</div><ul class="summary-list"><li>增加项目实时总结面板</li><li>增加 API Key 与模型设置入口</li><li>暂不执行代码修改或上传数据</li></ul>';
+      topic.innerHTML = '<div class="summary-label">讨论主题</div><div class="summary-value">negus Demo</div><ul class="summary-list"><li>增加项目实时总结面板</li><li>增加 API Key 与模型设置入口</li><li>暂不执行代码修改或上传数据</li></ul>';
       body.appendChild(topic);
       body.appendChild(aiSummary);
       const pending = document.createElement("div");

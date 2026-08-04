@@ -18,6 +18,8 @@ import { createMultiAgentService } from "../server/multi-agent-service.mjs";
 import { createArtifactService } from "../server/artifact-service.mjs";
 import { createWebOutputService } from "../server/web-output-service.mjs";
 import { createFushengUsageService } from "../server/fusheng-usage-service.mjs";
+import { createImageGenerationRunStore } from "../server/image-generation/image-generation-run-store.mjs";
+import { createWebImageGenerationService } from "../server/image-generation/web-image-generation-service.mjs";
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -27,7 +29,7 @@ const getArg = (name, fallback) => {
 
 const port = Number(getArg("--port", "9360"));
 const observerPort = Number(getArg("--observer-port", "9350"));
-const project = getArg("--project", "codex-collab-panel-demo");
+const project = getArg("--project", "negus");
 const projectRoot = path.resolve(getArg("--project-root", process.cwd()));
 const webRoot = path.resolve(getArg("--web-root", path.join(process.cwd(), "web-ui", "dist")));
 const token = getArg("--token", randomBytes(12).toString("hex"));
@@ -36,6 +38,10 @@ const device = { name: deviceName, startedAt: new Date().toISOString() };
 const sessionRoot = process.env.CODEX_SESSION_DIR || path.join(os.homedir(), ".codex", "sessions");
 const media = createMediaService({ uploadRoot: path.join(projectRoot, "runtime", "uploads") });
 await media.restoreUploads();
+const imageGenerationRuns = createImageGenerationRunStore({
+  stateFile: path.join(projectRoot, "runtime", "image-generation-runs.json"),
+  media,
+});
 const realtime = createRealtimeHub();
 const execution = createExecutionTracker({
   broadcast: realtime.broadcast,
@@ -66,6 +72,13 @@ const conversations = createConversationService({
   primary: appServerConversations,
   fallback: jsonlConversations,
   contentVersionStore: conversationVersions,
+  supplementalMessages: imageGenerationRuns,
+});
+const imageGeneration = createWebImageGenerationService({
+  projectRoot,
+  runStore: imageGenerationRuns,
+  execution,
+  broadcast: realtime.broadcast,
 });
 contextManagement = await createContextManagementService({
   stateFile: path.join(projectRoot, "runtime", "context-settings.json"),
@@ -107,7 +120,7 @@ const serveStatic = createStaticFileServer(webRoot);
 const readWebVersion = createWebVersionReader(webRoot);
 const requestHandler = createRequestHandler({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
-  contextManagement, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
+  contextManagement, imageGeneration, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
 });
 const server = http.createServer(requestHandler);
 
@@ -115,6 +128,7 @@ const close = () => {
   realtime.close();
   void execution.close();
   conversations.close();
+  void imageGenerationRuns.close();
   void contextManagement.close();
   multiAgent.close();
   webOutputs.close();

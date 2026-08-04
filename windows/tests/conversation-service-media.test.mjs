@@ -99,3 +99,101 @@ test("deduplicates identical in-flight session reads", async () => {
   await first;
   service.close();
 });
+
+test("merges persistent image generation messages into the recent conversation window", async () => {
+  const primary = {
+    findSession: async () => ({
+      threadId: "thread",
+      messages: [{ ...message(), createdAt: "2026-08-04T08:00:00.000Z" }],
+      latestAssistant: "Done",
+      latestUser: "",
+      updatedAt: "2026-08-04T08:00:00.000Z",
+      hasMore: false,
+    }),
+    close: () => {},
+  };
+  const fallback = { findSession: async () => null, close: () => {} };
+  const supplementalMessages = {
+    list: async () => [{
+      id: "image-assistant",
+      role: "assistant",
+      text: "Negus Image 已生成 1 张图片。",
+      blocks: [{ id: "image", type: "image", source: "/api/media/image" }],
+      createdAt: "2026-08-04T09:00:00.000Z",
+    }],
+  };
+  const service = createConversationService({ primary, fallback, supplementalMessages });
+
+  const session = await service.findSession("thread");
+  assert.deepEqual(session.messages.map((entry) => entry.id), ["answer", "image-assistant"]);
+  assert.equal(session.latestAssistant, "Negus Image 已生成 1 张图片。");
+  assert.equal(session.messageCount, 2);
+  service.close();
+});
+
+test("returns a supplemental-only session before a fresh Codex thread has native messages", async () => {
+  const primary = {
+    findSession: async () => { throw new Error("fresh thread has no persisted turns"); },
+    close: () => {},
+  };
+  const fallback = { findSession: async () => null, close: () => {} };
+  const supplementalMessages = {
+    list: async () => [{
+      id: "image-user",
+      role: "user",
+      text: "Generate an image",
+      blocks: [{ id: "text", type: "markdown", text: "Generate an image" }],
+      createdAt: "2026-08-04T09:00:00.000Z",
+    }, {
+      id: "image-assistant",
+      role: "assistant",
+      text: "Negus Image completed",
+      blocks: [{ id: "image", type: "image", source: "/api/media/image" }],
+      createdAt: "2026-08-04T09:01:00.000Z",
+    }],
+  };
+  const service = createConversationService({ primary, fallback, supplementalMessages });
+
+  const session = await service.findSession("thread", "all", { limit: 60 });
+  assert.equal(session.threadId, "thread");
+  assert.equal(session.title, "Generate an image");
+  assert.deepEqual(session.messages.map((entry) => entry.id), ["image-user", "image-assistant"]);
+  assert.equal(session.messageCount, 2);
+  assert.equal(session.hasMore, false);
+  service.close();
+});
+
+test("lists supplemental-only image sessions after the native empty thread disappears", async () => {
+  const primary = {
+    listSessions: async () => [{
+      threadId: "native-thread",
+      source: "codex",
+      title: "Native thread",
+      updatedAt: "2026-08-04T08:00:00.000Z",
+      messageCount: null,
+      latestUser: "",
+      latestAssistant: "",
+    }],
+    close: () => {},
+  };
+  const fallback = { listSessions: async () => [], close: () => {} };
+  const supplementalMessages = {
+    listSessions: async () => [{
+      threadId: "image-thread",
+      source: "codex",
+      title: "Generate an image",
+      updatedAt: "2026-08-04T09:00:00.000Z",
+      messageCount: 2,
+      latestUser: "Generate an image",
+      latestAssistant: "Negus Image completed",
+      archived: false,
+      forkedFromId: null,
+    }],
+  };
+  const service = createConversationService({ primary, fallback, supplementalMessages });
+
+  const sessions = await service.listSessions("all", false);
+  assert.deepEqual(sessions.map((session) => session.threadId), ["image-thread", "native-thread"]);
+  assert.equal(sessions[0].messageCount, 2);
+  service.close();
+});

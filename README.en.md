@@ -1,4 +1,6 @@
-# Codex Dream Skin
+# negus
+
+> This repository is the development home of **negus**. It began as a Codex Dream Skin experiment and is evolving into a cross-device AI collaboration and creation workspace for Codex.
 
 <p align="center">
   <a href="./README.md">中文</a> · <strong>English</strong>

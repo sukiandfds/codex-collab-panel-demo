@@ -41,7 +41,7 @@ test("uses a build-specific cache without activating during install", async () =
   worker.listeners.get("install")({ waitUntil: (promise) => { installWork = promise; } });
   await installWork;
 
-  assert.deepEqual(worker.openedCaches, ["codex-collab-shell-web-test"]);
+  assert.deepEqual(worker.openedCaches, ["negus-shell-web-test"]);
   assert.equal(worker.getSkipWaitingCalls(), 0);
 });
 

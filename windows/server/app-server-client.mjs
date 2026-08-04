@@ -212,7 +212,7 @@ export const createAppServerClient = ({ requestTimeoutMs = 15000 } = {}) => {
 
   const initialize = () => {
     initializePromise ||= requestRaw("initialize", {
-      clientInfo: { name: "codex-collab-panel-demo", title: "Codex Collab Panel", version: "0.1.0" },
+      clientInfo: { name: "negus", title: "negus", version: "0.1.0" },
       capabilities: { experimentalApi: true },
     }).then((result) => {
       writeMessage({ method: "initialized", params: {} });

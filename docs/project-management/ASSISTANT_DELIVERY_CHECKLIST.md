@@ -1,9 +1,9 @@
 ---
 document_type: project_management_delivery_checklist
 schema_version: 1
-project_id: codex-collab-panel-demo
+project_id: negus
 status: active
-last_updated: 2026-08-03
+last_updated: 2026-08-04
 ---
 
 # AI 助手交付与项目管理联动清单

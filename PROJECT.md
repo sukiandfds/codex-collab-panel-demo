@@ -1,4 +1,4 @@
-# Codex Collab Panel
+# negus
 
 更新日期：2026-07-22
 当前阶段：单项目真实对话 Web Demo，已完成浏览器双向 Codex 技术闭环

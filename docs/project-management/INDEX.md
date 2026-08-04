@@ -1,7 +1,7 @@
 ---
 document_type: project_management_index
 schema_version: 1
-project_id: codex-collab-panel-demo
+project_id: negus
 last_updated: 2026-08-04
 ---
 

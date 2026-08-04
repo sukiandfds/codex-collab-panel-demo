@@ -1,6 +1,6 @@
 # 本项目规则
 
-本文件只记录 `codex-collab-panel-demo` 的项目专属约束；通用的开发、命名和项目管理同步规则见 [`PROJECT_OPERATING_RULES.md`](./PROJECT_OPERATING_RULES.md)。
+本文件只记录 `negus` 的项目专属约束；当前仓库目录和远程仓库仍保留 `codex-collab-panel-demo`，通用的开发、命名和项目管理同步规则见 [`PROJECT_OPERATING_RULES.md`](./PROJECT_OPERATING_RULES.md)。
 
 ## 1. 分支
 

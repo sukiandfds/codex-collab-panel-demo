@@ -1,5 +1,5 @@
 {
-  "name": "codex-collab-panel-demo",
+  "name": "negus",
   "private": true,
   "packageManager": "pnpm@10.28.2",
   "scripts": {
@@ -9,6 +9,8 @@
     "restart:demo": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/restart-web-demo.ps1"
   },
   "dependencies": {
-    "image-size": "2.0.2"
+    "@modelcontextprotocol/server": "2.0.0",
+    "image-size": "2.0.2",
+    "zod": "4.4.3"
   }
 }

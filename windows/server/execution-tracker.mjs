@@ -492,5 +492,14 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
     await persist();
   };
 
-  return { markSubmitted, markFailed, handleProtocolMessage, handleHealthState, getStatus, reconcile, close };
+  return {
+    markSubmitted,
+    markFailed,
+    publishStatus: (threadId, next) => publish(threadId, next),
+    handleProtocolMessage,
+    handleHealthState,
+    getStatus,
+    reconcile,
+    close,
+  };
 };

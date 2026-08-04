@@ -9,7 +9,9 @@ const publicAttachment = ({ id, name, mimeType, url, width, height }) => ({
   ...(Number.isSafeInteger(width) && Number.isSafeInteger(height) ? { width, height } : {}),
 });
 
-export const createConversationRoutes = ({ conversations, execution, contextManagement, media, broadcast = () => {} }) => {
+export const createConversationRoutes = ({
+  conversations, execution, contextManagement, media, imageGeneration, broadcast = () => {},
+}) => {
   const submissions = new Map();
   const submissionTtlMs = 60000;
   const maxSubmissions = 200;
@@ -84,10 +86,15 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
       return true;
     }
     const status = execution.getStatus(threadId);
+    if (imageGeneration?.isActive(threadId)) {
+      sendJson(response, { error: "Negus Image 正在生成当前图片，请完成后再发送新消息" }, 409);
+      return true;
+    }
     if (status.active && !status.turnId) {
       sendJson(response, { error: "Codex 正在启动当前任务，请稍后再试" }, 409);
       return true;
     }
+    const imageIntent = !status.active ? imageGeneration?.intentFor({ text, attachments }) : null;
     broadcast({
       type: "user_message_submitted",
       threadId,
@@ -100,10 +107,15 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
     const submit = (async () => {
       let result;
       try {
-        result = status.active
-          ? await conversations.steerMessage(threadId, status.turnId, text, attachments)
-          : await conversations.sendMessage(threadId, text, attachments);
+        result = imageIntent
+          ? await imageGeneration.start({
+            threadId, submissionId, text, attachments, createdAt, intent: imageIntent,
+          })
+          : status.active
+            ? await conversations.steerMessage(threadId, status.turnId, text, attachments)
+            : await conversations.sendMessage(threadId, text, attachments);
       } catch (error) {
+        if (imageIntent) throw error;
         const recovered = execution.getStatus(threadId);
         if (status.active || !recovered.turnId || recovered.turnId === status.turnId) throw error;
         return {
@@ -114,10 +126,11 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
       return {
         body: {
           threadId,
-          turnId: status.active ? status.turnId : result.turn?.id || "",
-          status: status.active ? "steered" : result.turn?.status || "inProgress",
+          turnId: imageIntent ? result.turnId : status.active ? status.turnId : result.turn?.id || "",
+          status: imageIntent ? result.status : status.active ? "steered" : result.turn?.status || "inProgress",
           submissionId,
           messageId,
+          ...(imageIntent ? { capability: "negus_image", runId: result.runId } : {}),
         },
         statusCode: 202,
       };
@@ -160,6 +173,10 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
   if (url.pathname === "/api/session/interrupt" && request.method === "POST") {
     const body = await readJson(request);
     const threadId = String(body.threadId || "").trim();
+    if (threadId && imageGeneration?.isActive(threadId)) {
+      sendJson(response, { error: "Negus Image 任务提交后暂不支持取消；系统不会自动重复提交" }, 409);
+      return true;
+    }
     const status = execution.getStatus(threadId);
     if (!threadId || !status.active || !status.turnId) {
       sendJson(response, { error: "当前没有可停止的任务" }, 409);
@@ -250,7 +267,7 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
       return true;
     }
     const current = execution.getStatus(threadId);
-    if (current.active && url.searchParams.get("reconcile") === "1") {
+    if (current.active && !imageGeneration?.isActive(threadId) && url.searchParams.get("reconcile") === "1") {
       try {
         execution.reconcile(threadId, await conversations.getThreadStatus(threadId));
       } catch {
