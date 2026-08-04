@@ -29,25 +29,73 @@ const mergeOlderMessages = (olderMessages: SessionDetail["messages"], currentMes
   return [...older, ...current];
 };
 
+const isOptimisticMessage = (message: SessionDetail["messages"][number]) => message.id.startsWith("optimistic-");
+
+const attachmentSignature = (message: SessionDetail["messages"][number]) => (message.blocks || [])
+  .filter((block) => "source" in block)
+  .map((block) => `${block.type}:${block.file?.id || block.source}`)
+  .sort()
+  .join("|");
+
+const persistedMatchesOptimistic = (
+  persisted: SessionDetail["messages"][number],
+  optimistic: SessionDetail["messages"][number],
+) => {
+  if (persisted.role !== "user" || isOptimisticMessage(persisted) || persisted.text !== optimistic.text) return false;
+  const persistedAttachments = attachmentSignature(persisted);
+  const optimisticAttachments = attachmentSignature(optimistic);
+  if ((persistedAttachments || optimisticAttachments) && persistedAttachments !== optimisticAttachments) return false;
+  if (persisted.turnId && optimistic.turnId) return persisted.turnId === optimistic.turnId;
+  const persistedAt = Date.parse(persisted.createdAt || "");
+  const optimisticAt = Date.parse(optimistic.createdAt || "");
+  return !Number.isFinite(persistedAt)
+    || !Number.isFinite(optimisticAt)
+    || Math.abs(persistedAt - optimisticAt) <= 5 * 60 * 1000;
+};
+
+const unresolvedOptimisticMessages = (incoming: SessionDetail, current: SessionDetail) => {
+  const persistedUsers = incoming.messages.filter((message) => message.role === "user" && !isOptimisticMessage(message));
+  const consumed = new Set<number>();
+  return current.messages.filter(isOptimisticMessage).filter((optimistic) => {
+    const match = persistedUsers.findIndex((persisted, index) => (
+      !consumed.has(index) && persistedMatchesOptimistic(persisted, optimistic)
+    ));
+    if (match < 0) return true;
+    consumed.add(match);
+    return false;
+  });
+};
+
+const mergeSessionRefresh = (current: SessionDetail, incoming: SessionDetail): SessionDetail => {
+  const incomingIds = new Set(incoming.messages.map((message) => message.id));
+  const firstOverlap = current.messages.findIndex((message) => !isOptimisticMessage(message) && incomingIds.has(message.id));
+  const olderPrefix = firstOverlap > 0
+    ? current.messages.slice(0, firstOverlap).filter((message) => !isOptimisticMessage(message))
+    : [];
+  const pending = unresolvedOptimisticMessages(incoming, current)
+    .filter((message) => !incomingIds.has(message.id));
+  return {
+    ...incoming,
+    messages: mergeOlderMessages(olderPrefix, [...incoming.messages, ...pending]),
+  };
+};
+
 const mergeSessionDelta = (cached: SessionDetail, delta: SessionDelta): SessionDetail => {
   const upserts = new Map(delta.upserts.map((message) => [message.id, message]));
   const deleted = new Set(delta.deletes);
   const resolved = cached.messages
     .filter((message) => !deleted.has(message.id))
     .map((message) => upserts.get(message.id) || message);
-  const realMessageCounts = new Map<string, number>();
-  for (const message of delta.upserts) {
-    if (message.id.startsWith("optimistic-")) continue;
-    const key = `${message.role}:${message.text}`;
-    realMessageCounts.set(key, (realMessageCounts.get(key) || 0) + 1);
-  }
+  const persistedUsers = delta.upserts.filter((message) => message.role === "user" && !isOptimisticMessage(message));
+  const consumed = new Set<number>();
   const withoutOptimisticDuplicates = resolved.filter((message) => (
-    !message.id.startsWith("optimistic-")
+    !isOptimisticMessage(message)
     || (() => {
-      const key = `${message.role}:${message.text}`;
-      const count = realMessageCounts.get(key) || 0;
-      if (!count) return true;
-      realMessageCounts.set(key, count - 1);
+      const match = persistedUsers.findIndex((persisted, index) => (
+        !consumed.has(index) && persistedMatchesOptimistic(persisted, message)
+      ));
+      if (match < 0) return true;
+      consumed.add(match);
       return false;
     })()
   ));
@@ -98,17 +146,25 @@ export function useConversationSession(initial: InitialConversationState) {
       } : {
         contentVersion: cached?.contentVersion,
       }, controller.signal);
-      const detail = isSessionDelta(response)
-        ? cached ? mergeSessionDelta(cached, response) : null
+      const latest = sessionCache.current.get(threadId);
+      const latestVersion = latest?.contentVersion ?? 0;
+      const responseVersion = response.contentVersion ?? 0;
+      if (!older && latest && responseVersion > 0 && latestVersion > responseVersion) return true;
+      const deltaResponse = isSessionDelta(response);
+      const detail = deltaResponse
+        ? latest ? mergeSessionDelta(latest, response) : null
         : response;
       if (!detail) throw new Error("会话增量缺少本地快照，正在重新读取");
-      const next = older && cached
+      const next = older && latest
         ? {
-          ...detail,
-          contentVersion: detail.contentVersion ?? cached.contentVersion,
-          messages: mergeOlderMessages(detail.messages, cached.messages),
+          ...latest,
+          hasMore: detail.hasMore,
+          nextBefore: detail.nextBefore,
+          nextCursor: detail.nextCursor,
+          contentVersion: latest.contentVersion ?? detail.contentVersion,
+          messages: mergeOlderMessages(detail.messages, latest.messages),
         }
-        : detail;
+        : !deltaResponse && latest ? mergeSessionRefresh(latest, detail) : detail;
       sessionCache.current.set(threadId, next);
       if (selectedIdRef.current === threadId) setSession(next);
       setSessionError("");
@@ -221,12 +277,12 @@ export function useConversationSession(initial: InitialConversationState) {
   }, []);
 
   const updateCurrentSession = useCallback((threadId: string, update: (current: SessionDetail) => SessionDetail) => {
-    setSession((current) => {
-      if (!current || current.threadId !== threadId) return current;
-      const next = update(current);
-      sessionCache.current.set(threadId, next);
-      return next;
-    });
+    const current = sessionCache.current.get(threadId);
+    if (!current) return;
+    const next = update(current);
+    if (next === current) return;
+    sessionCache.current.set(threadId, next);
+    if (selectedIdRef.current === threadId) setSession(next);
   }, []);
 
   const invalidate = useCallback((threadId: string) => sessionCache.current.delete(threadId), []);

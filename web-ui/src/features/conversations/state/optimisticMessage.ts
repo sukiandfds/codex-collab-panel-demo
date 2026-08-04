@@ -1,7 +1,10 @@
 import type { MediaFile } from "../../../shared/model/media";
 import type { ContentBlock, SessionMessage } from "../model/types";
 
-let nextOptimisticMessageId = 1;
+export const createSubmissionId = (): string => globalThis.crypto?.randomUUID?.()
+  || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
+export const optimisticMessageId = (submissionId: string) => `optimistic-${submissionId}`;
 
 const optimisticBlocks = (messageId: string, text: string, attachments: MediaFile[]): ContentBlock[] => {
   const blocks: ContentBlock[] = text
@@ -17,7 +20,12 @@ const optimisticBlocks = (messageId: string, text: string, attachments: MediaFil
   return blocks;
 };
 
-export const createOptimisticMessage = (text: string, attachments: MediaFile[]): SessionMessage => {
-  const id = `optimistic-${Date.now().toString(36)}-${nextOptimisticMessageId++}`;
-  return { id, role: "user", text, blocks: optimisticBlocks(id, text, attachments), createdAt: new Date().toISOString() };
+export const createOptimisticMessage = (
+  text: string,
+  attachments: MediaFile[],
+  submissionId: string = createSubmissionId(),
+  createdAt = new Date().toISOString(),
+): SessionMessage => {
+  const id = optimisticMessageId(submissionId);
+  return { id, role: "user", text, blocks: optimisticBlocks(id, text, attachments), createdAt };
 };

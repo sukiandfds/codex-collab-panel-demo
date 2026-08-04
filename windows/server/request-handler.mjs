@@ -15,7 +15,7 @@ export const createRequestHandler = ({
     createVersionRoutes({ readWebVersion }),
     createArtifactRoutes({ groupRoom, artifacts, webOutputs }),
     createGroupRoutes({ groupRoom, media, multiAgent, webOutputs }),
-    createConversationRoutes({ conversations, execution, contextManagement, media }),
+    createConversationRoutes({ conversations, execution, contextManagement, media, broadcast: realtime.broadcast }),
     createUsageRoutes({ fushengUsage }),
     createSystemRoutes({ token, project, projectRoot, device, observerPort, media, realtime }),
   ];

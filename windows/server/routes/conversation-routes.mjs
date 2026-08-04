@@ -1,6 +1,15 @@
+import { randomUUID } from "node:crypto";
 import { paginationFrom, readJson, sendJson } from "../http/request-utils.mjs";
 
-export const createConversationRoutes = ({ conversations, execution, contextManagement, media }) => {
+const publicAttachment = ({ id, name, mimeType, url, width, height }) => ({
+  id,
+  name,
+  mimeType,
+  url,
+  ...(Number.isSafeInteger(width) && Number.isSafeInteger(height) ? { width, height } : {}),
+});
+
+export const createConversationRoutes = ({ conversations, execution, contextManagement, media, broadcast = () => {} }) => {
   const submissions = new Map();
   const submissionTtlMs = 60000;
   const maxSubmissions = 200;
@@ -55,7 +64,9 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
       sendJson(response, { error: "message is too long" }, 413);
       return true;
     }
-    const submissionId = String(body.submissionId || "").trim().slice(0, 160);
+    const submissionId = String(body.submissionId || "").trim().slice(0, 160) || randomUUID();
+    const messageId = `optimistic-${submissionId}`;
+    const createdAt = new Date().toISOString();
     const fingerprint = JSON.stringify({
       threadId,
       text,
@@ -77,6 +88,15 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
       sendJson(response, { error: "Codex 正在启动当前任务，请稍后再试" }, 409);
       return true;
     }
+    broadcast({
+      type: "user_message_submitted",
+      threadId,
+      submissionId,
+      messageId,
+      text,
+      attachments: attachments.map(publicAttachment),
+      createdAt,
+    });
     const submit = (async () => {
       let result;
       try {
@@ -87,7 +107,7 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
         const recovered = execution.getStatus(threadId);
         if (status.active || !recovered.turnId || recovered.turnId === status.turnId) throw error;
         return {
-          body: { threadId, turnId: recovered.turnId, status: "inProgress", recovered: true },
+          body: { threadId, turnId: recovered.turnId, status: "inProgress", recovered: true, submissionId, messageId },
           statusCode: 202,
         };
       }
@@ -96,6 +116,8 @@ export const createConversationRoutes = ({ conversations, execution, contextMana
           threadId,
           turnId: status.active ? status.turnId : result.turn?.id || "",
           status: status.active ? "steered" : result.turn?.status || "inProgress",
+          submissionId,
+          messageId,
         },
         statusCode: 202,
       };

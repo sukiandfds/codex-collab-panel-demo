@@ -1,4 +1,5 @@
 import type { RealtimeConnectedEvent } from "../../../shared/model/realtime";
+import type { MediaFile } from "../../../shared/model/media";
 import type { ContextStatus } from "../../context-management/model/types";
 
 export type ExecutionPhase =
@@ -77,10 +78,20 @@ export interface SessionsChangedEvent {
   eventSeq?: number;
 }
 
+export interface UserMessageSubmittedEvent {
+  type: "user_message_submitted";
+  threadId: string;
+  submissionId: string;
+  messageId: string;
+  text: string;
+  attachments?: MediaFile[];
+  createdAt: string;
+}
+
 export interface HeartbeatEvent {
   type: "heartbeat";
   active: boolean;
   at: string;
 }
 
-export type ProjectEvent = ExecutionStatus | AssistantDeltaEvent | AssistantCommentaryEvent | SessionsChangedEvent | ContextStatus | HeartbeatEvent | RealtimeConnectedEvent;
+export type ProjectEvent = ExecutionStatus | AssistantDeltaEvent | AssistantCommentaryEvent | SessionsChangedEvent | UserMessageSubmittedEvent | ContextStatus | HeartbeatEvent | RealtimeConnectedEvent;

@@ -31,3 +31,21 @@
 - 用户影响：重启后该对话显示上一任务已中断，用户可以重新发送，不会一直卡在自动恢复失败。
 - 验证：`node --test windows/tests/execution-tracker.test.mjs windows/tests/conversation-controls.test.mjs windows/tests/jsonl-conversation-media.test.mjs`（24/24）；`pnpm build:ui`；`git diff --check`；本机 `/api/execution-status` 已返回 `interrupted`。
 - 证据：`windows/server/execution-tracker.mjs`；`windows/tests/execution-tracker.test.mjs`；Git：`uncommitted`。
+
+### 2026-08-04 09:27 +08:00
+
+- 状态：in_progress / P0 regression
+- 本次更新：逐字保存用户连续报告的三条真实手机使用反馈和记录要求，并关联截图；不以助手概括替代用户原话。
+- 用户影响：当前产品提交存在消息顺序错误、新发送消息不能立即跨 Web 设备显示、最终光标持续闪烁和同一助手答案重复显示，不能视为可交付。
+- 代码范围：本次没有修改代码、没有启动或重启服务。
+- 产品基线：`63e8f948b8058d8236e7a4672b5c1f8bdbf8eb70`
+- 证据：`docs/project-management/items/FEAT-001/process.md#2026-08-04--feat-001-p05--regression--p0--active`
+
+### 2026-08-04 09:55 +08:00
+
+- 状态：in_progress / code_ready_for_runtime_review
+- 本次更新：修复 `FEAT-001-I25` 四项 P0 回归。统一本机乐观消息和跨设备 SSE 消息的提交身份；会话刷新按返回时最新缓存合并并拒绝旧版本；最终答案完成持久化交接后移除流式副本，终态未交接草稿停止闪烁光标。
+- 用户影响：重启加载新后端后，发送消息应立即在本机及其他 Web 设备各出现一次；慢会话刷新或加载旧页不再用旧内容覆盖最新消息；助手完成后只保留一份答案且没有持续闪烁光标。
+- 验证：Windows Node 测试 `84/84`；`pnpm build:ui`；后端语法检查；`git diff --check`；构建产物确认包含 `user_message_submitted`。
+- 运行边界：按用户要求未启动或重启服务；当前运行后端仍是旧代码，本轮不宣称真实手机或跨设备验收通过。
+- 证据：`web-ui/src/features/conversations/hooks/useConversationSession.ts`；`web-ui/src/features/conversations/components/ConversationView.tsx`；`windows/server/routes/conversation-routes.mjs`；`windows/tests/conversation-routes.test.mjs`。

@@ -8,7 +8,7 @@ const MAX_RETIRED_TURNS = 20;
 
 type RefreshStatus = (signal?: AbortSignal, reconcile?: boolean) => Promise<ExecutionStatus | null>;
 
-const createSubmissionId = () => globalThis.crypto?.randomUUID?.()
+const createFallbackSubmissionId = () => globalThis.crypto?.randomUUID?.()
   || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 const idleStatus = (threadId: string): ExecutionStatus => ({
@@ -219,13 +219,13 @@ export function useCodexExecution(threadId: string) {
     }
   }, [acceptEventSequence, applyStatus, clearStreaming, threadId]);
 
-  const sendMessage = useCallback(async (text: string, attachmentIds: string[] = []) => {
+  const sendMessage = useCallback(async (text: string, attachmentIds: string[] = [], submissionId = "") => {
     const message = text.trim();
     if (!threadId || (!message && !attachmentIds.length) || sendingRef.current) return false;
     sendingRef.current = true;
     setSending(true);
     setSendingSlow(false);
-    const submissionId = createSubmissionId();
+    const acceptedSubmissionId = submissionId || createFallbackSubmissionId();
     sendingSlowTimer.current = window.setTimeout(() => setSendingSlow(true), SEND_SLOW_NOTICE_MS);
     const steering = status.active;
     const previousTurnId = status.turnId;
@@ -256,7 +256,7 @@ export function useCodexExecution(threadId: string) {
       }));
     }
     try {
-      const accepted = await executionApi.sendMessage(threadId, message, attachmentIds, submissionId, controller.signal);
+      const accepted = await executionApi.sendMessage(threadId, message, attachmentIds, acceptedSubmissionId, controller.signal);
       if (accepted.turnId) {
         currentTurnIdRef.current = accepted.turnId;
         stateRevisionRef.current += 1;

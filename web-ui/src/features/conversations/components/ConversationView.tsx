@@ -100,14 +100,16 @@ export function ConversationView({
     || executionStatus.activities.length > 0
     || (completedExecution && Boolean(executionStatus.startedAt))
   );
-  const finalMessageLoaded = executionMatchesSession
-    && Boolean(executionStatus.turnId)
-    && messages.some((message) => message.role === "assistant"
-      && message.turnId === executionStatus.turnId
-      && (!executionStatus.streamingItemId
-        || message.itemId === executionStatus.streamingItemId
-        || (!message.itemId && message.text === streamingText))
-      && finalMessageContainsStream(message, streamingText));
+  const latestAssistant = [...messages].reverse().find((message) => message.role === "assistant");
+  const finalMessageLoaded = executionMatchesSession && (
+    messages.some((message) => message.role === "assistant"
+      && finalMessageContainsStream(message, streamingText)
+      && ((Boolean(executionStatus.turnId) && message.turnId === executionStatus.turnId)
+        || (Boolean(executionStatus.streamingItemId) && message.itemId === executionStatus.streamingItemId)))
+    || (completedExecution
+      && Boolean(latestAssistant)
+      && finalMessageContainsStream(latestAssistant!, streamingText))
+  );
   const visibleStreamingText = executionMatchesSession && !finalMessageLoaded ? streamingText : "";
   const executionIndex = !executionStatus.active && messages.at(-1)?.role === "assistant"
     ? messages.length - 1
@@ -127,7 +129,7 @@ export function ConversationView({
         turnId: executionStatus.turnId || undefined,
         itemId: executionStatus.streamingItemId || undefined,
       },
-      streaming: true,
+      streaming: executionStatus.active && !completedExecution,
     }] : []),
   ];
   const virtualizer = useVirtualizer({

@@ -7,7 +7,7 @@ import type { ProjectEvent } from "../../execution/model/types";
 import { useModels } from "../../models/hooks/useModels";
 import { readConversationSnapshotAsync, writeConversationSnapshot } from "../data/conversationSnapshot";
 import { useConversationEvents } from "../realtime/useConversationEvents";
-import { createOptimisticMessage } from "../state/optimisticMessage";
+import { createOptimisticMessage, createSubmissionId } from "../state/optimisticMessage";
 import { readInitialConversationState } from "../state/initialConversation";
 import { useConversationCatalog } from "./useConversationCatalog";
 import { useConversationSession } from "./useConversationSession";
@@ -60,13 +60,14 @@ export function useProjectConversations() {
     const messageText = text.trim();
     if (!threadId || (!messageText && !attachments.length)) return false;
 
-    const optimisticMessage = createOptimisticMessage(messageText, attachments);
+    const submissionId = createSubmissionId();
+    const optimisticMessage = createOptimisticMessage(messageText, attachments, submissionId);
     selection.updateCurrentSession(threadId, (current) => ({
       ...current,
       messages: [...current.messages, optimisticMessage],
     }));
 
-    const sent = await execution.sendMessage(messageText, attachments.map((attachment) => attachment.id));
+    const sent = await execution.sendMessage(messageText, attachments.map((attachment) => attachment.id), submissionId);
     if (!sent) {
       selection.updateCurrentSession(threadId, (current) => ({
         ...current,
@@ -98,7 +99,21 @@ export function useProjectConversations() {
   const handleEvent = useCallback((event: ProjectEvent) => {
     execution.handleEvent(event);
     if (event.type === "context_status") contextManagement.handleEvent(event);
-  }, [contextManagement.handleEvent, execution.handleEvent]);
+    if (event.type === "user_message_submitted") {
+      const generated = createOptimisticMessage(
+        event.text,
+        event.attachments || [],
+        event.submissionId,
+        event.createdAt,
+      );
+      const message = generated.id === event.messageId ? generated : { ...generated, id: event.messageId };
+      selection.updateCurrentSession(event.threadId, (current) => (
+        current.messages.some((item) => item.id === message.id)
+          ? current
+          : { ...current, messages: [...current.messages, message] }
+      ));
+    }
+  }, [contextManagement.handleEvent, execution.handleEvent, selection.updateCurrentSession]);
   const recoverRealtime = useCallback((_reason: RealtimeRecoveryReason) => {
     void execution.refreshStatus(undefined, true).then(() => {
       onSessionsChanged(selection.selectedIdRef.current || undefined);

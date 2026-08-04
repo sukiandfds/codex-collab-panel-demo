@@ -12,7 +12,7 @@ AI 助手应先根据任务定位功能编号，再读取对应文件。不要�
 
 | 功能编号 | 功能 | 当前状态 | 当前版本 | 最近更新 | 当前结论 | 记录 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `FEAT-001` | 单人 Codex Web 对话与控制 | `implemented_pending_review` | `v0.10.8` | 2026-08-02 11:39 +08:00 | 已按 Codex/Happy 的事件快路径与权威快照恢复模式修复“回复已完成但页面仍运行”；弱网发送、停止确认、完成后过程折叠和思考程度中英对照已补齐，跨设备终态与流式交接问题记录为 `I24`，等待手机长任务验收 | [`FEAT-001-single-codex-web.md`](./features/FEAT-001-single-codex-web.md) |
+| `FEAT-001` | 单人 Codex Web 对话与控制 | `implemented_pending_review` | `v0.10.9` | 2026-08-04 09:55 +08:00 | `I25` 四项 P0 回归已完成代码修复：同一提交身份驱动本机与跨 Web 设备即时消息、请求返回按最新缓存合并、旧版本响应不覆盖新内容、流式最终答案原子去重并在终态停止光标；Windows 测试 `84/84` 与 UI 构建通过，按用户要求未重启，等待真实手机验收 | [`FEAT-001-single-codex-web.md`](./features/FEAT-001-single-codex-web.md) |
 | `FEAT-002` | 项目群聊与多 Agent 讨论 | `implemented_pending_review` | `v0.4.0` | 2026-07-28 15:47 +08:00 | 已有真实群聊和四个 Agent；基础体验需与单人 Codex 看齐，长期按模型无关 Agent/Provider 边界扩展不同模型 | [`FEAT-002-group-multi-agent.md`](./features/FEAT-002-group-multi-agent.md) |
 | `FEAT-003` | 附件与对话内容渲染 | `implemented_pending_review` | `v0.3.0` | 2026-07-25 22:49 +08:00 | 支持上传、图片/音频/视频/文件展示和 Markdown 本地图片登记；仍是 Demo 级上传协议 | [`FEAT-003-attachments-content-rendering.md`](./features/FEAT-003-attachments-content-rendering.md) |
 | `FEAT-004` | PWA、设备身份与移动/平板入口 | `implemented_pending_review` | `v0.2.0` | 2026-07-28 17:43 +08:00 | 新构建会提示用户刷新且不会自动打断任务；连接状态不再误报电脑离线，真实 PWA 更新流程待原开发电脑验证 | [`FEAT-004-pwa-device-identity.md`](./features/FEAT-004-pwa-device-identity.md) |
