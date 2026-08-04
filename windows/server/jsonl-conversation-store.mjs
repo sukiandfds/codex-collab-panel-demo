@@ -130,6 +130,7 @@ export const createJsonlConversationStore = ({ sessionRoot, projectRoot, registe
     offset: 0,
     carry: "",
     lastKey: "",
+    messageSequence: 0,
     messages: [],
     pendingAssistantMedia: [],
     decoder: new StringDecoder("utf8"),
@@ -168,8 +169,14 @@ export const createJsonlConversationStore = ({ sessionRoot, projectRoot, registe
         state.pendingAssistantMedia = [];
       }
 
+      const messageIndex = state.messageSequence;
+      state.messageSequence += 1;
+      const itemId = item.id || item.payload?.id || item.payload?.client_id || message.itemId || "";
+      const turnId = message.turnId || item.turnId || item.payload?.internal_chat_message_metadata_passthrough?.turn_id || "";
+      const identity = itemId || `${item.timestamp || "unknown"}:${messageIndex}`;
+      message.id = `jsonl:${encodeURIComponent(state.threadId)}:${encodeURIComponent(String(turnId || "unknown"))}:${encodeURIComponent(String(identity))}`;
       const previous = state.messages.at(-1);
-      const logicalKey = `${message.role}:${message.text}:${item.timestamp || ""}`;
+      const logicalKey = `${message.role}:${turnId}:${identity}:${item.timestamp || ""}`;
       if (previous?.role === message.role && previous.text === message.text && state.lastKey.startsWith(`${logicalKey}:`)) {
         previous.blocks = mergeBlocks(previous.blocks, message.blocks);
         state.lastKey = `${logicalKey}:${previous.blocks.map(blockKey).join("|")}`;

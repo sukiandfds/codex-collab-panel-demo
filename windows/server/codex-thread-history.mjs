@@ -10,19 +10,30 @@ const itemListMethods = ["thread/items/list", "thread/turns/items/list"];
 const itemListMethodByClient = new WeakMap();
 const unsupportedMethodPattern = /(?:method\s+not\s+found|unknown\s+method|unsupported\s+method|not\s+implemented|unrecognized\s+method)/iu;
 
+const stableMessageId = (turnId, itemId, index, message) => {
+  const identity = itemId || `${message.id}:${index}`;
+  return `codex:${encodeURIComponent(String(turnId || "unknown"))}:${encodeURIComponent(String(identity))}`;
+};
+
 const turnPageLimit = (messageLimit) => {
   const safeLimit = Number.isSafeInteger(messageLimit) && messageLimit > 0 ? messageLimit : 60;
   return Math.min(100, Math.max(20, Math.ceil(safeLimit / 2) + 4));
 };
 
 const messagesFromTurn = (turn, registerMedia) => (Array.isArray(turn?.items) ? turn.items : [])
-  .map((item) => {
+  .map((item, index) => {
     const message = messageFromThreadItem(item, registerMedia);
     if (!message) return null;
     const timestamp = message.role === "user" ? turn.startedAt : turn.completedAt;
+    const itemId = item.id || message.itemId || "";
     const withTurn = turn.id
-      ? { ...message, turnId: turn.id, itemId: item.id || message.itemId }
-      : { ...message, itemId: item.id || message.itemId };
+      ? {
+        ...message,
+        id: stableMessageId(turn.id, itemId, index, message),
+        turnId: turn.id,
+        itemId,
+      }
+      : { ...message, id: stableMessageId("unknown", itemId, index, message), itemId };
     return Number.isFinite(timestamp)
       ? { ...withTurn, createdAt: new Date(timestamp * 1000).toISOString() }
       : withTurn;
@@ -30,14 +41,15 @@ const messagesFromTurn = (turn, registerMedia) => (Array.isArray(turn?.items) ? 
   .filter(Boolean);
 
 const messagesFromItems = (entries, registerMedia) => (Array.isArray(entries) ? entries : [])
-  .map((entry) => {
+  .map((entry, index) => {
     const item = entry?.item || entry?.threadItem || entry;
     const message = messageFromThreadItem(item, registerMedia);
     if (!message) return null;
     const turnId = item?.turnId || entry?.turnId || entry?.turn?.id || "";
+    const itemId = item?.id || message.itemId || "";
     return turnId
-      ? { ...message, turnId, itemId: item.id || message.itemId }
-      : { ...message, itemId: item.id || message.itemId };
+      ? { ...message, id: stableMessageId(turnId, itemId, index, message), turnId, itemId }
+      : { ...message, id: stableMessageId("unknown", itemId, index, message), itemId };
   })
   .filter(Boolean);
 

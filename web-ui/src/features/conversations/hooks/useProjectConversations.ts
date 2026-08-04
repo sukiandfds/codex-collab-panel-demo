@@ -62,20 +62,14 @@ export function useProjectConversations() {
 
     const submissionId = createSubmissionId();
     const optimisticMessage = createOptimisticMessage(messageText, attachments, submissionId);
-    selection.updateCurrentSession(threadId, (current) => ({
-      ...current,
-      messages: [...current.messages, optimisticMessage],
-    }));
+    selection.addOptimisticMessage(threadId, optimisticMessage);
 
     const sent = await execution.sendMessage(messageText, attachments.map((attachment) => attachment.id), submissionId);
     if (!sent) {
-      selection.updateCurrentSession(threadId, (current) => ({
-        ...current,
-        messages: current.messages.filter((message) => message.id !== optimisticMessage.id),
-      }));
+      selection.removeOptimisticMessage(threadId, optimisticMessage.id);
     }
     return sent;
-  }, [execution.sendMessage, selection.selectedIdRef, selection.updateCurrentSession]);
+  }, [execution.sendMessage, selection.addOptimisticMessage, selection.removeOptimisticMessage, selection.selectedIdRef]);
 
   const forkFromMessage = useCallback(async (message: SessionMessage) => {
     const threadId = selection.selectedIdRef.current;
@@ -107,13 +101,9 @@ export function useProjectConversations() {
         event.createdAt,
       );
       const message = generated.id === event.messageId ? generated : { ...generated, id: event.messageId };
-      selection.updateCurrentSession(event.threadId, (current) => (
-        current.messages.some((item) => item.id === message.id)
-          ? current
-          : { ...current, messages: [...current.messages, message] }
-      ));
+      selection.addOptimisticMessage(event.threadId, message);
     }
-  }, [contextManagement.handleEvent, execution.handleEvent, selection.updateCurrentSession]);
+  }, [contextManagement.handleEvent, execution.handleEvent, selection.addOptimisticMessage]);
   const recoverRealtime = useCallback((_reason: RealtimeRecoveryReason) => {
     void execution.refreshStatus(undefined, true).then(() => {
       onSessionsChanged(selection.selectedIdRef.current || undefined);

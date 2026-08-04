@@ -101,7 +101,7 @@ export const writeConversationSnapshot = ({ selectedId, sessions, session }: {
 }) => {
   try {
     const cachedSession = session && session.threadId === selectedId
-      ? { ...session, messages: session.messages.filter((message) => !message.id.startsWith("optimistic-")).slice(-60) }
+      ? { ...session, messages: session.messages.slice(-60) }
       : null;
     const snapshot: ConversationSnapshot = {
       version: 1,

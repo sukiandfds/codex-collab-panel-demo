@@ -108,3 +108,28 @@ test("returns a full snapshot when message identities reset across a source swit
   assert.equal(switched.contentVersion, 2);
   await store.close();
 });
+
+test("keeps duplicate source ids as separate messages", async () => {
+  const store = createConversationVersionStore();
+  const first = await store.sync("thread-1", {
+    ...session(),
+    messages: [
+      { id: "item-1", role: "user", text: "First" },
+      { id: "item-1", role: "user", text: "Second" },
+    ],
+  });
+
+  assert.equal(first.messages.length, 2);
+  assert.equal(new Set(first.messages.map((message) => message.id)).size, 2);
+  assert.equal(first.messages[1].id, "item-1#duplicate-1");
+
+  const unchanged = await store.sync("thread-1", {
+    ...session(),
+    messages: [
+      { id: "item-1", role: "user", text: "First" },
+      { id: "item-1", role: "user", text: "Second" },
+    ],
+  }, { requestedVersion: first.contentVersion, incremental: true });
+  assert.equal(unchanged.unchanged, true);
+  await store.close();
+});

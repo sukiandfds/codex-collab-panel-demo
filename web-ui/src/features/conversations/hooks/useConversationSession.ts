@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { InitialConversationState } from "../state/initialConversation";
 import { conversationApi } from "../data/conversationApi";
-import type { SessionDelta, SessionDetail, SessionResponse } from "../model/types";
+import type { SessionDelta, SessionDetail, SessionMessage, SessionResponse } from "../model/types";
 
 type LoadOptions = { older?: boolean; quiet?: boolean; retry?: boolean };
 
@@ -66,6 +66,16 @@ const unresolvedOptimisticMessages = (incoming: SessionDetail, current: SessionD
   });
 };
 
+const mergePendingOptimisticMessages = (incoming: SessionDetail, pending: SessionMessage[]) => {
+  if (!pending.length) return incoming;
+  const incomingIds = new Set(incoming.messages.map((message) => message.id));
+  const unresolved = unresolvedOptimisticMessages(incoming, { ...incoming, messages: pending })
+    .filter((message) => !incomingIds.has(message.id));
+  return unresolved.length
+    ? { ...incoming, messages: [...incoming.messages, ...unresolved] }
+    : incoming;
+};
+
 const mergeSessionRefresh = (current: SessionDetail, incoming: SessionDetail): SessionDetail => {
   const incomingIds = new Set(incoming.messages.map((message) => message.id));
   const firstOverlap = current.messages.findIndex((message) => !isOptimisticMessage(message) && incomingIds.has(message.id));
@@ -121,6 +131,7 @@ export function useConversationSession(initial: InitialConversationState) {
   const retryTimerRef = useRef(0);
   const sessionLoadsRef = useRef(new Map<string, Promise<boolean>>());
   const pendingSessionSyncRef = useRef(new Set<string>());
+  const pendingOptimisticMessagesRef = useRef(new Map<string, SessionMessage[]>());
   const sessionCache = useRef(new Map<string, SessionDetail>(initial.session
     ? [[initial.session.threadId, initial.session]]
     : []));
@@ -147,26 +158,32 @@ export function useConversationSession(initial: InitialConversationState) {
         contentVersion: cached?.contentVersion,
       }, controller.signal);
       const latest = sessionCache.current.get(threadId);
+      const pendingOptimistic = pendingOptimisticMessagesRef.current.get(threadId) || [];
+      const latestWithPending = latest
+        ? mergePendingOptimisticMessages(latest, pendingOptimistic)
+        : latest;
       const latestVersion = latest?.contentVersion ?? 0;
       const responseVersion = response.contentVersion ?? 0;
       if (!older && latest && responseVersion > 0 && latestVersion > responseVersion) return true;
       const deltaResponse = isSessionDelta(response);
       const detail = deltaResponse
-        ? latest ? mergeSessionDelta(latest, response) : null
+        ? latestWithPending ? mergeSessionDelta(latestWithPending, response) : null
         : response;
       if (!detail) throw new Error("会话增量缺少本地快照，正在重新读取");
-      const next = older && latest
+      const next = older && latestWithPending
         ? {
-          ...latest,
+          ...latestWithPending,
           hasMore: detail.hasMore,
           nextBefore: detail.nextBefore,
           nextCursor: detail.nextCursor,
-          contentVersion: latest.contentVersion ?? detail.contentVersion,
-          messages: mergeOlderMessages(detail.messages, latest.messages),
+          contentVersion: latestWithPending.contentVersion ?? detail.contentVersion,
+          messages: mergeOlderMessages(detail.messages, latestWithPending.messages),
         }
-        : !deltaResponse && latest ? mergeSessionRefresh(latest, detail) : detail;
-      sessionCache.current.set(threadId, next);
-      if (selectedIdRef.current === threadId) setSession(next);
+        : !deltaResponse && latestWithPending ? mergeSessionRefresh(latestWithPending, detail) : detail;
+      const resolved = mergePendingOptimisticMessages(next, pendingOptimistic);
+      sessionCache.current.set(threadId, resolved);
+      if (pendingOptimistic.length) pendingOptimisticMessagesRef.current.delete(threadId);
+      if (selectedIdRef.current === threadId) setSession(resolved);
       setSessionError("");
       return true;
     } catch (reason) {
@@ -243,6 +260,7 @@ export function useConversationSession(initial: InitialConversationState) {
   }, []);
 
   const setCreatedSession = useCallback((detail: SessionDetail) => {
+    pendingOptimisticMessagesRef.current.delete(detail.threadId);
     sessionCache.current.set(detail.threadId, detail);
     selectedIdRef.current = detail.threadId;
     setSelectedId(detail.threadId);
@@ -285,6 +303,33 @@ export function useConversationSession(initial: InitialConversationState) {
     if (selectedIdRef.current === threadId) setSession(next);
   }, []);
 
+  const addOptimisticMessage = useCallback((threadId: string, message: SessionMessage) => {
+    const current = sessionCache.current.get(threadId);
+    if (current) {
+      if (current.messages.some((item) => item.id === message.id)) return;
+      const next = { ...current, messages: [...current.messages, message] };
+      sessionCache.current.set(threadId, next);
+      if (selectedIdRef.current === threadId) setSession(next);
+      return;
+    }
+    const pending = pendingOptimisticMessagesRef.current.get(threadId) || [];
+    if (pending.some((item) => item.id === message.id)) return;
+    pendingOptimisticMessagesRef.current.set(threadId, [...pending, message]);
+  }, []);
+
+  const removeOptimisticMessage = useCallback((threadId: string, messageId: string) => {
+    const pending = pendingOptimisticMessagesRef.current.get(threadId);
+    if (pending) {
+      const nextPending = pending.filter((message) => message.id !== messageId);
+      if (nextPending.length) pendingOptimisticMessagesRef.current.set(threadId, nextPending);
+      else pendingOptimisticMessagesRef.current.delete(threadId);
+    }
+    updateCurrentSession(threadId, (current) => ({
+      ...current,
+      messages: current.messages.filter((message) => message.id !== messageId),
+    }));
+  }, [updateCurrentSession]);
+
   const invalidate = useCallback((threadId: string) => sessionCache.current.delete(threadId), []);
   const loadOlder = useCallback(async () => {
     if (selectedIdRef.current) await loadSession(selectedIdRef.current, { older: true });
@@ -298,6 +343,6 @@ export function useConversationSession(initial: InitialConversationState) {
   return {
     selectedId, selectedIdRef, session, loadingSession, loadingOlder, syncing, sessionError,
     setSyncing, loadSession, selectSession, adoptSelection, clearSelection, setCreatedSession, hydrateSnapshot,
-    updateCurrentSession, invalidate, loadOlder,
+    updateCurrentSession, addOptimisticMessage, removeOptimisticMessage, invalidate, loadOlder,
   };
 }
