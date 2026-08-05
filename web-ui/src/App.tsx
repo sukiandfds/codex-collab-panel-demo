@@ -51,6 +51,8 @@ export function App() {
           deviceName={device?.name}
           connected={conversations.connected}
           onOpenSidebar={() => setSidebarOpen(true)}
+          onRename={conversations.renameSession}
+          renaming={conversations.renaming}
           usage={
             <UsageSummaryControl
               snapshot={usage.snapshot}
@@ -74,6 +76,8 @@ export function App() {
           onLoadOlder={conversations.loadOlder}
           onForkMessage={conversations.forkFromMessage}
           forkingMessageId={conversations.forkingMessageId}
+          onEditMessage={conversations.beginEditMessage}
+          editingMessageId={conversations.editingMessageId}
         />
       }
       composer={
@@ -92,6 +96,16 @@ export function App() {
           modelChanging={conversations.modelChanging}
           modelError={conversations.modelError}
           onSend={conversations.sendMessage}
+          onQueue={conversations.queueMessage}
+          queueing={conversations.queueBusy}
+          queueItems={conversations.queueItems}
+          queueError={conversations.queueError}
+          onEditQueueItem={conversations.editQueueItem}
+          onRemoveQueueItem={conversations.removeQueueItem}
+          onMoveQueueItem={conversations.moveQueueItem}
+          onRetryQueueItem={conversations.retryQueueItem}
+          editingMessage={conversations.editingMessage}
+          onCancelEdit={conversations.cancelEditMessage}
           onInterrupt={conversations.interrupt}
           onCompactContext={conversations.compactContext}
           onAutoCompactThresholdChange={conversations.setAutoCompactThreshold}

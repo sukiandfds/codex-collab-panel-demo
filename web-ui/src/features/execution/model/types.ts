@@ -1,6 +1,7 @@
 import type { RealtimeConnectedEvent } from "../../../shared/model/realtime";
 import type { MediaFile } from "../../../shared/model/media";
 import type { ContextStatus } from "../../context-management/model/types";
+import type { FollowUpQueueItem } from "../../conversations/model/followUpQueue";
 
 export type ExecutionPhase =
   | "idle"
@@ -88,10 +89,19 @@ export interface UserMessageSubmittedEvent {
   createdAt: string;
 }
 
+export interface QueueChangedEvent {
+  type: "queue_changed";
+  threadId: string;
+  reason: string;
+  items: FollowUpQueueItem[];
+  eventEpoch?: string;
+  eventSeq?: number;
+}
+
 export interface HeartbeatEvent {
   type: "heartbeat";
   active: boolean;
   at: string;
 }
 
-export type ProjectEvent = ExecutionStatus | AssistantDeltaEvent | AssistantCommentaryEvent | SessionsChangedEvent | UserMessageSubmittedEvent | ContextStatus | HeartbeatEvent | RealtimeConnectedEvent;
+export type ProjectEvent = ExecutionStatus | AssistantDeltaEvent | AssistantCommentaryEvent | SessionsChangedEvent | UserMessageSubmittedEvent | QueueChangedEvent | ContextStatus | HeartbeatEvent | RealtimeConnectedEvent;

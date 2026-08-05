@@ -2,9 +2,17 @@
 .topbar { display: flex; align-items: center; gap: 9px; min-width: 0; height: var(--topbar-height); padding: 0 12px 0 15px; }
 .titleIcon { width: 17px; height: 17px; flex: 0 0 17px; color: var(--color-text-secondary); stroke-width: 1.8; }
 .heading { display: grid; min-width: 0; overflow: hidden; gap: 1px; }
+.titleRow { display: flex; min-width: 0; align-items: center; gap: 3px; }
 .title,
 .meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .title { min-width: 0; margin: 0; color: var(--color-text); font-size: 14px; font-weight: 600; }
+.titleInput { min-width: 0; width: min(360px, 100%); height: 28px; padding: 3px 7px; border: 1px solid var(--color-border-strong); border-radius: 6px; outline: 0; background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 14px; font-weight: 600; }
+.titleActions { display: flex; align-items: center; gap: 1px; }
+.titleEdit { display: grid; width: 25px; height: 25px; flex: 0 0 25px; place-items: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--color-text-muted); cursor: pointer; }
+.titleEdit:hover:not(:disabled) { background: var(--color-surface-hover); color: var(--color-text); }
+.titleEdit:disabled { cursor: default; opacity: .45; }
+.titleEdit svg { width: 14px; height: 14px; }
+.renameError { overflow: hidden; color: #d58f8f; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .meta { flex: 0 1 auto; color: var(--color-text-muted); font-size: 11px; }
 .spacer { flex: 1; }
 .statusbar { display: flex; min-width: 0; height: 28px; align-items: center; gap: 7px; overflow: hidden; padding: 0 13px 0 41px; color: var(--color-text-muted); }

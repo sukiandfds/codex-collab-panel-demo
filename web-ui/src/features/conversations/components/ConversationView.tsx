@@ -34,12 +34,18 @@ function Message({
   forkable = false,
   forking = false,
   onFork,
+  editable = false,
+  editing = false,
+  onEdit,
 }: {
   message: SessionMessage;
   streaming?: boolean;
   forkable?: boolean;
   forking?: boolean;
   onFork: () => Promise<boolean>;
+  editable?: boolean;
+  editing?: boolean;
+  onEdit: () => void;
 }) {
   const formattedTime = messageTime(message.createdAt);
   return (
@@ -50,7 +56,15 @@ function Message({
       </div>
       {!streaming ? (
         <div className={styles.actionRow}>
-          <MessageActions text={message.text} forkable={forkable} forking={forking} onFork={onFork} />
+          <MessageActions
+            text={message.text}
+            forkable={forkable}
+            forking={forking}
+            onFork={onFork}
+            editable={editable}
+            editing={editing}
+            onEdit={onEdit}
+          />
         </div>
       ) : null}
     </article>
@@ -69,6 +83,8 @@ interface ConversationViewProps {
   onLoadOlder: () => Promise<void>;
   onForkMessage: (message: SessionMessage) => Promise<boolean>;
   forkingMessageId: string;
+  onEditMessage: (message: SessionMessage) => void;
+  editingMessageId: string;
 }
 
 type ConversationItem =
@@ -87,6 +103,8 @@ export function ConversationView({
   onLoadOlder,
   onForkMessage,
   forkingMessageId,
+  onEditMessage,
+  editingMessageId,
 }: ConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingOlderRef = useRef(false);
@@ -237,6 +255,12 @@ export function ConversationView({
                           && !session?.archived}
                         forking={forkingMessageId === item.message.id}
                         onFork={() => onForkMessage(item.message)}
+                        editable={item.message.role === "user"
+                          && Boolean(item.message.turnId)
+                          && !executionStatus.active
+                          && !session?.archived}
+                        editing={editingMessageId === item.message.id}
+                        onEdit={() => onEditMessage(item.message)}
                       />
                     )}
                 </div>

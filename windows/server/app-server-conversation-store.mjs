@@ -200,6 +200,15 @@ export const createAppServerConversationStore = ({
     return summaryFromThread(thread);
   };
 
+  const renameSession = async (threadId, name) => {
+    await ensureProjectThread(threadId);
+    const result = await client.request("thread/name/set", { threadId, name });
+    const cached = threadCache.get(threadId) || { id: threadId };
+    const thread = result?.thread || { ...cached, name };
+    threadCache.set(threadId, thread);
+    return summaryFromThread(thread, archivedFromThread(thread));
+  };
+
   const listModels = async () => {
     const models = [];
     let cursor = null;
@@ -424,7 +433,7 @@ export const createAppServerConversationStore = ({
   };
 
   return {
-    listSessions, createSession, findSession, sendMessage, steerMessage, interrupt,
+    listSessions, createSession, renameSession, findSession, sendMessage, steerMessage, interrupt,
     forkSession, archiveSession, unarchiveSession,
     listModels, updateModel, updateReasoningEffort, getRuntimeContext, getThreadStatus,
     compactContext, close,

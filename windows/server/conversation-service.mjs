@@ -161,6 +161,7 @@ export const createConversationService = ({ primary, fallback, contentVersionSto
   return {
     listSessions,
     createSession: (...args) => primary.createSession(...args),
+    renameSession: (...args) => primary.renameSession(...args),
     findSession,
     sendMessage,
     steerMessage: (...args) => primary.steerMessage(...args),

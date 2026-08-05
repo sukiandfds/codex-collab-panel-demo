@@ -4,7 +4,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { activityFromItem, detailFromItem, maxActivities, stateFromItem, terminalPhases } from "./execution/activity.mjs";
 
-export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
+export const createExecutionTracker = ({ broadcast, stateFile = "", onTurnTerminal = () => {} }) => {
   const statuses = new Map();
   const messagePhases = new Map();
   const itemTurns = new Map();
@@ -265,6 +265,9 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
       });
       rememberCompletedTurn(threadId, turnId || statuses.get(threadId)?.turnId || "");
       broadcastThreadEvent(threadId, { type: "sessions_changed", threadId });
+      Promise.resolve(onTurnTerminal({ threadId, turnId, status: phase })).catch((error) => {
+        console.warn(`[execution-tracker] terminal callback failed: ${error.message}`);
+      });
       return;
     }
     const eventTurnId = turnIdFor(threadId, params, params.itemId || params.item?.id || "");
@@ -502,6 +505,7 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
     handleHealthState,
     getStatus,
     reconcile,
+    publishThreadEvent: broadcastThreadEvent,
     close,
   };
 };

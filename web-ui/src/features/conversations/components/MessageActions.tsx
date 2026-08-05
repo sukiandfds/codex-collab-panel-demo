@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, GitBranch } from "lucide-react";
+import { Check, Copy, Edit3, GitBranch } from "lucide-react";
 import styles from "./MessageActions.module.css";
 
 interface MessageActionsProps {
@@ -7,6 +7,9 @@ interface MessageActionsProps {
   forkable: boolean;
   forking: boolean;
   onFork: () => Promise<boolean>;
+  editable: boolean;
+  editing: boolean;
+  onEdit: () => void;
 }
 
 const copyWithFallback = async (text: string) => {
@@ -26,7 +29,7 @@ const copyWithFallback = async (text: string) => {
   if (!copied) throw new Error("clipboard unavailable");
 };
 
-export function MessageActions({ text, forkable, forking, onFork }: MessageActionsProps) {
+export function MessageActions({ text, forkable, forking, onFork, editable, editing, onEdit }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const resetTimerRef = useRef<number | null>(null);
@@ -74,6 +77,18 @@ export function MessageActions({ text, forkable, forking, onFork }: MessageActio
           onClick={() => void onFork()}
         >
           <GitBranch aria-hidden="true" className={forking ? styles.spinning : undefined} />
+        </button>
+      ) : null}
+      {editable ? (
+        <button
+          className={styles.button}
+          type="button"
+          aria-label={editing ? "正在编辑" : "重新编辑"}
+          title={editing ? "正在编辑" : "重新编辑"}
+          disabled={editing}
+          onClick={onEdit}
+        >
+          <Edit3 aria-hidden="true" />
         </button>
       ) : null}
     </div>

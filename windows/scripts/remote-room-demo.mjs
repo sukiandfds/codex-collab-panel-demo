@@ -9,6 +9,7 @@ import { createConversationVersionStore } from "../server/conversation-version-s
 import { createMediaService } from "../server/media-service.mjs";
 import { createRealtimeHub } from "../server/realtime-hub.mjs";
 import { createExecutionTracker } from "../server/execution-tracker.mjs";
+import { createFollowUpQueueService } from "../server/follow-up-queue-service.mjs";
 import { createContextManagementService } from "../server/context-management-service.mjs";
 import { createRequestHandler } from "../server/request-handler.mjs";
 import { createStaticFileServer } from "../server/static-files.mjs";
@@ -42,9 +43,11 @@ const imageGenerationRuns = createImageGenerationRunStore({
   media,
 });
 const realtime = createRealtimeHub();
+let followUpQueue;
 const execution = createExecutionTracker({
   broadcast: realtime.broadcast,
   stateFile: path.join(projectRoot, "runtime", "execution-runs.json"),
+  onTurnTerminal: (event) => followUpQueue?.handleTurnTerminal(event),
 });
 let contextManagement;
 const jsonlConversations = createJsonlConversationStore({
@@ -73,6 +76,14 @@ const conversations = createConversationService({
   contentVersionStore: conversationVersions,
   supplementalMessages: imageGenerationRuns,
 });
+followUpQueue = createFollowUpQueueService({
+  stateFile: path.join(projectRoot, "runtime", "follow-up-queues.json"),
+  execution,
+  conversations,
+  media,
+  publishThreadEvent: execution.publishThreadEvent,
+});
+void followUpQueue.start();
 contextManagement = await createContextManagementService({
   stateFile: path.join(projectRoot, "runtime", "context-settings.json"),
   broadcast: realtime.broadcast,
@@ -113,12 +124,13 @@ const serveStatic = createStaticFileServer(webRoot);
 const readWebVersion = createWebVersionReader(webRoot);
 const requestHandler = createRequestHandler({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
-  contextManagement, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
+  followUpQueue, contextManagement, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
 });
 const server = http.createServer(requestHandler);
 
 const close = () => {
   realtime.close();
+  void followUpQueue.close();
   void execution.close();
   conversations.close();
   void imageGenerationRuns.close();

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MediaFile } from "../../../shared/model/media";
 import type { RealtimeRecoveryReason } from "../../../shared/model/realtime";
 import { useContextManagement } from "../../context-management/hooks/useContextManagement";
@@ -6,12 +6,22 @@ import { useCodexExecution } from "../../execution/hooks/useCodexExecution";
 import type { ProjectEvent } from "../../execution/model/types";
 import { useModels } from "../../models/hooks/useModels";
 import { readConversationSnapshotAsync, writeConversationSnapshot } from "../data/conversationSnapshot";
+import { conversationApi } from "../data/conversationApi";
 import { useConversationEvents } from "../realtime/useConversationEvents";
 import { createOptimisticMessage, createSubmissionId } from "../state/optimisticMessage";
 import { readInitialConversationState } from "../state/initialConversation";
 import { useConversationCatalog } from "./useConversationCatalog";
 import { useConversationSession } from "./useConversationSession";
+import { useFollowUpQueue } from "./useFollowUpQueue";
 import type { SessionMessage } from "../model/types";
+
+const attachmentsFromMessage = (message: SessionMessage): MediaFile[] => {
+  const attachments = new Map<string, MediaFile>();
+  for (const block of message.blocks || []) {
+    if ("file" in block && block.file) attachments.set(block.file.id, block.file);
+  }
+  return [...attachments.values()];
+};
 
 export function useProjectConversations() {
   const [initial] = useState(readInitialConversationState);
@@ -28,7 +38,18 @@ export function useProjectConversations() {
   }, [initial, selection.hydrateSnapshot]);
 
   const execution = useCodexExecution(selection.selectedId);
+  const followUpQueue = useFollowUpQueue(selection.selectedId);
   const [forkingMessageId, setForkingMessageId] = useState("");
+  const [editingMessage, setEditingMessage] = useState<SessionMessage | null>(null);
+  const editingMessageRef = useRef<SessionMessage | null>(null);
+  const pendingEditRef = useRef<{
+    threadId: string;
+    text: string;
+    attachments: MediaFile[];
+    resolve: (accepted: boolean) => void;
+  } | null>(null);
+  const [editRequestVersion, setEditRequestVersion] = useState(0);
+  const [renaming, setRenaming] = useState(false);
   const contextManagement = useContextManagement(selection.selectedId);
   const onModelChanged = useCallback(() => {
     void contextManagement.refresh();
@@ -55,7 +76,11 @@ export function useProjectConversations() {
     return () => window.clearTimeout(timer);
   }, [catalog.sessions, selection.selectedId, selection.session]);
 
-  const sendMessage = useCallback(async (text: string, attachments: MediaFile[] = []) => {
+  useEffect(() => {
+    editingMessageRef.current = editingMessage;
+  }, [editingMessage]);
+
+  const sendDirectMessage = useCallback(async (text: string, attachments: MediaFile[] = []) => {
     const threadId = selection.selectedIdRef.current;
     const messageText = text.trim();
     if (!threadId || (!messageText && !attachments.length)) return false;
@@ -85,6 +110,85 @@ export function useProjectConversations() {
     selection.selectedIdRef,
   ]);
 
+  useEffect(() => {
+    const pending = pendingEditRef.current;
+    if (!pending || pending.threadId !== selection.selectedId) return;
+    pendingEditRef.current = null;
+    void sendDirectMessage(pending.text, pending.attachments)
+      .then(pending.resolve)
+      .catch(() => pending.resolve(false));
+  }, [editRequestVersion, sendDirectMessage, selection.selectedId]);
+
+  const sendMessage = useCallback(async (text: string, attachments: MediaFile[] = []) => {
+    const target = editingMessageRef.current;
+    if (!target) return sendDirectMessage(text, attachments);
+    const sourceThreadId = selection.selectedIdRef.current;
+    if (!sourceThreadId || !target.turnId || target.role !== "user" || execution.status.active || selection.session?.archived) return false;
+    const sourceMessages = selection.session?.messages || [];
+    const targetIndex = sourceMessages.findIndex((message) => message.id === target.id);
+    const previousTurnId = targetIndex > 0
+      ? [...sourceMessages.slice(0, targetIndex)].reverse().find((message) => message.role === "assistant" && message.turnId)?.turnId || ""
+      : "";
+    setForkingMessageId(target.id);
+    try {
+      const created = previousTurnId
+        ? await catalog.forkSession(sourceThreadId, previousTurnId)
+        : await catalog.createSession();
+      if (!created) return false;
+      setEditingMessage(null);
+      editingMessageRef.current = null;
+      return await new Promise<boolean>((resolve) => {
+        pendingEditRef.current = {
+          threadId: selection.selectedIdRef.current,
+          text,
+          attachments,
+          resolve,
+        };
+        setEditRequestVersion((value) => value + 1);
+      });
+    } finally {
+      setForkingMessageId("");
+    }
+  }, [catalog.createSession, catalog.forkSession, execution.status.active, selection.selectedIdRef, selection.session, sendDirectMessage]);
+
+  const beginEditMessage = useCallback((message: SessionMessage) => {
+    if (message.role !== "user" || !message.turnId || execution.status.active || selection.session?.archived) return;
+    editingMessageRef.current = message;
+    setEditingMessage(message);
+  }, [execution.status.active, selection.session?.archived]);
+
+  const cancelEditMessage = useCallback(() => {
+    editingMessageRef.current = null;
+    setEditingMessage(null);
+  }, []);
+
+  const renameSession = useCallback(async (name: string) => {
+    const threadId = selection.selectedIdRef.current;
+    const normalized = name.trim();
+    if (!threadId || !normalized || normalized.length > 120 || renaming) return false;
+    setRenaming(true);
+    try {
+      const renamed = await conversationApi.rename(threadId, normalized);
+      selection.updateCurrentSession(threadId, (current) => ({
+        ...current,
+        ...renamed,
+        title: renamed.title || normalized,
+      }));
+      await catalog.refreshSessions(false, threadId, false);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setRenaming(false);
+    }
+  }, [catalog.refreshSessions, renaming, selection.selectedIdRef, selection.updateCurrentSession]);
+
+  useEffect(() => {
+    if (!editingMessageRef.current) return;
+    editingMessageRef.current = null;
+    setEditingMessage(null);
+  }, [selection.selectedId]);
+
   const forkFromMessage = useCallback(async (message: SessionMessage) => {
     const threadId = selection.selectedIdRef.current;
     if (!threadId || !message.turnId || execution.status.active || selection.session?.archived) return false;
@@ -96,6 +200,12 @@ export function useProjectConversations() {
     }
   }, [catalog.forkSession, execution.status.active, selection.selectedIdRef, selection.session?.archived]);
 
+  const queueMessage = useCallback(async (text: string, attachments: MediaFile[] = []) => {
+    const messageText = text.trim();
+    if (!messageText && !attachments.length) return false;
+    return followUpQueue.enqueue(messageText, attachments);
+  }, [followUpQueue.enqueue]);
+
   const onSessionsChanged = useCallback((threadId?: string) => {
     const selected = selection.selectedIdRef.current;
     if (selected && (!threadId || threadId === selected)) {
@@ -106,6 +216,7 @@ export function useProjectConversations() {
 
   const handleEvent = useCallback((event: ProjectEvent) => {
     execution.handleEvent(event);
+    followUpQueue.handleEvent(event);
     if (event.type === "context_status") contextManagement.handleEvent(event);
     if (event.type === "user_message_submitted") {
       const generated = createOptimisticMessage(
@@ -117,12 +228,13 @@ export function useProjectConversations() {
       const message = generated.id === event.messageId ? generated : { ...generated, id: event.messageId };
       selection.addOptimisticMessage(event.threadId, message);
     }
-  }, [contextManagement.handleEvent, execution.handleEvent, selection.addOptimisticMessage]);
+  }, [contextManagement.handleEvent, execution.handleEvent, followUpQueue.handleEvent, selection.addOptimisticMessage]);
   const recoverRealtime = useCallback((_reason: RealtimeRecoveryReason) => {
     void execution.refreshStatus(undefined, true).then(() => {
       onSessionsChanged(selection.selectedIdRef.current || undefined);
     });
-  }, [execution.refreshStatus, onSessionsChanged, selection.selectedIdRef]);
+    void followUpQueue.refresh();
+  }, [execution.refreshStatus, followUpQueue.refresh, onSessionsChanged, selection.selectedIdRef]);
   const connected = useConversationEvents(
     onSessionsChanged,
     handleEvent,
@@ -154,6 +266,12 @@ export function useProjectConversations() {
     archiveBusyId: catalog.archiveBusyId,
     forkFromMessage,
     forkingMessageId,
+    editingMessage,
+    editingMessageId: editingMessage?.id || "",
+    beginEditMessage,
+    cancelEditMessage,
+    renameSession,
+    renaming,
     loadOlder: selection.loadOlder,
     executionStatus: execution.status,
     streamingText: execution.streamingText,
@@ -166,6 +284,15 @@ export function useProjectConversations() {
     sending: execution.sending,
     sendingSlow: execution.sendingSlow,
     sendMessage,
+    queueMessage,
+    queueItems: followUpQueue.items,
+    queueLoading: followUpQueue.loading,
+    queueBusy: followUpQueue.busy,
+    queueError: followUpQueue.error,
+    editQueueItem: followUpQueue.edit,
+    removeQueueItem: followUpQueue.remove,
+    moveQueueItem: followUpQueue.move,
+    retryQueueItem: followUpQueue.retry,
     interrupt: execution.interrupt,
     compactContext: contextManagement.compact,
     setAutoCompactThreshold: contextManagement.setThreshold,

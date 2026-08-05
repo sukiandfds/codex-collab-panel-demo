@@ -19,7 +19,7 @@ const eventIdFrom = (value: unknown) => {
 
 const isConversationProgressEvent = (event: ProjectEvent, threadId: string) => {
   if (event.type === "sessions_changed") return !event.threadId || event.threadId === threadId;
-  if (["execution_status", "assistant_commentary", "assistant_delta", "context_status", "user_message_submitted"].includes(event.type)) {
+  if (["execution_status", "assistant_commentary", "assistant_delta", "context_status", "user_message_submitted", "queue_changed"].includes(event.type)) {
     return "threadId" in event && event.threadId === threadId;
   }
   return false;

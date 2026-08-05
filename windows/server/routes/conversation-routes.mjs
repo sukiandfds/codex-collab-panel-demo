@@ -10,7 +10,8 @@ const publicAttachment = ({ id, name, mimeType, url, width, height }) => ({
 });
 
 export const createConversationRoutes = ({
-  conversations, execution, contextManagement, media, broadcast = () => {},
+  conversations, execution, followUpQueue, contextManagement, media,
+  broadcast = () => {}, publishThreadEvent = broadcast,
 }) => {
   const submissions = new Map();
   const submissionTtlMs = 60000;
@@ -85,21 +86,22 @@ export const createConversationRoutes = ({
       sendJson(response, cachedResult.body, cachedResult.statusCode);
       return true;
     }
-    const status = execution.getStatus(threadId);
-    if (status.active && !status.turnId) {
-      sendJson(response, { error: "Codex 正在启动当前任务，请稍后再试" }, 409);
-      return true;
-    }
-    broadcast({
-      type: "user_message_submitted",
-      threadId,
-      submissionId,
-      messageId,
-      text,
-      attachments: attachments.map(publicAttachment),
-      createdAt,
-    });
-    const submit = (async () => {
+    const run = async () => {
+      const status = execution.getStatus(threadId);
+      if (status.active && !status.turnId) {
+        const error = new Error("Codex 正在启动当前任务，请稍后再试");
+        error.statusCode = 409;
+        throw error;
+      }
+      publishThreadEvent(threadId, {
+        type: "user_message_submitted",
+        threadId,
+        submissionId,
+        messageId,
+        text,
+        attachments: attachments.map(publicAttachment),
+        createdAt,
+      });
       let result;
       try {
         result = status.active
@@ -124,10 +126,30 @@ export const createConversationRoutes = ({
         },
         statusCode: 202,
       };
-    })();
+    };
+    const submit = followUpQueue?.withThreadLock
+      ? followUpQueue.withThreadLock(threadId, run)
+      : run();
     const accepted = rememberSubmission(submissionId, fingerprint, submit);
     const responsePayload = await accepted;
     sendJson(response, responsePayload.body, responsePayload.statusCode);
+    return true;
+  }
+  if (url.pathname === "/api/session/name" && request.method === "POST") {
+    const body = await readJson(request);
+    const threadId = String(body.threadId || "").trim();
+    const name = String(body.name || "").trim();
+    if (!threadId || !name) {
+      sendJson(response, { error: "threadId and name are required" }, 400);
+      return true;
+    }
+    if (name.length > 120) {
+      sendJson(response, { error: "name is too long" }, 413);
+      return true;
+    }
+    const session = await conversations.renameSession(threadId, name);
+    publishThreadEvent(threadId, { type: "sessions_changed", threadId });
+    sendJson(response, session, 202);
     return true;
   }
   if (url.pathname === "/api/session/model" && request.method === "POST") {
