@@ -27,7 +27,7 @@ AI 助手应先根据任务定位功能编号，再读取对应文件。不要�
 | `FEAT-013` | 从当前消息分叉继续 | `implemented_uncommitted` | `v0.1.0` | 2026-08-03 14:47 +08:00 | 已接入官方 `thread/fork` 路由和 Turn 边界；本机运行时能力待探测 | [`FEAT-013-conversation-fork.md`](./features/FEAT-013-conversation-fork.md) |
 | `FEAT-014` | 项目对话归档与恢复 | `implemented_uncommitted` | `v0.1.0` | 2026-08-03 14:47 +08:00 | 活动/归档列表、恢复和 JSONL fallback 隔离已接入；本机运行时和移动端体验待确认 | [`FEAT-014-conversation-archive.md`](./features/FEAT-014-conversation-archive.md) |
 | `FEAT-015` | 自然语言生图与自动化工作台 | `in_progress` | `v0.5.0` | 2026-08-05 01:04 +08:00 | 网页与原生 Codex 已统一为真实 Thread/Turn 生图；2.35:1 4K、连续改图、旧会话迁移、普通后续对话和结果去重通过，工作台与定时任务待后续开发 | [`FEAT-015-image-generation-and-automation-workbench.md`](./features/FEAT-015-image-generation-and-automation-workbench.md) |
-| `FEAT-016` | 项目统一更名为 negus | `implementation_in_progress` | `v1.0.0` | 2026-08-05 09:20 +08:00 | 主界面、PWA、群聊、包名、仓库和本地目录统一为 negus；浏览器旧存储、历史资料与 Dream Skin 兼容模块保留迁移边界 | [`FEAT-016-project-identity-negus.md`](./features/FEAT-016-project-identity-negus.md) |
+| `FEAT-016` | 项目统一更名为 negus | `implemented_pending_review` | `v1.0.0` | 2026-08-05 09:28 +08:00 | 界面、PWA、包名和 GitHub 仓库已统一为 negus，浏览器旧数据保留兼容；本地目录将在当前活动 Turn 收口后由独立 Worker 迁移并恢复同一端口 | [`FEAT-016-project-identity-negus.md`](./features/FEAT-016-project-identity-negus.md) |
 
 `FEAT-010` 曾用于已暂停的 Orca 路线实验，本轮不复用该编号。
 
@@ -47,7 +47,7 @@ AI 助手应先根据任务定位功能编号，再读取对应文件。不要�
 | 8 | 像 OpenClaw 一样尽量无感完成远程开发，不让 UAC 成为日常负担 | `FEAT-009` 已开始实施；关联 `FEAT-001-I11` | 已有只读检查器可核对用户目录、工具链、端口和常见 UAC 风险；当前电脑结果为 0 blocked，原开发电脑与真实修改/构建/Git 链路尚未验证 | 正常开发优先使用用户目录、项目依赖和无需提权的工具链。只有驱动、系统服务等真正系统级操作才报告为一次本机维护；日常网页开发不要求用户处理 UAC |
 | 9 | 在 Codex 标题栏查看浮生云算用量和倍率 | `FEAT-011 v0.1.0` 已实现未提交 | 页面加载不查询；服务重启后，回复完成会更新今日金额、固定 GPT 倍率和时间，点击可查看账户与全部分组详情 | 用户无需离开 Codex 页面即可判断今日消耗；多设备观察同一 Turn 不会重复请求，查询失败也不影响对话 |
 | 10 | 自然语言生图与专门的生图自动化工作台 | `FEAT-015 v0.5.0` 开发中 | 网页与原生 Codex 共用真实 MCP Turn；4K 小数画幅、同会话改图、继续聊天和图片去重已通过 | 批量、模板、队列、历史和定时任务进入专门工作台，并与对话共用同一运行、媒体、交付物和审计链路 |
-| 11 | 项目品牌与仓库身份统一为 negus | `FEAT-016 v1.0.0` 实施中 | 主对话和 PWA 已显示 negus，群聊、图标、仓库与本地路径正在统一 | 用户在电脑、手机、安装后的 PWA 和 GitHub 中看到一致的 negus；升级不丢失旧会话快照或设备身份 |
+| 11 | 项目品牌与仓库身份统一为 negus | `FEAT-016 v1.0.0` 已实现待体验 | 主对话、PWA、群聊、图标和 GitHub 仓库已统一；本地目录迁移将在当前 Turn 收口后自动执行 | 用户在电脑、手机、安装后的 PWA 和 GitHub 中看到一致的 negus；升级不丢失旧会话快照或设备身份 |
 
 ## 当前待办开发顺序
 

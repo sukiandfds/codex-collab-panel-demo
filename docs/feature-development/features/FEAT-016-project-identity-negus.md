@@ -1,9 +1,9 @@
 ---
 id: FEAT-016
 title: 项目统一更名为 negus
-status: implementation_in_progress
+status: implemented_pending_review
 version: v1.0.0
-updated_at: 2026-08-05 09:20 +08:00
+updated_at: 2026-08-05 09:28 +08:00
 ---
 
 # FEAT-016：项目统一更名为 negus
@@ -35,7 +35,7 @@ updated_at: 2026-08-05 09:20 +08:00
 
 ## 当前状态
 
-代码和项目记录正在修改，验证、GitHub 仓库改名、本地目录迁移与服务恢复尚未完成。
+界面品牌、图标、Web 包名、浏览器存储兼容和项目记录已经完成；GitHub 仓库已改名为 `sukiandfds/negus`，开发分支远端 SHA 与本地一致。本地目录迁移必须等待当前由 `9360` 承载的活动 Turn 收口，已交由项目外独立 Worker 执行；Worker 会保持固定网址和 Tunnel 不变，从 `D:\codingproject\negus` 恢复同一端口并把结果写入被 Git 忽略的运行记录。
 
 ## 验证要求
 
@@ -43,3 +43,10 @@ updated_at: 2026-08-05 09:20 +08:00
 - `pnpm build:ui` 和 `git diff --check` 通过。
 - GitHub 新仓库地址、远程分支 SHA 和本地 `origin` 一致。
 - 新目录下 `9360` 健康接口返回 `200 application/json`，固定公网链接保持不变。
+
+## 本轮验证
+
+- 全部 Node 测试 `103/103` 通过。
+- `pnpm build:ui` 和 `git diff --check` 通过。
+- GitHub 仓库为 `https://github.com/sukiandfds/negus`，远端 `codex/publish-current-panel` 已包含本轮产品提交。
+- 本地目录与服务恢复由独立 Worker 在当前 Turn 完成后执行，运行结果保存到 `runtime/rename-migration-result.json`。
