@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { executionApi } from "../data/executionApi";
+import type { SendMessageResult } from "../data/executionApi";
 import type { ExecutionStatus, ProjectEvent } from "../model/types";
 
 const SEND_CONFIRM_TIMEOUT_MS = 20000;
@@ -219,9 +220,13 @@ export function useCodexExecution(threadId: string) {
     }
   }, [acceptEventSequence, applyStatus, clearStreaming, threadId]);
 
-  const sendMessage = useCallback(async (text: string, attachmentIds: string[] = [], submissionId = "") => {
+  const sendMessage = useCallback(async (
+    text: string,
+    attachmentIds: string[] = [],
+    submissionId = "",
+  ): Promise<SendMessageResult | null> => {
     const message = text.trim();
-    if (!threadId || (!message && !attachmentIds.length) || sendingRef.current) return false;
+    if (!threadId || (!message && !attachmentIds.length) || sendingRef.current) return null;
     sendingRef.current = true;
     setSending(true);
     setSendingSlow(false);
@@ -257,6 +262,7 @@ export function useCodexExecution(threadId: string) {
     }
     try {
       const accepted = await executionApi.sendMessage(threadId, message, attachmentIds, acceptedSubmissionId, controller.signal);
+      if (accepted.threadId !== threadId) return accepted;
       if (accepted.turnId) {
         currentTurnIdRef.current = accepted.turnId;
         stateRevisionRef.current += 1;
@@ -268,7 +274,7 @@ export function useCodexExecution(threadId: string) {
           updatedAt: new Date().toISOString(),
         }));
       }
-      return true;
+      return accepted;
     } catch (reason) {
       const recovered = await refreshStatus(undefined, true);
       const acceptedAfterFailure = !steering
@@ -276,7 +282,7 @@ export function useCodexExecution(threadId: string) {
         && recovered?.turnId !== previousTurnId
         && !["failed", "systemError"].includes(recovered?.phase || "");
       if (acceptedAfterFailure) {
-        return true;
+        return { threadId, turnId: recovered?.turnId || "", status: recovered?.phase || "inProgress" };
       }
       const detail = controller.signal.aborted
         ? "发送确认超时，未重复提交；请确认任务状态后重试"
@@ -292,7 +298,7 @@ export function useCodexExecution(threadId: string) {
           updatedAt: new Date().toISOString(),
         });
       }
-      return false;
+      return null;
     } finally {
       window.clearTimeout(timeout);
       window.clearTimeout(sendingSlowTimer.current);

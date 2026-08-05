@@ -188,7 +188,9 @@ export const createImageGenerationRunStore = ({ stateFile = "", media }) => {
       selected.push(record);
       byThread.set(record.threadId, selected);
     }
-    return [...byThread.entries()].map(([threadId, selected]) => {
+    return [...byThread.entries()]
+      .filter(([, selected]) => selected.some((record) => !record.migratedToThreadId))
+      .map(([threadId, selected]) => {
       selected.sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
       const latest = selected.at(-1);
       const outputCount = latest.outputs?.length || 0;
@@ -208,7 +210,41 @@ export const createImageGenerationRunStore = ({ stateFile = "", media }) => {
         archived: false,
         forkedFromId: null,
       };
-    });
+      });
+  });
+
+  const migrationContext = (threadId) => run(async () => {
+    await load();
+    const selected = [...records.values()]
+      .filter((record) => record.threadId === threadId && !record.migratedToThreadId)
+      .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+    const latest = selected.find((record) => record.status === "succeeded" && record.outputs?.length);
+    if (!latest) return null;
+    const attachments = [];
+    for (const output of latest.outputs) {
+      try {
+        await fs.access(output.path);
+        attachments.push({
+          path: output.path,
+          name: path.basename(output.path),
+          mimeType: output.mimeType || "image/png",
+        });
+      } catch {}
+    }
+    return attachments.length ? { text: latest.text, attachments } : null;
+  });
+
+  const markMigrated = (threadId, migratedToThreadId) => run(async () => {
+    await load();
+    let changed = false;
+    const migratedAt = new Date().toISOString();
+    for (const [runId, record] of records) {
+      if (record.threadId !== threadId || record.migratedToThreadId) continue;
+      records.set(runId, { ...record, migratedToThreadId, migratedAt, updatedAt: migratedAt });
+      changed = true;
+    }
+    if (changed) await persist();
+    return changed;
   });
 
   return {
@@ -225,6 +261,8 @@ export const createImageGenerationRunStore = ({ stateFile = "", media }) => {
     get,
     list,
     listSessions,
+    migrationContext,
+    markMigrated,
     close: () => queue,
   };
 };

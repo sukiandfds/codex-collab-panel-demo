@@ -19,7 +19,6 @@ import { createArtifactService } from "../server/artifact-service.mjs";
 import { createWebOutputService } from "../server/web-output-service.mjs";
 import { createFushengUsageService } from "../server/fusheng-usage-service.mjs";
 import { createImageGenerationRunStore } from "../server/image-generation/image-generation-run-store.mjs";
-import { createWebImageGenerationService } from "../server/image-generation/web-image-generation-service.mjs";
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -74,12 +73,6 @@ const conversations = createConversationService({
   contentVersionStore: conversationVersions,
   supplementalMessages: imageGenerationRuns,
 });
-const imageGeneration = createWebImageGenerationService({
-  projectRoot,
-  runStore: imageGenerationRuns,
-  execution,
-  broadcast: realtime.broadcast,
-});
 contextManagement = await createContextManagementService({
   stateFile: path.join(projectRoot, "runtime", "context-settings.json"),
   broadcast: realtime.broadcast,
@@ -120,7 +113,7 @@ const serveStatic = createStaticFileServer(webRoot);
 const readWebVersion = createWebVersionReader(webRoot);
 const requestHandler = createRequestHandler({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
-  contextManagement, imageGeneration, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
+  contextManagement, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
 });
 const server = http.createServer(requestHandler);
 

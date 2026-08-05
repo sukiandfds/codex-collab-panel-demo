@@ -1,10 +1,11 @@
 import { fetchJson, postJson } from "../../../shared/api/http";
 import type { ExecutionStatus } from "../model/types";
 
-interface SendMessageResult {
+export interface SendMessageResult {
   threadId: string;
   turnId: string;
   status: string;
+  migratedFromThreadId?: string;
 }
 
 interface InterruptResult {

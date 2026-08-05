@@ -65,39 +65,70 @@ test("reuses the in-flight result for a repeated submission id", async () => {
   assert.deepEqual(JSON.parse(first.response.body), JSON.parse(third.response.body));
 });
 
-test("routes explicit image commands to Negus Image without starting a Codex turn", async () => {
-  let codexCalls = 0;
-  const starts = [];
+test("routes image requests through the real Codex turn without a web-side bypass", async () => {
+  const codexCalls = [];
   const route = createConversationRoutes({
     conversations: {
-      sendMessage: async () => { codexCalls += 1; },
-      steerMessage: async () => { codexCalls += 1; },
+      sendMessage: async (threadId, text, attachments) => {
+        codexCalls.push({ threadId, text, attachments });
+        return { turn: { id: "turn-image-1", status: "inProgress" } };
+      },
+      steerMessage: async () => { throw new Error("steer should not be called"); },
     },
     execution: { getStatus: () => ({ active: false, turnId: "" }) },
     contextManagement: {},
     media: { resolveMany: () => [] },
     imageGeneration: {
-      isActive: () => false,
-      intentFor: () => ({ operation: "generate", prompt: "直播图片", resolution: "2K", size: "16:9", n: 1 }),
-      start: async (request) => {
-        starts.push(request);
-        return { runId: "run-1", turnId: "negus-image-run-1", status: "inProgress" };
-      },
+      intentFor: () => { throw new Error("legacy image intent must not be used"); },
+      start: async () => { throw new Error("legacy image service must not be used"); },
     },
   });
+  const prompt = "Generate one 2.35：1 cinematic image in 4K";
   const call = invoke(route, {
     threadId: "thread-1",
-    text: "生成一张 16:9 2K 的直播图片",
+    text: prompt,
     attachmentIds: [],
     submissionId: "image-submission",
   });
   await call.promise;
 
   assert.equal(call.response.status, 202);
-  assert.equal(codexCalls, 0);
-  assert.equal(starts.length, 1);
+  assert.deepEqual(codexCalls, [{ threadId: "thread-1", text: prompt, attachments: [] }]);
   const body = JSON.parse(call.response.body);
-  assert.equal(body.capability, "negus_image");
-  assert.equal(body.runId, "run-1");
-  assert.equal(body.turnId, "negus-image-run-1");
+  assert.equal(body.turnId, "turn-image-1");
+  assert.equal("capability" in body, false);
+  assert.equal("runId" in body, false);
+});
+
+test("returns the new real thread id after migrating a legacy image conversation", async () => {
+  const route = createConversationRoutes({
+    conversations: {
+      sendMessage: async () => ({
+        threadId: "real-thread",
+        migratedFromThreadId: "legacy-thread",
+        turn: { id: "real-turn", status: "inProgress" },
+      }),
+      steerMessage: async () => { throw new Error("steer should not be called"); },
+    },
+    execution: { getStatus: () => ({ active: false, turnId: "" }) },
+    contextManagement: {},
+    media: { resolveMany: () => [] },
+  });
+  const call = invoke(route, {
+    threadId: "legacy-thread",
+    text: "Make the previous image a night scene",
+    attachmentIds: [],
+    submissionId: "legacy-migration",
+  });
+  await call.promise;
+
+  assert.equal(call.response.status, 202);
+  assert.deepEqual(JSON.parse(call.response.body), {
+    threadId: "real-thread",
+    migratedFromThreadId: "legacy-thread",
+    turnId: "real-turn",
+    status: "inProgress",
+    submissionId: "legacy-migration",
+    messageId: "optimistic-legacy-migration",
+  });
 });

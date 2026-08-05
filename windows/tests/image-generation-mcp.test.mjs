@@ -36,7 +36,7 @@ const mockServer = async (t, handler) => {
   return `http://127.0.0.1:${address.port}/v1`;
 };
 
-test("submits and polls a generation task using Retry-After", async (t) => {
+test("waits for generation by default and falls back to polling using Retry-After", async (t) => {
   const outputDirectory = await temporaryRoot(t);
   const requests = [];
   const baseUrl = await mockServer(t, async (request, response) => {
@@ -61,7 +61,7 @@ test("submits and polls a generation task using Retry-After", async (t) => {
   });
   const result = await client.generate({ prompt: "a minimal test image", size: "1:1" });
   assert.equal(requests.length, 2);
-  assert.equal(requests[0].async, true);
+  assert.equal(requests[0].async, undefined);
   assert.equal(requests[0].response_format, "b64_json");
   assert.deepEqual(requests[1], { model: "gpt-image-2", task_id: "img-test-1" });
   assert.deepEqual(sleeps, [2]);
@@ -89,7 +89,7 @@ test("uploads multiple references and a PNG mask as multipart edit data", async 
   const result = await client.edit({ prompt: "combine the references", imagePaths: [first, second], maskPath: mask });
   assert.equal((multipartText.match(/name="image"/gu) || []).length, 2);
   assert.match(multipartText, /name="mask"/u);
-  assert.match(multipartText, /name="async"\r\n\r\ntrue/u);
+  assert.doesNotMatch(multipartText, /name="async"/u);
   assert.match(multipartText, /name="response_format"\r\n\r\nb64_json/u);
   assert.equal(result.outputs.length, 1);
 });
@@ -130,8 +130,9 @@ test("returns provider errors without leaking the API key", async (t) => {
 test("stdio MCP advertises the image tools and completes a mocked tool call", async (t) => {
   const projectRoot = path.resolve(import.meta.dirname, "..", "..");
   const outputDirectory = await temporaryRoot(t);
+  let providerRequest;
   const baseUrl = await mockServer(t, async (request, response) => {
-    await readRequestBody(request);
+    providerRequest = JSON.parse((await readRequestBody(request)).toString("utf8"));
     response.writeHead(200, { "Content-Type": "application/json" });
     response.end(JSON.stringify({ data: [{ b64_json: pngBase64 }] }));
   });
@@ -189,12 +190,19 @@ test("stdio MCP advertises the image tools and completes a mocked tool call", as
     jsonrpc: "2.0",
     id: 3,
     method: "tools/call",
-    params: { name: "generate_image", arguments: { prompt: "mocked MCP image", size: "1:1" } },
+    params: {
+      name: "generate_image",
+      arguments: { prompt: "mocked MCP cinematic image", resolution: "4K", size: "2.35：1" },
+    },
   });
   const called = await responseFor(3);
   assert.equal(called.result.isError, undefined);
   assert.match(called.result.content[0].text, /Generated 1 image/u);
   assert.equal(called.result.structuredContent.outputs[0].width, 1);
+  assert.equal(providerRequest.prompt, "mocked MCP cinematic image");
+  assert.equal(providerRequest.model, "gpt-image-2-4k");
+  assert.equal(providerRequest.size, "3840x1632");
+  assert.equal(providerRequest.n, 1);
   await fs.access(called.result.structuredContent.outputs[0].path);
   child.stdin.end();
 });

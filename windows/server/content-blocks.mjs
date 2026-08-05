@@ -70,6 +70,34 @@ const mediaBlock = (type, source, registerMedia, extra = {}) => {
   return { id: blockId(type, source), type, source, ...extra };
 };
 
+const structuredContentFrom = (item) => {
+  const value = item?.result?.structuredContent;
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+
+const isNegusImageToolCall = (item) => item?.type === "mcpToolCall"
+  && String(item.server || "").replace(/-/gu, "_") === "negus_image"
+  && item.status === "completed";
+
+const negusImageBlocks = (item, registerMedia) => {
+  if (!isNegusImageToolCall(item)) return [];
+  const outputs = structuredContentFrom(item)?.outputs;
+  if (!Array.isArray(outputs)) return [];
+  return outputs.flatMap((output) => {
+    const block = mediaBlock("image", output?.path, registerMedia, {
+      alt: path.basename(String(output?.path || "generated-image")),
+      ...(Number.isSafeInteger(output?.width) ? { width: output.width } : {}),
+      ...(Number.isSafeInteger(output?.height) ? { height: output.height } : {}),
+    });
+    return block ? [block] : [];
+  });
+};
+
 export const blocksFromContent = (value, registerMedia, depth = 0) => {
   if (depth > 6 || value === null || value === undefined) return [];
   if (typeof value === "string") {
@@ -193,6 +221,32 @@ export const messageFromItem = (item, registerMedia) => {
 
 export const previewText = (value, limit = 180) => cleanText(value).replace(/\s+/g, " ").slice(0, limit);
 
+const markdownImagePattern = /!\[([^\]]*)\]\((<[^>]+>|[^)\n]+)\)/gu;
+
+export const dedupeAssistantMediaMessages = (messages, seen = new Set()) => (Array.isArray(messages) ? messages : [])
+  .map((message) => {
+    if (message?.role !== "assistant" || !Array.isArray(message.blocks)) return message;
+    const blocks = message.blocks.flatMap((block) => {
+      if (block.type === "image") {
+        const source = String(block.source || "");
+        if (!source || seen.has(source)) return [];
+        seen.add(source);
+        return [block];
+      }
+      if (block.type !== "markdown") return [block];
+      const text = String(block.text || "").replace(markdownImagePattern, (match, _alt, rawSource) => {
+        const source = rawSource.trim().replace(/^<|>$/gu, "");
+        if (!source || seen.has(source)) return "";
+        seen.add(source);
+        return match;
+      }).trim();
+      return text ? [{ ...block, id: blockId("markdown", text), text }] : [];
+    });
+    if (!blocks.length) return null;
+    return { ...message, blocks, text: visibleText(blocks) };
+  })
+  .filter(Boolean);
+
 export const messageFromThreadItem = (item, registerMedia) => {
   if (item?.type === "userMessage") {
     const blocks = cleanUserAttachmentEnvelope(blocksFromContent(item.content, registerMedia));
@@ -212,6 +266,16 @@ export const messageFromThreadItem = (item, registerMedia) => {
       : { type: "image", url: `data:image/png;base64,${item.result}` };
     const blocks = blocksFromContent(content, registerMedia);
     return blocks.length ? { id: item.id || blockId("message", item.savedPath || item.result), role: "assistant", text: "", blocks } : null;
+  }
+  if (isNegusImageToolCall(item)) {
+    const blocks = negusImageBlocks(item, registerMedia);
+    return blocks.length ? {
+      id: item.id || blockId("message", JSON.stringify(structuredContentFrom(item))),
+      itemId: item.id || "",
+      role: "assistant",
+      text: "",
+      blocks,
+    } : null;
   }
   return null;
 };

@@ -1,7 +1,10 @@
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { imageSize } from "image-size";
+
+const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
+const defaultOutputDirectory = path.resolve(moduleDirectory, "../../../runtime/generated-images");
 
 const imageFields = new Set(["b64_json", "base64", "base64_json", "url", "image_url", "image"]);
 const containerFields = new Set(["data", "images", "output", "result", "image"]);
@@ -102,7 +105,7 @@ export const saveImageResponse = async ({
     const message = response?.error?.message || response?.message || "Image API returned no image data";
     throw new Error(message);
   }
-  const directory = path.resolve(outputDirectory || path.join(os.tmpdir(), "lynn-image-generate"));
+  const directory = path.resolve(outputDirectory || defaultOutputDirectory);
   await fs.mkdir(directory, { recursive: true });
   const now = new Date();
   const stamp = now.toISOString().replace(/[-:]/gu, "").replace(/\.\d{3}Z$/u, "Z");

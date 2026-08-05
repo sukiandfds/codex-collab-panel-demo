@@ -2,17 +2,18 @@
 feature_id: FEAT-015
 title: 自然语言生图与自动化工作台
 status: in_progress
-current_version: v0.4.0
-last_updated: 2026-08-04 18:39 +08:00
+current_version: v0.5.0
+last_updated: 2026-08-05 01:04 +08:00
 owners: [capability_runtime, app_server, image_generation, artifacts, web_ui]
 key_paths:
   - .codex/config.toml
   - windows/server/image-generation/happyevering-client.mjs
+  - windows/server/image-generation/image-contract.mjs
   - windows/server/image-generation/image-output.mjs
   - windows/server/image-generation/mcp-server.mjs
-  - windows/server/image-generation/web-image-intent.mjs
-  - windows/server/image-generation/web-image-generation-service.mjs
   - windows/server/image-generation/image-generation-run-store.mjs
+  - windows/server/routes/conversation-routes.mjs
+  - windows/server/codex-thread-history.mjs
   - windows/tests/image-generation-mcp.test.mjs
   - windows/server/app-server-client.mjs
   - windows/server/execution-tracker.mjs
@@ -29,12 +30,13 @@ key_paths:
 - 用户已明确：自然语言生图只是第一入口，后续还可能建设专门的生图自动化工作台。
 - 当前主运行时是 Codex app-server，主要使用 GPT-5.6 Luna；已有一个经过用户实测、可以正常生图的中转站 API。
 - 已核查 HappyEvering 官方文档：平台支持专用生成与编辑接口、多参考图、PNG Mask、1K/2K/4K、SSE 和异步任务。
-- 已完成原生 Codex 最小闭环代码：`lynn-image-generate` Skill 通过项目级 STDIO MCP 调用 `generate_image` / `edit_image`，Provider 负责 HappyEvering 请求、异步轮询和本地保存。
-- 密钥已从临时 Skill 明文配置迁移到 Windows 用户环境变量；仓库和新版 Skill 均不保存密钥。
-- 已完成原生 Negus Image MCP 真实 2K 生图，以及网页版 1K 真实自然语言生图验收。
-- 网页版已复用现有对话、SSE、执行状态和 Media 展示；生成结果与运行记录持久化，服务重启后仍能从侧栏打开并查看大图。
-- 首版采用明确生图关键词和防误触规则；关键词识别、参数解析、执行服务、Provider 和运行记录分别管理，现有对话路由只负责分流调用。
-- 全部 Node 测试和生产构建通过；Artifact、完整 `CapabilityRun`、自动化工作台和定时任务仍属后续阶段。
+- 原生 Codex 与网页端统一走真实 app-server Thread/Turn；GPT-5.6 读取用户完整原话并调用项目级 `negus_image` MCP，不再由网页关键词旁路创建假 Turn。
+- HappyEvering 默认使用同步等待结果的合同，不再发送 `async: true`；仅在 Provider 明确返回 `202` 时按任务 ID 和 `Retry-After` 兼容轮询，不会重新提交生成订单。
+- 小数比例和全角冒号已统一归一化；`2.35：1 + 4K` 会发送 `3840x1632` 与 `gpt-image-2-4k`，未指定数量时只生成一张。
+- MCP 输出持久保存为本地文件，真实 `mcpToolCall.result.structuredContent.outputs` 经 Media 注册后显示；同一 Turn 的工具图片与最终回答按媒体身份去重。
+- 同一 Thread 可继续普通对话；“保持构图，改成夜景”等后续指令会由 GPT-5.6 把最近一次生成结果路径传给 `edit_image`。
+- 密钥从被 Git 忽略的 `runtime/secrets.env` 加载，浏览器和会话内容均不接触密钥值。
+- 真实验收已通过：GPT-5.6 生成 `3840x1632` 首图、同 Thread 自动引用首图完成编辑、再继续普通对话；旧假会话首次续聊会携带最近图片迁移到真实 Thread；全部 103 项 Node 测试和生产 UI 构建通过。
 - 用户原话保存在 `docs/project-management/items/FEAT-015/item.md`，本文件只记录正式功能范围和阶段方案。
 
 ## 目标与边界
@@ -52,7 +54,7 @@ key_paths:
 
 - 不立即建设完整设计软件、节点编辑器或 Photoshop 替代品。
 - 不让前端直接保存 API Key 或直接调用中转站。
-- 首版不额外调用模型做意图分类；使用明确生图关键词，并排除“讨论生图功能、架构、工作台”等非执行语义。
+- 不在网页端维护关键词意图分类；由真实 GPT-5.6 Turn 根据自然语言和会话上下文决定是否调用图片工具。
 - 不为 Codex、Gemini、Claude、OpenClaw 和定时任务分别实现一套生图逻辑。
 - v0.3.0 不启动现有项目服务、不调用付费外部 API、不修改现有页面。
 
@@ -119,7 +121,7 @@ Luna 5.6 识别为图片生成任务，调用正式生图能力。页面显示�
 
 - 正式调用使用 `/v1/images/generations` 和 `/v1/images/edits`，不通过 Chat Completions 绕行。
 - 文生图、图片编辑、多参考图和 Mask 使用统一的 Capability 输入，由 Provider Adapter 转换为 JSON 或 multipart。
-- 默认采用 Provider 异步任务，项目自己的 SSE 向浏览器展示状态；Provider SSE 只作为实验或诊断模式。
+- 默认等待 Provider 返回最终结果；若 Provider 明确返回 `202`，才进入任务轮询兼容路径。项目 SSE 展示 Codex Turn 与 MCP 工具状态。
 - 轮询必须保存并使用原接口、原模型、Provider Job ID 和 `Retry-After`。
 - Provider 成功结果只能领取一次，领取后必须立即写入 Media，再创建或更新 Artifact。
 - Provider 没有公开取消接口；M1 的取消只停止本地等待和后续处理，不承诺上游停止或退费。
@@ -132,19 +134,20 @@ Luna 5.6 识别为图片生成任务，调用正式生图能力。页面显示�
 
 - 项目级 `.codex/config.toml` 注册 `negus_image`（Negus Image）STDIO MCP。
 - `generate_image` 支持自然语言文生图；`edit_image` 支持多参考图和 PNG Mask。
-- Provider 固定使用 `b64_json` 发起异步任务，遵循 `Retry-After`，不在提交结果未知时自动重提。
+- Provider 固定使用 `b64_json` 并默认同步等待，不发送 `async: true`；意外返回 `202` 时遵循 `Retry-After`，不在提交结果未知时自动重提。
 - 返回 Base64 或 URL 时均保存本地文件，按真实 MIME/图片内容决定扩展名并报告实际像素尺寸。
 - Skill 只负责自然语言意图、参数映射和结果展示；密钥、HTTP、轮询和文件保存由 MCP 执行层负责。
-- 已完成 Mock、STDIO 协议和一次 16:9、2K 真实生图验证；新任务中的 MCP 自动发现仍待验证。
-- 网页对话支持 `生成图片`、`生图`、`画一张`、`改图`、`/image` 和 `Negus Image` 等明确表达，直接复用 Provider，不启动 MCP 子进程。
-- 网页请求立即返回 `202`，后台生成并通过现有执行状态与会话刷新展示结果；图片保存到 `runtime/generated-images/<runId>`。
-- 运行记录保存到 `runtime/image-generation-runs.json`；全新空会话只执行生图时，也能在服务重启后恢复到侧栏和聊天记录。
+- app-server 已真实发现 `negus_image` 的 `generate_image` / `edit_image`；网页请求与普通消息完全一致地进入 `turn/start` 或 `turn/steer`。
+- 用户原话、模型优化后的 Prompt、工具参数、结果路径和最终回答都保存在同一真实 Thread/Turn 中。
+- 旧版 `runtime/image-generation-runs.json` 仅保留历史记录兼容；新任务不再写入该假 Turn 存储，也不再实例化网页生图执行服务。
+- 旧假会话首次继续发送时自动创建真实 Thread，把最近生成图作为参考附件带入当前消息并切换页面；迁移后旧记录退出活动列表但仍可按旧 ID 读取。
+- 图片工具项完成时触发会话刷新；最终回答和工具结果使用稳定 Item ID，并在同一 Turn 内按媒体来源去重。
 
 ### M1：对话自然语言生图
 
 - 一个 `generate_image` 能力和一个中转站 Provider Adapter。
 - 同时定义 `edit_image` 的统一输入；首期实现至少完成文本生图，编辑能力不再存在协议不确定性。
-- Provider 默认异步执行；真实 `CapabilityRun` 状态通过项目 SSE 展示。
+- Provider 默认等待最终结果；真实 Codex Turn 与 MCP Tool Item 状态通过项目 SSE 展示。
 - 输出登记到 Media 和 Artifact。
 - 服务端保存密钥并限制数量、尺寸、并发和超时。
 - 完成 HappyEvering Provider 的 Mock 合同测试后，再进行一次用户授权的最低成本真实验收。
@@ -195,7 +198,7 @@ Luna 5.6 识别为图片生成任务，调用正式生图能力。页面显示�
 - 官方没有公开任务取消和幂等接口；取消与重试必须采用保守语义。
 - 官方没有给出图片 SSE 的准确完成事件名称，不能写死临时 Skill 中的事件名。
 - 自动化任务无人值守时的预算、失败停止和审批策略。
-- 原生 Codex MCP 与网页 Codex 最小适配已完成；Artifact 登记、完整通用运行底座和自动化工作台尚未实现。
+- 原生 Codex MCP 与网页 Codex 的真实 Thread/Turn 接入已完成；Artifact 登记、完整通用运行底座和自动化工作台尚未实现。
 
 ## 关联调研
 
@@ -240,6 +243,15 @@ Luna 5.6 识别为图片生成任务，调用正式生图能力。页面显示�
 - 完成一次 1:1、1K 真实网页生图；验证请求接受、生成状态、结果显示、大图查看、服务重启后侧栏恢复与图片持久化。
 - 全部 Node 测试 94 项通过，生产 UI 构建通过；自动化工作台、Artifact 和定时任务继续按后续阶段开发。
 
+### 2026-08-05 01:04 +08:00 | v0.5.0 | in_progress
+
+- 删除网页关键词识别和独立生图执行旁路；所有新消息保留即时多设备广播，并统一进入真实 Codex app-server Turn。
+- 修复项目 MCP 工作目录，真实确认 `negus_image` 同时暴露生成与编辑工具；MCP 工具结果进入原生 Thread Item 并由网页 Media 渲染。
+- 新增小数比例、全角冒号、像素尺寸和分辨率模型归一化；真实 `2.35:1 + 4K` 生成得到 `3840x1632`。
+- 同一真实 Thread 中完成首图生成、自动引用上一张图编辑和普通后续对话；图片只显示一份，输入状态随 Turn 正常结束。
+- HappyEvering 改为默认等待最终结果，移除 `async: true`；Provider 返回 `202` 时仍保留同任务轮询兜底。
+- 全部 Node 测试 103 项通过，生产 UI 构建通过；真实测试会话已归档，旧会话迁移合同已覆盖。
+
 ## 下一步
 
-推送当前开发分支并由用户在另一台电脑拉取后验收网页版生图。拉取代码不会同步 API Key；目标电脑需要已有 `LYNN_IMAGE_API_KEY` 用户环境变量，再启动项目服务。
+由用户在手机和电脑网页验收真实对话生图、连续改图、结果去重与完成后继续发送；后续再建设 Artifact、批量模板和自动化工作台。

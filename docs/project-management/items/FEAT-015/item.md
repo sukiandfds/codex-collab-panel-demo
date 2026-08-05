@@ -5,7 +5,7 @@ title: 自然语言生图与自动化工作台
 category: development
 priority: P2
 status: in_progress
-updated_at: 2026-08-04 18:39 +08:00
+updated_at: 2026-08-05 01:04 +08:00
 source: docs/feature-development/features/FEAT-015-image-generation-and-automation-workbench.md
 related: [FEAT-001, FEAT-002, FEAT-003, FEAT-007, FEAT-008]
 owner: product_and_runtime
@@ -14,8 +14,8 @@ product_commit: pending
 docs_commit: pending
 audited_product_commit: pending
 sync_status: implementation_uncommitted
-next_action: 推送当前开发分支；用户在目标电脑拉取后确认 LYNN_IMAGE_API_KEY 环境变量并验收网页版生图
-last_user_visible_change: 网页单人 Codex 已可用明确自然语言触发 Negus Image，显示生成状态和图片，服务重启后会话与图片仍保留
+next_action: 用户在手机和电脑网页验收真实对话生图、连续改图、结果去重和完成后继续发送
+last_user_visible_change: 网页生图已进入真实 Codex Thread/Turn；2.35：1 4K、同会话自动引用上一张图编辑及普通后续对话均已真实通过
 ---
 
 # 自然语言生图与自动化工作台
@@ -43,6 +43,18 @@ last_user_visible_change: 网页单人 Codex 已可用明确自然语言触发 N
 > 那请你开始。可以适当参考之前的别的项目的成果。
 
 > 我期待的是，相关功能有对应文件拆分管理，目前已有文件只负责调用，避免造成一个文件巨大不好维护。其实用关键词也可以吧？
+
+> 能成功生成，但是一直请求，导致中转平台一直显示尚未生成
+
+> 怎么修？反正我看结果是对的。那当然最好是等待结果。平台文档在：https://api.happyevering.xyz/docs/
+
+> 感觉做第一个识别小数比例和全角冒号 2.35：1 就好了其他的是不是没必要？你觉得有必要吗？还有个问题。单次生成后，无法继续在该对话框中和助手对话沟通，无法发送消息，也无法根据之前的内容去修改第一张图片
+
+> 我以为是把我们的原话发给中转站进行生成。
+
+> 官方codex内置的image_generation 工具调用，怎么 处理这些字段请求的？我以为我们有gpt5.6起码能分析我们的prompt再填写？prompt：一张2.35：1电影画幅……4K，极度真实 model：gpt-image-2-4k size：1:1 n：1
+
+> 请你自主高效进行修改、修复、验证。你有充足的时间，但是不能钻牛角尖。我明天早上起来进行验收。确保给我一个完美的图片生成系统。
 
 ## 助手初步理解
 
@@ -74,7 +86,7 @@ last_user_visible_change: 网页单人 Codex 已可用明确自然语言触发 N
 
 ## 当前状态
 
-开发中。原生 `negus_image` MCP、HappyEvering Provider、Skill、网页版关键词分流、异步运行状态、Media 图片展示和持久运行记录均已接入。已完成一次 16:9、2K 原生真实生图和一次 1:1、1K 网页真实生图；服务重启后生图会话和图片仍可从侧栏恢复。API Key 只保存在 Windows 用户环境变量中。Artifact、完整 `CapabilityRun`、自动化工作台和定时任务尚未实现。
+开发中。网页版关键词旁路和假 Turn 已删除，所有新生图请求均进入真实 Codex app-server Thread/Turn，由 GPT-5.6 读取用户完整原话、优化 Provider Prompt 并调用 `negus_image`。HappyEvering 默认等待最终结果；`2.35：1 + 4K` 已真实生成 `3840x1632`，同一 Thread 已真实完成自动引用上一张图编辑和普通后续对话。旧假会话首次续聊会把最近图片带入新真实 Thread，页面自动切换且旧记录退出活动列表。工具图片由原生 `mcpToolCall` 结果进入 Media，并在同一 Turn 内去重。API Key 从被 Git 忽略的 `runtime/secrets.env` 加载。Artifact、完整 `CapabilityRun`、自动化工作台和定时任务尚未实现。
 
 ## 当前证据
 
@@ -82,12 +94,13 @@ last_user_visible_change: 网页单人 Codex 已可用明确自然语言触发 N
 - `docs/research/IMAGE_GENERATION_CAPABILITY_AND_AUTOMATION_WORKBENCH_RESEARCH_2026-08-04.md`
 - `.codex/config.toml`
 - `windows/server/image-generation/happyevering-client.mjs`
+- `windows/server/image-generation/image-contract.mjs`
 - `windows/server/image-generation/image-output.mjs`
 - `windows/server/image-generation/mcp-server.mjs`
-- `windows/server/image-generation/web-image-intent.mjs`
-- `windows/server/image-generation/web-image-generation-service.mjs`
 - `windows/server/image-generation/image-generation-run-store.mjs`
-- `windows/tests/web-image-generation.test.mjs`
+- `windows/server/routes/conversation-routes.mjs`
+- `windows/server/codex-thread-history.mjs`
+- `windows/tests/image-contract.test.mjs`
 - `windows/tests/image-generation-mcp.test.mjs`
 - HappyEvering 官方文档：`https://api.happyevering.xyz/docs/`
 - 产品基线：`267a27cd9c6c8ab141dcc1e743d38d38a9d7f611`

@@ -11,6 +11,8 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
   const retiredTurns = new Map();
   const completedTurns = new Map();
   const reasoningBuffers = new Map();
+  const isConversationItem = (item) => ["userMessage", "agentMessage", "imageGeneration"].includes(item?.type)
+    || (item?.type === "mcpToolCall" && String(item.server || "").replace(/-/gu, "_") === "negus_image");
   const protocolEventTimes = new Map();
   const eventSequences = new Map();
   const eventEpoch = randomUUID();
@@ -306,7 +308,7 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
       const itemId = String(params.item?.id || "");
       if (itemId) rememberItemTurn(threadId, itemId, eventTurnId);
       if (isCompletedTurn) {
-        if (["userMessage", "agentMessage", "imageGeneration"].includes(params.item?.type)) {
+        if (isConversationItem(params.item)) {
           broadcastThreadEvent(threadId, { type: "sessions_changed", threadId });
         }
         if (params.item?.type === "agentMessage") messagePhases.delete(itemKey(threadId, itemId));
@@ -325,7 +327,7 @@ export const createExecutionTracker = ({ broadcast, stateFile = "" }) => {
             text,
           });
         }
-      } else if (["userMessage", "agentMessage", "imageGeneration"].includes(params.item?.type)) {
+      } else if (isConversationItem(params.item)) {
         if (params.item?.type === "agentMessage" && params.item?.phase !== "commentary") {
           publish(threadId, {
             phase: "finalizing",

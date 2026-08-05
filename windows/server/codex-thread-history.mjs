@@ -1,4 +1,4 @@
-import { messageFromThreadItem } from "./content-blocks.mjs";
+import { dedupeAssistantMediaMessages, messageFromThreadItem } from "./content-blocks.mjs";
 
 const cursorValue = (value) => typeof value === "string" && value ? value : null;
 
@@ -20,7 +20,7 @@ const turnPageLimit = (messageLimit) => {
   return Math.min(100, Math.max(20, Math.ceil(safeLimit / 2) + 4));
 };
 
-const messagesFromTurn = (turn, registerMedia) => (Array.isArray(turn?.items) ? turn.items : [])
+const messagesFromTurn = (turn, registerMedia) => dedupeAssistantMediaMessages((Array.isArray(turn?.items) ? turn.items : [])
   .map((item, index) => {
     const message = messageFromThreadItem(item, registerMedia);
     if (!message) return null;
@@ -38,9 +38,10 @@ const messagesFromTurn = (turn, registerMedia) => (Array.isArray(turn?.items) ? 
       ? { ...withTurn, createdAt: new Date(timestamp * 1000).toISOString() }
       : withTurn;
   })
-  .filter(Boolean);
+  .filter(Boolean));
 
-const messagesFromItems = (entries, registerMedia) => (Array.isArray(entries) ? entries : [])
+const messagesFromItems = (entries, registerMedia) => {
+  const messages = (Array.isArray(entries) ? entries : [])
   .map((entry, index) => {
     const item = entry?.item || entry?.threadItem || entry;
     const message = messageFromThreadItem(item, registerMedia);
@@ -51,7 +52,14 @@ const messagesFromItems = (entries, registerMedia) => (Array.isArray(entries) ? 
       ? { ...message, id: stableMessageId(turnId, itemId, index, message), turnId, itemId }
       : { ...message, id: stableMessageId("unknown", itemId, index, message), itemId };
   })
-  .filter(Boolean);
+    .filter(Boolean);
+  const seenByTurn = new Map();
+  return messages.flatMap((message) => {
+    const scope = message.turnId || message.id;
+    if (!seenByTurn.has(scope)) seenByTurn.set(scope, new Set());
+    return dedupeAssistantMediaMessages([message], seenByTurn.get(scope));
+  });
+};
 
 export const messagesFromTurns = (turns, registerMedia) => (Array.isArray(turns) ? turns : [])
   .flatMap((turn) => messagesFromTurn(turn, registerMedia));

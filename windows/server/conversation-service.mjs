@@ -82,6 +82,7 @@ const mergeSupplementalSessions = (sessions = [], supplemental = []) => {
 
 export const createConversationService = ({ primary, fallback, contentVersionStore, supplementalMessages }) => {
   const inFlightFinds = new Map();
+  const missingThreadPattern = /(?:thread|conversation|session).*(?:not found|does not exist|unknown)|no persisted turns/iu;
 
   const withFallback = async (operation, ...args) => {
     try {
@@ -134,11 +135,34 @@ export const createConversationService = ({ primary, fallback, contentVersionSto
     return mergeSupplementalSessions(sessions, await supplementalMessages.listSessions());
   };
 
+  const sendMessage = async (threadId, text, attachments = []) => {
+    try {
+      return { ...(await primary.sendMessage(threadId, text, attachments)), threadId };
+    } catch (error) {
+      if (!missingThreadPattern.test(String(error?.message || error))
+        || !supplementalMessages?.migrationContext
+        || !supplementalMessages?.markMigrated) throw error;
+      const legacy = await supplementalMessages.migrationContext(threadId);
+      if (!legacy?.attachments?.length) throw error;
+      const created = await primary.createSession();
+      const nextThreadId = created?.threadId;
+      if (!nextThreadId) throw new Error("Codex did not return a thread for legacy image migration");
+      const mergedAttachments = [...attachments];
+      const knownPaths = new Set(mergedAttachments.map((attachment) => attachment.path));
+      for (const attachment of legacy.attachments) {
+        if (!knownPaths.has(attachment.path)) mergedAttachments.push(attachment);
+      }
+      const result = await primary.sendMessage(nextThreadId, text, mergedAttachments);
+      await supplementalMessages.markMigrated(threadId, nextThreadId);
+      return { ...result, threadId: nextThreadId, migratedFromThreadId: threadId };
+    }
+  };
+
   return {
     listSessions,
     createSession: (...args) => primary.createSession(...args),
     findSession,
-    sendMessage: (...args) => primary.sendMessage(...args),
+    sendMessage,
     steerMessage: (...args) => primary.steerMessage(...args),
     interrupt: (...args) => primary.interrupt(...args),
     forkSession: (...args) => primary.forkSession(...args),

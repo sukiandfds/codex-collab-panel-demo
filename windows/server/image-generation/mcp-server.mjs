@@ -9,11 +9,11 @@ const commonInput = {
   prompt: z.string().min(1).describe("Natural-language image prompt or edit instruction."),
   resolution: z.enum(["1K", "2K", "4K"]).optional().describe("Requested output resolution tier."),
   model: z.string().min(1).optional().describe("Optional provider model override. Prefer resolution for normal use."),
-  size: z.string().min(1).optional().describe("Aspect ratio or pixel size accepted by the provider, such as 3:4 or 1024x1024."),
+  size: z.string().min(1).optional().describe("Aspect ratio or pixel size. Decimal ratios and fullwidth colons are supported, for example 2.35:1, 2.35：1, or 3840x1632."),
   n: z.number().int().min(1).max(20).optional().describe("Number of output images. Defaults to 1."),
   quality: z.string().min(1).optional().describe("Optional provider quality setting."),
   target_size: z.string().min(1).optional().describe("Optional final target size supported by the provider."),
-  output_directory: z.string().min(1).optional().describe("Local directory for saved images. Defaults to the configured temp directory."),
+  output_directory: z.string().min(1).optional().describe("Local directory for saved images. Defaults to the project's persistent runtime/generated-images directory."),
   output_name: z.string().min(1).optional().describe("Optional filename stem. The real image extension is detected automatically."),
 };
 
@@ -44,13 +44,13 @@ export const createImageMcpServer = ({ client = createHappyEveringImageClient() 
   const server = new McpServer({ name: "negus-image", version: "0.1.0" }, { capabilities: { tools: {} } });
   server.registerTool("generate_image", {
     title: "Generate image",
-    description: "Generate one or more raster images from a natural-language prompt through HappyEvering and save them as local files.",
+    description: "Generate images for the user's natural-language image request. Preserve the user's full visual intent, infer resolution, aspect ratio and count, improve the provider prompt when useful, and save results as persistent local files. Defaults to one image.",
     inputSchema: z.object(commonInput),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, (args) => toolResult(() => client.generate(providerImageRequestFromArgs(args)), "Generated"));
   server.registerTool("edit_image", {
     title: "Edit image",
-    description: "Edit or transform one or more local reference images through HappyEvering and save the results as local files.",
+    description: "Edit or transform local reference images. For follow-up requests about the previously generated image, reuse the most recent negus_image output path as image_paths, preserve requested composition or identity constraints, and save the new result as a persistent local file.",
     inputSchema: z.object({
       ...commonInput,
       image_paths: z.array(z.string().min(1)).min(1).max(16).describe("Absolute local paths to reference images."),

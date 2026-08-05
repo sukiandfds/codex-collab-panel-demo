@@ -1,6 +1,15 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { saveImageResponse } from "./image-output.mjs";
+
+const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
+const localSecretsFile = path.resolve(moduleDirectory, "../../../runtime/secrets.env");
+try {
+  process.loadEnvFile(localSecretsFile);
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
+}
 
 const defaultBaseUrl = "https://api.happyevering.xyz/v1";
 const defaultModel = "gpt-image-2";
@@ -154,7 +163,6 @@ export const createHappyEveringImageClient = ({
       n: requestArgs.n || 1,
       size: requestArgs.size || defaultSize,
       response_format: "b64_json",
-      async: true,
     }, requestArgs);
     return run({
       endpoint: "/images/generations",
@@ -178,7 +186,6 @@ export const createHappyEveringImageClient = ({
       n: requestArgs.n || 1,
       size: requestArgs.size || defaultSize,
       response_format: "b64_json",
-      async: true,
     }, requestArgs);
     for (const [key, value] of Object.entries(requestBody)) formData.append(key, String(value));
     for (const imagePath of imagePaths) {

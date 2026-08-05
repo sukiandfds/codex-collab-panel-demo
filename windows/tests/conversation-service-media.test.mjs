@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { createConversationService } from "../server/conversation-service.mjs";
+import { createImageGenerationRunStore } from "../server/image-generation/image-generation-run-store.mjs";
 
 const message = (blocks = [{ id: "text", type: "markdown", text: "Done" }]) => ({
   id: "answer",
@@ -196,4 +200,67 @@ test("lists supplemental-only image sessions after the native empty thread disap
   assert.deepEqual(sessions.map((session) => session.threadId), ["image-thread", "native-thread"]);
   assert.equal(sessions[0].messageCount, 2);
   service.close();
+});
+
+test("migrates a supplemental-only image conversation before sending its next message", async () => {
+  const sends = [];
+  const primary = {
+    sendMessage: async (threadId, text, attachments) => {
+      sends.push({ threadId, text, attachments });
+      if (threadId === "legacy-thread") throw new Error("Thread not found: legacy-thread");
+      return { turn: { id: "turn-new", status: "inProgress" } };
+    },
+    createSession: async () => ({ threadId: "real-thread" }),
+    close: () => {},
+  };
+  const fallback = { close: () => {} };
+  const migrated = [];
+  const supplementalMessages = {
+    migrationContext: async () => ({
+      text: "Create the original image",
+      attachments: [{ path: "C:\\images\\original.png", name: "original.png", mimeType: "image/png" }],
+    }),
+    markMigrated: async (...args) => { migrated.push(args); },
+  };
+  const service = createConversationService({ primary, fallback, supplementalMessages });
+
+  const result = await service.sendMessage("legacy-thread", "Make it a night scene", []);
+
+  assert.equal(result.threadId, "real-thread");
+  assert.equal(result.migratedFromThreadId, "legacy-thread");
+  assert.deepEqual(sends.map((entry) => entry.threadId), ["legacy-thread", "real-thread"]);
+  assert.deepEqual(sends[1].attachments.map((attachment) => attachment.path), ["C:\\images\\original.png"]);
+  assert.deepEqual(migrated, [["legacy-thread", "real-thread"]]);
+  service.close();
+});
+
+test("keeps migrated legacy records readable but removes them from the active session list", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "negus-legacy-image-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const output = path.join(root, "original.png");
+  await fs.writeFile(output, Buffer.from([1, 2, 3]));
+  const runStore = createImageGenerationRunStore({
+    stateFile: path.join(root, "runs.json"),
+    media: { register: () => ({ id: "media", name: "original.png", mimeType: "image/png", url: "/api/media/media" }) },
+  });
+  await runStore.create({
+    runId: "legacy-run",
+    turnId: "legacy-turn",
+    threadId: "legacy-thread",
+    submissionId: "legacy-submission",
+    text: "Create the original image",
+    attachments: [],
+    intent: { operation: "generate", resolution: "1K", size: "1:1", n: 1 },
+  });
+  await runStore.complete("legacy-run", {
+    outputs: [{ path: output, mimeType: "image/png", width: 1, height: 1 }],
+  });
+
+  const context = await runStore.migrationContext("legacy-thread");
+  assert.deepEqual(context.attachments.map((attachment) => attachment.path), [output]);
+  assert.equal((await runStore.listSessions()).length, 1);
+  await runStore.markMigrated("legacy-thread", "real-thread");
+  assert.equal((await runStore.listSessions()).length, 0);
+  assert.equal((await runStore.list("legacy-thread")).length, 2);
+  await runStore.close();
 });

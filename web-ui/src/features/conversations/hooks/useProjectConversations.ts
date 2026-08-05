@@ -64,12 +64,26 @@ export function useProjectConversations() {
     const optimisticMessage = createOptimisticMessage(messageText, attachments, submissionId);
     selection.addOptimisticMessage(threadId, optimisticMessage);
 
-    const sent = await execution.sendMessage(messageText, attachments.map((attachment) => attachment.id), submissionId);
-    if (!sent) {
+    const accepted = await execution.sendMessage(messageText, attachments.map((attachment) => attachment.id), submissionId);
+    if (!accepted) {
       selection.removeOptimisticMessage(threadId, optimisticMessage.id);
+      return false;
     }
-    return sent;
-  }, [execution.sendMessage, selection.addOptimisticMessage, selection.removeOptimisticMessage, selection.selectedIdRef]);
+    if (accepted.threadId !== threadId) {
+      selection.removeOptimisticMessage(threadId, optimisticMessage.id);
+      selection.addOptimisticMessage(accepted.threadId, optimisticMessage);
+      selection.selectSession(accepted.threadId);
+      void catalog.refreshSessions(false, accepted.threadId, false);
+    }
+    return true;
+  }, [
+    catalog.refreshSessions,
+    execution.sendMessage,
+    selection.addOptimisticMessage,
+    selection.removeOptimisticMessage,
+    selection.selectSession,
+    selection.selectedIdRef,
+  ]);
 
   const forkFromMessage = useCallback(async (message: SessionMessage) => {
     const threadId = selection.selectedIdRef.current;

@@ -1,7 +1,6 @@
 [mcp_servers.negus_image]
 command = "node"
 args = ["windows/server/image-generation/mcp-server.mjs"]
-cwd = ".."
 enabled = true
 required = false
 enabled_tools = ["generate_image", "edit_image"]
