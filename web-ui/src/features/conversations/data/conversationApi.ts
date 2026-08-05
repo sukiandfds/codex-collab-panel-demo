@@ -2,7 +2,7 @@ import type { ProjectInfo, SessionResponse, SessionSummary } from "../model/type
 import { fetchJson, postJson } from "../../../shared/api/http";
 
 const PAGE_SIZE = 60;
-const READ_TIMEOUT_MS = 12000;
+const READ_TIMEOUT_MS = 10000;
 
 const fetchConversationJson = async <T,>(pathname: string, signal?: AbortSignal): Promise<T> => {
   const controller = new AbortController();

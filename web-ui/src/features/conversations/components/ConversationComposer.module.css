@@ -104,29 +104,6 @@
 .sendButton svg { width: 15px; height: 15px; stroke-width: 1.9; }
 .sendButton svg.stopIcon { width: 10px; height: 10px; fill: currentColor; }
 
-.submitControls { display: flex; align-items: center; gap: 4px; }
-.queueButton,
-.directButton {
-  display: inline-flex;
-  height: 30px;
-  align-items: center;
-  gap: 5px;
-  padding: 0 9px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 7px;
-  color: var(--color-text-muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
-.queueButton svg,
-.directButton svg { width: 14px; height: 14px; }
-.queueButton:not(:disabled),
-.directButton:not(:disabled) { cursor: pointer; }
-.queueButton:not(:disabled) { background: var(--color-text); color: var(--color-bg); }
-.directButton:not(:disabled) { background: transparent; color: var(--color-text); }
-.queueButton:disabled,
-.directButton:disabled { cursor: default; opacity: .45; }
-
 .srOnly {
   position: absolute;
   width: 1px;
@@ -137,7 +114,7 @@
 }
 
 @media (max-width: 760px) {
-  .positioner { padding: 20px 12px max(10px, env(safe-area-inset-bottom)); }
+  .positioner { padding: 10px 12px max(10px, env(safe-area-inset-bottom)); }
 
   .footer {
     display: grid;
@@ -176,20 +153,18 @@
     height: 36px;
   }
 
-  .submitControls {
-    grid-column: 2;
-    grid-row: 1;
-    gap: 3px;
+}
+
+@media (any-pointer: coarse) {
+  .positioner {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    z-index: 5;
+    background: var(--color-bg);
   }
 
-  .queueButton,
-  .directButton {
-    width: 36px;
-    height: 36px;
-    justify-content: center;
-    padding: 0;
-  }
-
-  .queueButton span,
-  .directButton span { display: none; }
+  .focused .settingsControls { display: none; }
+  .focused textarea { max-height: 96px; }
 }

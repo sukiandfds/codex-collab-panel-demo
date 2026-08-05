@@ -9,9 +9,13 @@ import styles from "./ContentRenderer.module.css";
 
 const sourceUrl = (source: string) => withAccessToken(source);
 const downloadUrl = (source: string) => withAccessToken(`${source}${source.includes("?") ? "&" : "?"}download=1`);
+const previewUrl = (source: string) => sourceUrl(
+  source.startsWith("/api/media/")
+    ? `${source}${source.includes("?") ? "&" : "?"}preview=1`
+    : source,
+);
 const IMAGE_VIEWER_HISTORY_KEY = "codexImageViewer";
 
-type ImageShape = "panorama" | "landscape" | "square" | "portrait" | "tall";
 interface ImageDimensions { width: number; height: number }
 
 const imageDimensionsCache = new Map<string, ImageDimensions>();
@@ -39,28 +43,16 @@ function rememberImageDimensions(source: string, dimensions: ImageDimensions) {
   imageDimensionsCache.set(source, dimensions);
 }
 
-function getImageShape(width: number, height: number): ImageShape {
-  const ratio = width / height;
-  if (ratio >= 2.4) return "panorama";
-  if (ratio >= 1.2) return "landscape";
-  if (ratio >= 0.82) return "square";
-  if (ratio >= 0.58) return "portrait";
-  return "tall";
-}
-
 function RenderedImage({ source, alt, width, height }: { source: string; alt: string; width?: number; height?: number }) {
   const url = sourceUrl(source);
+  const thumbnailUrl = previewUrl(source);
   const [dimensions, setDimensions] = useState<ImageDimensions | null>(() => {
     if (validDimension(width) && validDimension(height)) return { width, height };
     return getSourceDimensions(source) || imageDimensionsCache.get(source) || null;
   });
   const [failed, setFailed] = useState(!source);
   const [isOpen, setIsOpen] = useState(false);
-  const shape = dimensions ? getImageShape(dimensions.width, dimensions.height) : null;
-  const imageClass = failed ? styles.imageFailed : shape ? styles[shape] : styles.imagePending;
-  const imageStyle = dimensions
-    ? { aspectRatio: `${dimensions.width} / ${dimensions.height}` }
-    : { aspectRatio: "4 / 3" };
+  const imageClass = failed ? styles.imageFailed : dimensions ? styles.imageReady : styles.imagePending;
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -107,14 +99,13 @@ function RenderedImage({ source, alt, width, height }: { source: string; alt: st
       <button
         type="button"
         className={`${styles.imageThumbnail} ${imageClass}`}
-        style={imageStyle}
         onClick={openViewer}
         aria-label={failed ? "图片无法显示" : `查看大图${alt ? `：${alt}` : ""}`}
         disabled={failed}
       >
         {!failed ? (
           <img
-            src={url}
+            src={thumbnailUrl}
             alt={alt}
             loading="lazy"
             width={dimensions?.width}

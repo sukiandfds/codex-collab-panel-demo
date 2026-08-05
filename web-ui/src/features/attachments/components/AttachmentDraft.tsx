@@ -61,12 +61,14 @@ export function AttachmentPreviews({
           ))}
         </div>
       ) : null}
-      {uploading ? (
+      {uploading && (uploadSlow || onCancelUpload) ? (
         <div className={styles.uploading} role="status">
           {uploadSlow ? <span>网络较慢</span> : null}
-          <button type="button" aria-label="取消上传" title="取消上传" onClick={onCancelUpload}>
-            <X aria-hidden="true" />
-          </button>
+          {onCancelUpload ? (
+            <button type="button" aria-label="取消上传" title="取消上传" onClick={onCancelUpload}>
+              <X aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       ) : null}
       {error ? <div className={styles.error} role="alert">{error}</div> : null}

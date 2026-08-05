@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Brain, Check, ChevronRight, FilePenLine, LoaderCircle, Search, Terminal, Wrench } from "lucide-react";
 import type { ExecutionActivity, ExecutionStatus } from "../model/types";
+import type { ContextStatus } from "../../context-management/model/types";
 import styles from "./ExecutionTimeline.module.css";
 
 const iconFor = (activity: ExecutionActivity) => {
@@ -17,7 +18,7 @@ const elapsedText = (durationMs: number) => {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 };
 
-export function ExecutionTimeline({ status }: { status: ExecutionStatus }) {
+export function ExecutionTimeline({ status, contextStatus }: { status: ExecutionStatus; contextStatus: ContextStatus }) {
   const [expanded, setExpanded] = useState(false);
   const [now, setNow] = useState(Date.now());
 
@@ -39,6 +40,8 @@ export function ExecutionTimeline({ status }: { status: ExecutionStatus }) {
   const elapsed = status.active
     ? elapsedText(liveDurationMs)
     : Number.isFinite(status.durationMs) ? elapsedText(status.durationMs || 0) : "";
+  const compacting = contextStatus.threadId === status.threadId && contextStatus.phase === "compacting";
+  const label = compacting ? "正在压缩上下文" : status.label.replace(/^Codex\s*/u, "");
 
   return (
     <section className={styles.timeline} aria-label="Codex 工作过程">
@@ -46,7 +49,7 @@ export function ExecutionTimeline({ status }: { status: ExecutionStatus }) {
         {status.active
           ? <LoaderCircle className={styles.spinner} aria-hidden="true" />
           : <Check className={styles.completed} aria-hidden="true" />}
-        <span>{status.label.replace(/^Codex\s*/u, "")}</span>
+        <span>{label}</span>
         {elapsed ? <time>{elapsed}</time> : null}
         <ChevronRight className={expanded ? styles.expanded : ""} aria-hidden="true" />
       </button>

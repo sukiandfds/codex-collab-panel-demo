@@ -43,6 +43,13 @@
   overflow: hidden;
 }
 
+@media (any-pointer: coarse) {
+  .main {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+}
+
 @media (max-width: 760px) {
   .shell {
     grid-template-columns: 1fr;

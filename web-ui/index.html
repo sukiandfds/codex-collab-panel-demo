@@ -2,17 +2,63 @@
 <html lang="zh-CN">
   <head>
   <meta charset="UTF-8" />
-    <link rel="icon" href="/icons/app-icon-192.png" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="icon" href="/icons/negus-icon-v1.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/negus-apple-touch-icon-v1.png" />
+    <link rel="manifest" href="/manifest.webmanifest?v=negus-2" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#101010" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    <meta name="apple-mobile-web-app-title" content="negus" />
-    <title>negus</title>
+    <meta name="apple-mobile-web-app-title" content="Negus" />
+    <meta name="description" content="Negus · 随时随地掌控 AI" />
+    <title>Negus · 随时随地掌控 AI</title>
+    <script>
+      if (!navigator.language.toLowerCase().startsWith("zh")) {
+        document.documentElement.lang = "en";
+        document.title = "Negus · Manage AI Anytime, Anywhere";
+        document.querySelector('meta[name="description"]').content = "Negus · Manage AI Anytime, Anywhere";
+      }
+    </script>
+    <style>
+      #negus-launch {
+        position: fixed;
+        z-index: 2147483000;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        padding: max(40px, env(safe-area-inset-top)) 28px max(40px, env(safe-area-inset-bottom));
+        background: #000;
+        color: #fff;
+        opacity: 1;
+        transition: opacity 280ms ease, visibility 280ms ease;
+      }
+      #negus-launch.negus-launch-leaving { visibility: hidden; opacity: 0; pointer-events: none; }
+      .negus-launch-content { display: grid; width: min(100%, 360px); justify-items: center; text-align: center; }
+      .negus-launch-kicker { margin: 0 0 38px; font: 600 30px/1.1 var(--font-sans, system-ui, sans-serif); }
+      .negus-launch-logo { display: block; width: 144px; height: 144px; }
+      .negus-launch-copy { max-width: 320px; margin: 38px 0 0; color: #d0d0d0; font: 450 16px/1.75 var(--font-sans, system-ui, sans-serif); }
+      .negus-launch-copy strong { color: #fff; font-weight: 650; }
+      html[lang="en"] .negus-launch-zh,
+      html:not([lang="en"]) .negus-launch-en { display: none; }
+      @media (prefers-reduced-motion: reduce) {
+        #negus-launch { transition-duration: 0.001ms; }
+      }
+    </style>
   </head>
   <body>
+    <div id="negus-launch" role="status" aria-label="Negus 正在启动">
+      <div class="negus-launch-content negus-launch-zh">
+        <p class="negus-launch-kicker">为什么选择</p>
+        <img class="negus-launch-logo" src="/icons/negus-icon-v1.svg" width="144" height="144" alt="Negus" />
+        <p class="negus-launch-copy"><strong>Negus 只为精英提供真正高效的系统，</strong><br />让你随时随地掌控 AI。</p>
+      </div>
+      <div class="negus-launch-content negus-launch-en">
+        <p class="negus-launch-kicker">WHY</p>
+        <img class="negus-launch-logo" src="/icons/negus-icon-v1.svg" width="144" height="144" alt="Negus" />
+        <p class="negus-launch-copy"><strong>Built for those who lead.</strong><br />Manage AI anytime, anywhere.</p>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

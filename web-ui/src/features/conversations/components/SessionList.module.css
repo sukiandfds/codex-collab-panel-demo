@@ -1,11 +1,11 @@
 .root { min-height: 0; overflow-y: auto; padding: 0 7px 14px; scrollbar-color: #3c3e40 transparent; scrollbar-width: thin; }
 .root h2 { margin: 0; padding: 9px 10px 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 450; }
 .error { margin: 0 10px 6px; color: var(--color-danger, #e57373); font-size: 12px; line-height: 1.45; }
-.itemRow { display: flex; width: 100%; min-height: 50px; align-items: stretch; }
-.item { display: flex; min-width: 0; flex: 1; align-items: flex-start; gap: 8px; padding: 7px 5px 7px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--color-text-secondary); text-align: left; }
-.item > svg { width: 15px; height: 15px; flex: 0 0 15px; margin-top: 2px; stroke-width: 1.7; }
-.active { background: var(--color-surface-active); color: var(--color-text); }
-.itemAction { display: grid; width: 28px; height: 28px; flex: 0 0 28px; align-self: center; place-items: center; border: 0; border-radius: 5px; background: transparent; color: var(--color-text-muted); cursor: pointer; }
+.itemRow { display: flex; width: 100%; min-height: 50px; align-items: stretch; border-radius: 6px; transition: background-color var(--duration-fast) var(--ease-out); }
+.item { display: flex; min-width: 0; flex: 1; align-items: flex-start; padding: 7px 5px 7px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--color-text-secondary); text-align: left; }
+.activeRow { background: var(--color-surface-active); }
+.activeRow .item { color: var(--color-text); }
+.itemAction { display: grid; width: 28px; height: 28px; flex: 0 0 28px; align-self: center; place-items: center; border: 0; border-radius: 5px; background: transparent; color: var(--color-text-muted); cursor: pointer; opacity: 0; pointer-events: none; transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out); }
 .itemAction:hover:not(:disabled) { background: var(--color-surface-hover); color: var(--color-text); }
 .itemAction:focus-visible { outline: 2px solid var(--color-text-secondary); outline-offset: 1px; }
 .itemAction:disabled { cursor: default; opacity: .5; }
@@ -18,4 +18,13 @@
 .empty { margin: 8px 10px; color: var(--color-text-muted); font-size: 12px; line-height: 1.5; }
 .loading { display: grid; gap: 7px; padding: 5px 9px; }
 .loading span { height: 42px; border-radius: 6px; background: #272b2d; }
-@media (hover: hover) { .item:hover { background: var(--color-surface-hover); color: var(--color-text); } }
+@media (hover: hover) {
+  .itemRow:hover { background: var(--color-surface-hover); }
+  .itemRow:hover .item { color: var(--color-text); }
+  .itemRow:hover .itemAction,
+  .itemRow:focus-within .itemAction { opacity: 1; pointer-events: auto; }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .itemAction { opacity: 1; pointer-events: auto; }
+}

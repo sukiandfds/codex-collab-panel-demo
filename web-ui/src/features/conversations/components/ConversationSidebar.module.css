@@ -14,7 +14,6 @@
 .brandRow { justify-content: space-between; height: var(--topbar-height); padding: 0 11px 0 16px; }
 .brand { display: flex; align-items: center; gap: 4px; font-size: 18px; font-weight: 670; }
 .actions { display: flex; align-items: center; }
-.brand svg { width: 14px; height: 14px; color: var(--color-text-muted); stroke-width: 1.8; }
 
 .iconButton {
   display: grid;

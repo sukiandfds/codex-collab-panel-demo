@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronDown, ChevronUp, ListOrdered, Pencil, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, ListOrdered, Pencil, RotateCcw, Send, Trash2, X } from "lucide-react";
 import type { FollowUpQueueItem } from "../model/followUpQueue";
 import styles from "./FollowUpQueue.module.css";
 
@@ -11,6 +11,7 @@ interface FollowUpQueueProps {
   onRemove: (itemId: string) => Promise<boolean>;
   onMove: (itemId: string, direction: "up" | "down") => Promise<boolean>;
   onRetry: (itemId: string) => Promise<boolean>;
+  onSendNow: (itemId: string) => Promise<boolean>;
 }
 
 const stateLabel = (item: FollowUpQueueItem) => {
@@ -19,7 +20,7 @@ const stateLabel = (item: FollowUpQueueItem) => {
   return "等待执行";
 };
 
-export function FollowUpQueue({ items, busy, error, onEdit, onRemove, onMove, onRetry }: FollowUpQueueProps) {
+export function FollowUpQueue({ items, busy, error, onEdit, onRemove, onMove, onRetry, onSendNow }: FollowUpQueueProps) {
   const [editingId, setEditingId] = useState("");
   const [editingText, setEditingText] = useState("");
 
@@ -89,6 +90,7 @@ export function FollowUpQueue({ items, busy, error, onEdit, onRemove, onMove, on
                   </>
                 ) : (
                   <>
+                    <button type="button" title="直接发送" aria-label="直接发送" disabled={locked} onClick={() => void onSendNow(item.id)}><Send aria-hidden="true" /></button>
                     {item.state === "failed" && <button type="button" title="重试" aria-label="重试" disabled={locked} onClick={() => void onRetry(item.id)}><RotateCcw aria-hidden="true" /></button>}
                     <button type="button" title="编辑" aria-label="编辑" disabled={locked} onClick={() => beginEdit(item)}><Pencil aria-hidden="true" /></button>
                     <button type="button" title="上移" aria-label="上移" disabled={locked || index === 0} onClick={() => void onMove(item.id, "up")}><ChevronUp aria-hidden="true" /></button>

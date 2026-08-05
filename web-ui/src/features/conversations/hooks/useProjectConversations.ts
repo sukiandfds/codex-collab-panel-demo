@@ -369,6 +369,7 @@ export function useProjectConversations() {
     removeQueueItem: followUpQueue.remove,
     moveQueueItem: followUpQueue.move,
     retryQueueItem: followUpQueue.retry,
+    sendQueueItem: followUpQueue.sendNow,
     interrupt: execution.interrupt,
     compactContext: contextManagement.compact,
     setAutoCompactThreshold: contextManagement.setThreshold,

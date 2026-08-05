@@ -155,6 +155,17 @@ export const createFollowUpQueueStore = ({ stateFile = "" } = {}) => {
     return { ...item };
   };
 
+  const claim = (threadId, itemId) => {
+    const items = itemsFor(threadId);
+    const index = items.findIndex((item) => item.id === itemId);
+    if (index < 0 || items[index].state === "dispatching") return null;
+    const item = { ...items[index], state: "dispatching", error: "", updatedAt: new Date().toISOString() };
+    const nextItems = [...items];
+    nextItems[index] = item;
+    writeItems(threadId, nextItems);
+    return { ...item };
+  };
+
   const markFailed = (threadId, itemId, error) => update(threadId, itemId, {
     state: "failed",
     error: String(error?.message || error || "指令发送失败"),
@@ -179,6 +190,7 @@ export const createFollowUpQueueStore = ({ stateFile = "" } = {}) => {
     update,
     remove,
     move,
+    claim,
     claimNext,
     markFailed,
     markPending,

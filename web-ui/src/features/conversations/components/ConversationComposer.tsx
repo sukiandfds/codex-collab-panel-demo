@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ListPlus, Send, Square, X } from "lucide-react";
+import { Send, Square, X } from "lucide-react";
 import { FollowUpQueue } from "./FollowUpQueue";
 import type { FollowUpQueueItem } from "../model/followUpQueue";
 import { AttachmentButton, AttachmentPreviews } from "../../attachments/components/AttachmentDraft";
@@ -36,6 +36,7 @@ interface ConversationComposerProps {
   onRemoveQueueItem: (itemId: string) => Promise<boolean>;
   onMoveQueueItem: (itemId: string, direction: "up" | "down") => Promise<boolean>;
   onRetryQueueItem: (itemId: string) => Promise<boolean>;
+  onSendQueueItem: (itemId: string) => Promise<boolean>;
   editingMessage: SessionMessage | null;
   onCancelEdit: () => void;
   onInterrupt: () => Promise<boolean>;
@@ -49,11 +50,13 @@ export function ConversationComposer({
   connected, selected, archived, sending, sendingSlow, status, commentary, contextStatus,
   models, modelsLoading, modelChanging, modelError,
   onSend, onQueue, queueing, queueItems, queueError, onEditQueueItem, onRemoveQueueItem, onMoveQueueItem, onRetryQueueItem,
+  onSendQueueItem,
   editingMessage, onCancelEdit,
   onInterrupt, onCompactContext, onAutoCompactThresholdChange, onModelChange,
   onReasoningEffortChange,
 }: ConversationComposerProps) {
   const [text, setText] = useState("");
+  const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submittingRef = useRef(false);
   const draft = useAttachmentDraft();
@@ -72,18 +75,18 @@ export function ConversationComposer({
     requestAnimationFrame(() => textareaRef.current?.focus());
   }, [draft.clear, editingMessage?.id]);
 
-  const submit = async (mode: "queue" | "direct") => {
+  const submit = async () => {
     const disabled = inputDisabled || !hasContent;
     if (disabled || submittingRef.current) return;
     submittingRef.current = true;
     const submittedText = text;
+    setText("");
     try {
-      const uploaded = await draft.uploadAll();
+      const uploaded = draft.attachments.length ? await draft.uploadAll() : [];
       const submittedAttachments = editing
         ? [...inheritedAttachments, ...uploaded.filter((attachment) => !inheritedAttachments.some((item) => item.id === attachment.id))]
         : uploaded;
-      setText("");
-      const accepted = editing || mode === "direct"
+      const accepted = editing || !status.active
         ? await onSend(submittedText, submittedAttachments)
         : await onQueue(submittedText, submittedAttachments);
       if (accepted) draft.clear();
@@ -112,9 +115,10 @@ export function ConversationComposer({
         onRemove={onRemoveQueueItem}
         onMove={onMoveQueueItem}
         onRetry={onRetryQueueItem}
+        onSendNow={onSendQueueItem}
       />
       <div
-        className={styles.composer}
+        className={`${styles.composer} ${focused ? styles.focused : ""}`}
         aria-label="Codex 对话输入"
         onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }}
         onDrop={(event) => {
@@ -131,6 +135,13 @@ export function ConversationComposer({
             </button>
           </div>
         ) : null}
+        <AttachmentPreviews
+          attachments={draft.attachments}
+          error={draft.error}
+          uploading={draft.uploading}
+          uploadSlow={draft.uploadSlow}
+          onRemove={draft.removeFile}
+        />
         <label className={styles.srOnly} htmlFor="prompt">给 Codex 发送指令</label>
         <textarea
           id="prompt"
@@ -139,6 +150,8 @@ export function ConversationComposer({
           value={text}
           placeholder={!selected ? "请选择一个对话" : archived ? "已归档，请先恢复对话" : status.active ? "追加指令，引导当前任务" : "给 Codex 发送指令"}
           disabled={inputDisabled}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           onChange={(event) => setText(event.target.value)}
           onPaste={(event) => {
             if (!event.clipboardData.files.length) return;
@@ -148,22 +161,14 @@ export function ConversationComposer({
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
-              void submit(editing ? "direct" : "queue");
+              void submit();
             }
           }}
-        />
-        <AttachmentPreviews
-          attachments={draft.attachments}
-          error={draft.error}
-          uploading={draft.uploading}
-          uploadSlow={draft.uploadSlow}
-          onRemove={draft.removeFile}
-          onCancelUpload={draft.cancelUpload}
         />
         <div className={styles.footer}>
           <div className={styles.leadingControls}>
             <AttachmentButton disabled={inputDisabled} onFiles={draft.addFiles} />
-            <ExecutionStatus connected={connected} status={status} commentary={commentary} sendingSlow={sendingSlow} />
+            <ExecutionStatus connected={connected} status={status} contextStatus={contextStatus} commentary={commentary} sendingSlow={sendingSlow} />
           </div>
           <span className={styles.spacer} />
           <div className={styles.settingsControls}>
@@ -185,7 +190,17 @@ export function ConversationComposer({
               onThresholdChange={onAutoCompactThresholdChange}
             />
           </div>
-          {status.active && !hasContent ? (
+          {draft.uploading ? (
+            <button
+              className={styles.sendButton}
+              type="button"
+              aria-label="取消图片上传"
+              title="取消图片上传"
+              onClick={draft.cancelUpload}
+            >
+              <Square className={styles.stopIcon} aria-hidden="true" />
+            </button>
+          ) : status.active && !hasContent ? (
             <button
               className={styles.sendButton}
               type="button"
@@ -197,16 +212,16 @@ export function ConversationComposer({
               <Square className={styles.stopIcon} aria-hidden="true" />
             </button>
           ) : (
-            <div className={styles.submitControls}>
-              {!editing ? (
-                <button className={styles.queueButton} type="button" title="指令等候中" aria-label="指令等候中" disabled={inputDisabled || !hasContent} onClick={() => void submit("queue")}>
-                  <ListPlus aria-hidden="true" /><span>指令等候中</span>
-                </button>
-              ) : null}
-              <button className={styles.directButton} type="button" title={editing ? "重新发送" : "直接发送"} aria-label={editing ? "重新发送" : "直接发送"} disabled={inputDisabled || !hasContent} onClick={() => void submit("direct")}>
-                <Send aria-hidden="true" /><span>{editing ? "重新发送" : "直接发送"}</span>
-              </button>
-            </div>
+            <button
+              className={styles.sendButton}
+              type="button"
+              title={editing ? "重新发送" : status.active ? "加入等候队列" : "发送"}
+              aria-label={editing ? "重新发送" : status.active ? "加入等候队列" : "发送"}
+              disabled={inputDisabled || !hasContent}
+              onClick={() => void submit()}
+            >
+              <Send aria-hidden="true" />
+            </button>
           )}
         </div>
       </div>

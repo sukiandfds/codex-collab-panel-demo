@@ -9,9 +9,11 @@ const APP_SHELL = [
   "/progress",
   "/project-management",
   "/manifest.webmanifest",
-  "/icons/app-icon-192.png",
-  "/icons/app-icon-512.png",
-  "/icons/apple-touch-icon.png",
+  "/icons/negus-icon-v1.svg",
+  "/icons/negus-icon-192-v1.png",
+  "/icons/negus-icon-512-v1.png",
+  "/icons/negus-icon-maskable-512-v1.png",
+  "/icons/negus-apple-touch-icon-v1.png",
 ];
 
 self.addEventListener("install", (event) => {

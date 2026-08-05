@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "./components/AppShell/AppShell";
 import { WindowBar } from "./components/WindowBar/WindowBar";
 import { ConversationComposer } from "./features/conversations/components/ConversationComposer";
@@ -15,6 +15,10 @@ export function App() {
   const device = useDeviceInfo(conversations.connected);
   const usage = useUsageMonitor(conversations.executionStatus);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  useEffect(() => {
+    if (conversations.loadingList || conversations.loadingSession) return;
+    window.dispatchEvent(new Event("negus:app-ready"));
+  }, [conversations.loadingList, conversations.loadingSession]);
   const selectSession = useCallback((threadId: string) => {
     conversations.selectSession(threadId);
     setSidebarOpen(false);
@@ -73,6 +77,7 @@ export function App() {
           listAvailable={!conversations.listError}
           streamingText={conversations.streamingText}
           executionStatus={conversations.executionStatus}
+          contextStatus={conversations.contextStatus}
           onLoadOlder={conversations.loadOlder}
           onForkMessage={conversations.forkFromMessage}
           forkingMessageId={conversations.forkingMessageId}
@@ -106,6 +111,7 @@ export function App() {
           onRemoveQueueItem={conversations.removeQueueItem}
           onMoveQueueItem={conversations.moveQueueItem}
           onRetryQueueItem={conversations.retryQueueItem}
+          onSendQueueItem={conversations.sendQueueItem}
           editingMessage={conversations.editingMessage}
           onCancelEdit={conversations.cancelEditMessage}
           onInterrupt={conversations.interrupt}

@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Clock3 } from "lucide-react";
+import { Clock3, LoaderCircle } from "lucide-react";
 import { JumpToLatest } from "../../../components/JumpToLatest/JumpToLatest";
+import { RefreshNotice } from "../../app-update/components/AppUpdateNotice";
 import type { ContentSyncState, SessionDetail, SessionMessage } from "../model/types";
 import { MessageActions } from "./MessageActions";
 import { ContentRenderer } from "../rendering/ContentRenderer";
 import { ExecutionTimeline } from "../../execution/components/ExecutionTimeline";
 import type { ExecutionStatus } from "../../execution/model/types";
+import type { ContextStatus } from "../../context-management/model/types";
 import styles from "./ConversationView.module.css";
 
 const padTimePart = (value: number) => String(value).padStart(2, "0");
@@ -21,11 +23,17 @@ const messageTime = (value?: string) => {
     : `${date.getFullYear()}-${monthDayTime}`;
 };
 
-const finalMessageMatchesStream = (message: SessionMessage, executionStatus: ExecutionStatus) => (
+const normalizedText = (value: string) => value.replace(/\s+/gu, " ").trim();
+
+const finalMessageMatchesStream = (message: SessionMessage, executionStatus: ExecutionStatus, streamingText: string) => (
   message.role === "assistant"
   && Boolean(executionStatus.turnId)
   && message.turnId === executionStatus.turnId
-  && (!executionStatus.streamingItemId || message.itemId === executionStatus.streamingItemId)
+  && (
+    !executionStatus.streamingItemId
+    || message.itemId === executionStatus.streamingItemId
+    || (Boolean(streamingText.trim()) && normalizedText(message.text) === normalizedText(streamingText))
+  )
 );
 
 const waitForLayoutToSettle = (root: HTMLDivElement, measure: () => void) => new Promise<void>((resolve) => {
@@ -114,6 +122,7 @@ interface ConversationViewProps {
   listAvailable: boolean;
   streamingText: string;
   executionStatus: ExecutionStatus;
+  contextStatus: ContextStatus;
   onLoadOlder: () => Promise<void>;
   onForkMessage: (message: SessionMessage) => Promise<boolean>;
   forkingMessageId: string;
@@ -136,6 +145,7 @@ export function ConversationView({
   listAvailable,
   streamingText,
   executionStatus,
+  contextStatus,
   onLoadOlder,
   onForkMessage,
   forkingMessageId,
@@ -158,12 +168,11 @@ export function ConversationView({
   );
   const latestAssistant = [...messages].reverse().find((message) => message.role === "assistant");
   const finalMessageLoaded = executionMatchesSession && (
-    messages.some((message) => finalMessageMatchesStream(message, executionStatus))
+    messages.some((message) => finalMessageMatchesStream(message, executionStatus, streamingText))
     || (completedExecution
       && Boolean(latestAssistant)
       && Boolean(executionStatus.turnId)
-      && latestAssistant?.turnId === executionStatus.turnId
-      && (!executionStatus.streamingItemId || latestAssistant.itemId === executionStatus.streamingItemId))
+      && latestAssistant?.turnId === executionStatus.turnId)
   );
   const visibleStreamingText = executionMatchesSession && !finalMessageLoaded ? streamingText : "";
   const executionIndex = !executionStatus.active && messages.at(-1)?.role === "assistant"
@@ -241,6 +250,28 @@ export function ConversationView({
 
   useEffect(() => {
     const root = scrollRef.current;
+    if (!root || typeof ResizeObserver === "undefined") return undefined;
+    let previousHeight = root.clientHeight;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      const nextHeight = root.clientHeight;
+      if (nextHeight === previousHeight) return;
+      previousHeight = nextHeight;
+      if (!stickToBottomRef.current) return;
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        root.scrollTop = Math.max(0, root.scrollHeight - root.clientHeight);
+      });
+    });
+    observer.observe(root);
+    return () => {
+      observer.disconnect();
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  useEffect(() => {
+    const root = scrollRef.current;
     if (!root) return;
     let disposed = false;
     const onScroll = async () => {
@@ -268,18 +299,19 @@ export function ConversationView({
 
   return (
     <div className={styles.viewport}>
+      {error ? (
+        <RefreshNotice
+          surface="conversation"
+          title="内容暂时未更新"
+          detail="连接长时间没有响应，请刷新网页后重试。"
+          actionLabel="刷新网页"
+          onAction={() => window.location.reload()}
+        />
+      ) : null}
       <div className={styles.scrollArea} ref={scrollRef}>
         <section className={styles.conversation} aria-label="真实项目对话" aria-live="polite">
-        {loading ? <div className={styles.loading}>正在读取对话…</div> : null}
-        {!loading && session && (error || contentSyncState === "syncing" || contentSyncState === "recovering" || contentSyncState === "degraded") ? (
-          <div className={styles.older}>{error || (contentSyncState === "recovering"
-            ? "正在恢复最新内容…"
-            : contentSyncState === "degraded"
-              ? "当前显示上次稳定内容，最新内容暂未确认"
-              : "正在同步最新内容…")}</div>
-        ) : null}
+        {loading ? <div className={styles.loading} role="status" aria-label="正在读取对话"><LoaderCircle aria-hidden="true" /></div> : null}
         {loadingOlder ? <div className={styles.older}>正在加载更早消息…</div> : null}
-        {!loading && error && !session ? <div className={styles.state}>{error}</div> : null}
         {!loading && !error && !session && listAvailable ? <div className={styles.state}>当前项目暂无可显示对话</div> : null}
         {!loading && session ? (
           <div className={styles.virtualList} style={{ height: virtualizer.getTotalSize() }}>
@@ -294,7 +326,7 @@ export function ConversationView({
                   style={{ transform: `translateY(${virtualRow.start}px)` }}
                 >
                   {item.type === "execution"
-                    ? <ExecutionTimeline status={executionStatus} />
+                    ? <ExecutionTimeline status={executionStatus} contextStatus={contextStatus} />
                     : (
                       <Message
                         message={item.message}

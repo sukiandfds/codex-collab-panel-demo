@@ -4,6 +4,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { imageSize } from "image-size";
 import { imageSizeFromFile } from "image-size/fromFile";
+import sharp from "sharp";
 
 const mimeTypes = new Map([
   [".png", "image/png"], [".jpg", "image/jpeg"], [".jpeg", "image/jpeg"], [".gif", "image/gif"],
@@ -23,6 +24,7 @@ const mimeTypes = new Map([
 const inlineTypes = /^(?:image|audio|video)\//u;
 const maxUploadBytes = 20 * 1024 * 1024;
 const maxImageProbeBytes = 25 * 1024 * 1024;
+const previewMaxPixels = 320;
 
 const validDimension = (value) => Number.isSafeInteger(value) && value > 0;
 const publicMedia = ({ id, name, mimeType, url, width, height }) => ({
@@ -90,6 +92,44 @@ const readUpload = async (request) => {
 
 export const createMediaService = ({ uploadRoot } = {}) => {
   const entries = new Map();
+  const previewJobs = new Map();
+  const previewRoot = uploadRoot ? path.join(path.dirname(uploadRoot), "media-previews") : "";
+
+  const createPreview = async (entry) => {
+    if (!previewRoot || !entry.mimeType.startsWith("image/") || entry.mimeType === "image/svg+xml") return null;
+    const version = createHash("sha256").update(entry.signature || entry.path).digest("hex").slice(0, 12);
+    const target = path.join(previewRoot, `${entry.id}-${version}.webp`);
+    try {
+      await fsp.access(target);
+      return target;
+    } catch {
+      // Generate once below.
+    }
+
+    const existing = previewJobs.get(target);
+    if (existing) return existing;
+    const job = (async () => {
+      await fsp.mkdir(previewRoot, { recursive: true });
+      const temporary = `${target}.${process.pid}.tmp`;
+      try {
+        await sharp(entry.path, { failOn: "none" })
+          .rotate()
+          .resize({ width: previewMaxPixels, height: previewMaxPixels, fit: "inside", withoutEnlargement: true })
+          .webp({ quality: 62, effort: 3 })
+          .toFile(temporary);
+        await fsp.rename(temporary, target);
+        return target;
+      } finally {
+        await fsp.rm(temporary, { force: true }).catch(() => {});
+      }
+    })();
+    previewJobs.set(target, job);
+    try {
+      return await job;
+    } finally {
+      previewJobs.delete(target);
+    }
+  };
 
   const register = (file, overrides = {}) => {
     const resolved = path.resolve(file);
@@ -175,16 +215,30 @@ export const createMediaService = ({ uploadRoot } = {}) => {
     })
     .filter(Boolean);
 
-  const serve = async (request, response, id, download = false) => {
+  const serve = async (request, response, id, { download = false, preview = false } = {}) => {
     const entry = entries.get(id);
     if (!entry) {
       response.writeHead(404);
       response.end("Media not found");
       return;
     }
+    let servedPath = entry.path;
+    let servedType = entry.mimeType;
+    if (preview && !download) {
+      try {
+        const generated = await createPreview(entry);
+        if (generated) {
+          servedPath = generated;
+          servedType = "image/webp";
+        }
+      } catch {
+        // Keep the original image available when preview generation is unsupported.
+      }
+    }
+
     let stat;
     try {
-      stat = await fsp.stat(entry.path);
+      stat = await fsp.stat(servedPath);
       if (!stat.isFile()) throw new Error("not a file");
     } catch {
       entries.delete(id);
@@ -193,11 +247,11 @@ export const createMediaService = ({ uploadRoot } = {}) => {
       return;
     }
 
-    const disposition = download || (!inlineTypes.test(entry.mimeType) && entry.mimeType !== "application/pdf") ? "attachment" : "inline";
+    const disposition = download || (!inlineTypes.test(servedType) && servedType !== "application/pdf") ? "attachment" : "inline";
     const headers = {
       "Accept-Ranges": "bytes",
       "Cache-Control": "private, max-age=3600",
-      "Content-Type": entry.mimeType,
+      "Content-Type": servedType,
       "Content-Disposition": `${disposition}; filename*=UTF-8''${encodeURIComponent(entry.name)}`,
       "X-Content-Type-Options": "nosniff",
       "Content-Security-Policy": "sandbox; default-src 'none'",
@@ -205,7 +259,7 @@ export const createMediaService = ({ uploadRoot } = {}) => {
     const range = request.headers.range;
     if (!range) {
       response.writeHead(200, { ...headers, "Content-Length": stat.size });
-      fs.createReadStream(entry.path).pipe(response);
+      fs.createReadStream(servedPath).pipe(response);
       return;
     }
 
@@ -227,7 +281,7 @@ export const createMediaService = ({ uploadRoot } = {}) => {
       "Content-Length": end - start + 1,
       "Content-Range": `bytes ${start}-${end}/${stat.size}`,
     });
-    fs.createReadStream(entry.path, { start, end }).pipe(response);
+    fs.createReadStream(servedPath, { start, end }).pipe(response);
   };
 
   return { register, restoreUploads, upload, resolveMany, serve };

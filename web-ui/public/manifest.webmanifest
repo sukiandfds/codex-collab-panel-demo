@@ -2,7 +2,7 @@
   "id": "/",
   "name": "negus",
   "short_name": "negus",
-  "description": "面向 Codex 的多端 AI 协作与创作工作台。",
+  "description": "随时随地掌控 AI。",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -10,8 +10,10 @@
   "theme_color": "#101010",
   "orientation": "any",
   "icons": [
-    { "src": "/icons/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/icons/negus-icon-v1.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/negus-icon-192-v1.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/negus-icon-512-v1.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/negus-icon-maskable-512-v1.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
     { "name": "单人对话", "short_name": "对话", "url": "/" },

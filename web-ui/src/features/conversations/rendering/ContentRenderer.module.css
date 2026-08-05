@@ -86,18 +86,21 @@
   object-fit: contain;
 }
 .imagePending,
+.imageReady,
 .imageFailed {
   width: clamp(160px, calc((100% - 6px) / 2), 360px);
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1 / 1;
 }
 .imagePending {
   visibility: hidden;
 }
-.panorama { width: 100%; }
-.landscape { width: clamp(160px, calc((100% - 6px) / 2), 360px); }
-.square { width: clamp(104px, calc((100% - 12px) / 3), 210px); }
-.portrait { width: clamp(82px, calc((100% - 18px) / 4), 150px); }
-.tall { width: clamp(68px, calc((100% - 24px) / 5), 112px); }
+@media (max-width: 760px) {
+  .imagePending,
+  .imageReady,
+  .imageFailed {
+    width: calc((100% - 12px) / 2);
+  }
+}
 .imageError {
   display: flex;
   min-height: 92px;

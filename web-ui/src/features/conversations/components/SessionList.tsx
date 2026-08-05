@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, MessageSquare } from "lucide-react";
+import { Archive, ArchiveRestore } from "lucide-react";
 import type { SessionSummary } from "../model/types";
 import styles from "./SessionList.module.css";
 
@@ -36,17 +36,16 @@ export function SessionList({
       {!loading && error ? <p className={styles.error}>{error}</p> : null}
       {!loading && !sessions.length && !error ? <p className={styles.empty}>当前项目暂无可显示会话</p> : null}
       {sessions.map((session) => (
-        <div className={styles.itemRow} key={session.threadId}>
+        <div className={`${styles.itemRow} ${session.threadId === selectedId ? styles.activeRow : ""}`} key={session.threadId}>
           <button
-            className={`${styles.item} ${session.threadId === selectedId ? styles.active : ""}`}
+            className={styles.item}
             type="button"
             onClick={() => onSelect(session.threadId)}
           >
-            <MessageSquare aria-hidden="true" />
             <span className={styles.content}>
               <span className={styles.title}>{session.title}</span>
               <span className={styles.meta}>
-                {session.source === "happy" ? "Happy" : "Codex"} · {timeFormatter.format(new Date(session.updatedAt))}
+                {session.source === "happy" ? "Happy · " : ""}{timeFormatter.format(new Date(session.updatedAt))}
                 {session.messageCount === null ? "" : ` · ${session.messageCount} 条`}
               </span>
             </span>

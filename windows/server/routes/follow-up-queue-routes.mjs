@@ -71,6 +71,8 @@ export const createFollowUpQueueRoutes = ({ queue, media }) => async (request, r
     item = await queue.move(threadId, itemId, String(body.direction || ""));
   } else if (action === "retry") {
     item = await queue.retry(threadId, itemId);
+  } else if (action === "sendNow") {
+    item = await queue.sendNow(threadId, itemId);
   } else {
     sendJson(response, { error: "unknown queue action" }, 400);
     return true;

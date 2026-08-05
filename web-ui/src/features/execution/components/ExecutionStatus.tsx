@@ -1,10 +1,12 @@
 import { CheckCircle2, CircleAlert, CircleDot, WifiOff } from "lucide-react";
 import type { ExecutionStatus as ExecutionStatusValue } from "../model/types";
+import type { ContextStatus } from "../../context-management/model/types";
 import styles from "./ExecutionStatus.module.css";
 
-export function ExecutionStatus({ connected, status, sendingSlow }: {
+export function ExecutionStatus({ connected, status, contextStatus, sendingSlow }: {
   connected: boolean;
   status: ExecutionStatusValue;
+  contextStatus: ContextStatus;
   commentary: string;
   sendingSlow: boolean;
 }) {
@@ -19,7 +21,8 @@ export function ExecutionStatus({ connected, status, sendingSlow }: {
   const completed = status.phase === "completed";
   const Icon = status.active ? CircleDot : failed ? CircleAlert : completed ? CheckCircle2 : CheckCircle2;
   const showsSpecificStatus = ["unknown", "recovering", "finalizing", "stopping"].includes(status.phase);
-  const label = showsSpecificStatus ? status.label : status.active ? "Codex 正在运行" : status.label;
+  const compacting = contextStatus.threadId === status.threadId && contextStatus.phase === "compacting";
+  const label = compacting ? "正在压缩上下文" : showsSpecificStatus ? status.label : status.active ? "Codex 正在运行" : status.label;
   return (
     <span className={`${styles.status} ${failed ? styles.failed : ""}`} title={status.detail || label}>
       <Icon aria-hidden="true" />

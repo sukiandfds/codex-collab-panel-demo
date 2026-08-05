@@ -33,13 +33,7 @@ export const createFollowUpQueueService = ({
     });
   };
 
-  const dispatchNext = (threadId) => withThreadLock(threadId, async () => {
-    const status = execution.getStatus(threadId);
-    if (status.active || ["failed", "interrupted", "systemError", "waitingOnApproval", "waitingOnUserInput"].includes(status.phase)) {
-      return null;
-    }
-    const item = store.claimNext(threadId);
-    if (!item) return null;
+  const dispatchClaimed = async (threadId, item, status) => {
     broadcastQueue(threadId, "dispatching");
     const attachments = media.resolveMany(item.attachmentIds);
     if (attachments.length !== item.attachmentIds.length) {
@@ -57,7 +51,8 @@ export const createFollowUpQueueService = ({
       createdAt: item.createdAt,
     });
     try {
-      await conversations.sendMessage(threadId, item.text, attachments);
+      if (status.active) await conversations.steerMessage(threadId, status.turnId, item.text, attachments);
+      else await conversations.sendMessage(threadId, item.text, attachments);
       store.complete(threadId, item.id);
       broadcastQueue(threadId, "completed");
       return item;
@@ -66,6 +61,16 @@ export const createFollowUpQueueService = ({
       broadcastQueue(threadId, "failed");
       return failed;
     }
+  };
+
+  const dispatchNext = (threadId) => withThreadLock(threadId, async () => {
+    const status = execution.getStatus(threadId);
+    if (status.active || ["failed", "interrupted", "systemError", "waitingOnApproval", "waitingOnUserInput"].includes(status.phase)) {
+      return null;
+    }
+    const item = store.claimNext(threadId);
+    if (!item) return null;
+    return dispatchClaimed(threadId, item, status);
   });
 
   const enqueue = async ({ threadId, text, attachmentIds = [], attachments = [], submissionId = "" }) => {
@@ -111,6 +116,16 @@ export const createFollowUpQueueService = ({
     return publicItem(pending);
   });
 
+  const sendNow = async (threadId, itemId) => withThreadLock(threadId, async () => {
+    const status = execution.getStatus(threadId);
+    if (status.active && !status.turnId) {
+      throw Object.assign(new Error("Codex 正在启动当前任务，请稍后再试"), { statusCode: 409 });
+    }
+    const item = store.claim(threadId, itemId);
+    if (!item) throw Object.assign(new Error("该指令不存在或正在发送"), { statusCode: 409 });
+    return publicItem(await dispatchClaimed(threadId, item, status));
+  });
+
   const handleTurnTerminal = ({ threadId, status }) => {
     if (status !== "completed") return;
     if (!execution.getStatus(threadId).active) void dispatchNext(threadId);
@@ -130,6 +145,7 @@ export const createFollowUpQueueService = ({
     remove,
     move,
     retry,
+    sendNow,
     withThreadLock,
     handleTurnTerminal,
     start,

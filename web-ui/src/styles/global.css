@@ -10,11 +10,7 @@ body,
 }
 
 @supports (height: 100dvh) {
-  html,
-  body,
-  #root {
-    height: 100dvh;
-  }
+  #root { height: 100dvh; }
 }
 
 html {
@@ -31,6 +27,30 @@ html {
   textarea,
   select {
     font-size: 16px !important;
+  }
+}
+
+@media (any-pointer: coarse) {
+  html,
+  body,
+  #root {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body {
+    position: fixed;
+    inset: 0;
+  }
+
+  #root {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: auto;
+    left: 0;
+    height: var(--app-viewport-height, 100dvh);
+    transform: translate3d(0, var(--app-viewport-offset-top, 0px), 0);
   }
 }
 

@@ -7,6 +7,34 @@ const timestampOf = (message: SessionMessage) => {
   return Number.isFinite(timestamp) ? timestamp : null;
 };
 
+const attachmentSignature = (message: SessionMessage) => (message.blocks || [])
+  .filter((block) => "source" in block)
+  .map((block) => `${block.type}:${block.file?.id || block.source}`)
+  .sort()
+  .join("|");
+
+const persistedMatchesOptimistic = (persisted: SessionMessage, optimistic: SessionMessage) => {
+  if (persisted.role !== "user" || isOptimisticMessage(persisted) || persisted.text !== optimistic.text) return false;
+  const persistedAttachments = attachmentSignature(persisted);
+  const optimisticAttachments = attachmentSignature(optimistic);
+  if ((persistedAttachments || optimisticAttachments) && persistedAttachments !== optimisticAttachments) return false;
+  if (persisted.turnId && optimistic.turnId) return persisted.turnId === optimistic.turnId;
+  const persistedAt = Date.parse(persisted.createdAt || "");
+  const optimisticAt = Date.parse(optimistic.createdAt || "");
+  return !Number.isFinite(persistedAt)
+    || !Number.isFinite(optimisticAt)
+    || Math.abs(persistedAt - optimisticAt) <= 5 * 60 * 1000;
+};
+
+const persistedIdentityChanged = (current: SessionMessage, incoming: SessionMessage) => {
+  if (isOptimisticMessage(current) || isOptimisticMessage(incoming)) return false;
+  if (!current.turnId || current.turnId !== incoming.turnId || current.role !== incoming.role) return false;
+  if (current.text !== incoming.text || attachmentSignature(current) !== attachmentSignature(incoming)) return false;
+  const currentAt = timestampOf(current);
+  const incomingAt = timestampOf(incoming);
+  return currentAt === null || incomingAt === null || Math.abs(currentAt - incomingAt) <= 1000;
+};
+
 export const mergeMessageList = (baseMessages: SessionMessage[], incomingMessages: SessionMessage[]) => {
   const merged: SessionMessage[] = [];
   const indexes = new Map<string, number>();
@@ -15,6 +43,20 @@ export const mergeMessageList = (baseMessages: SessionMessage[], incomingMessage
     const knownIndex = indexes.get(message.id);
     if (knownIndex !== undefined) {
       merged[knownIndex] = message;
+      return;
+    }
+
+    const replacementIndex = merged.findIndex((current) => (
+      persistedIdentityChanged(current, message)
+      || (isOptimisticMessage(current) && persistedMatchesOptimistic(message, current))
+      || (isOptimisticMessage(message) && persistedMatchesOptimistic(current, message))
+    ));
+    if (replacementIndex >= 0) {
+      const current = merged[replacementIndex];
+      if (isOptimisticMessage(message) && !isOptimisticMessage(current)) return;
+      indexes.delete(current.id);
+      merged[replacementIndex] = message;
+      indexes.set(message.id, replacementIndex);
       return;
     }
 
@@ -35,25 +77,6 @@ export const mergeMessageList = (baseMessages: SessionMessage[], incomingMessage
   for (const message of baseMessages) addOrReplace(message);
   for (const message of incomingMessages) addOrReplace(message);
   return merged;
-};
-
-const attachmentSignature = (message: SessionMessage) => (message.blocks || [])
-  .filter((block) => "source" in block)
-  .map((block) => `${block.type}:${block.file?.id || block.source}`)
-  .sort()
-  .join("|");
-
-const persistedMatchesOptimistic = (persisted: SessionMessage, optimistic: SessionMessage) => {
-  if (persisted.role !== "user" || isOptimisticMessage(persisted) || persisted.text !== optimistic.text) return false;
-  const persistedAttachments = attachmentSignature(persisted);
-  const optimisticAttachments = attachmentSignature(optimistic);
-  if ((persistedAttachments || optimisticAttachments) && persistedAttachments !== optimisticAttachments) return false;
-  if (persisted.turnId && optimistic.turnId) return persisted.turnId === optimistic.turnId;
-  const persistedAt = Date.parse(persisted.createdAt || "");
-  const optimisticAt = Date.parse(optimistic.createdAt || "");
-  return !Number.isFinite(persistedAt)
-    || !Number.isFinite(optimisticAt)
-    || Math.abs(persistedAt - optimisticAt) <= 5 * 60 * 1000;
 };
 
 const unresolvedOptimisticMessages = (incoming: SessionDetail, current: SessionDetail) => {

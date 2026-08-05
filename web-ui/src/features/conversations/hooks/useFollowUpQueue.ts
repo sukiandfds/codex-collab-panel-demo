@@ -79,11 +79,16 @@ export function useFollowUpQueue(threadId: string) {
     return run(() => followUpQueueApi.action(threadId, "retry", itemId));
   }, [run, threadId]);
 
+  const sendNow = useCallback((itemId: string) => {
+    if (!threadId) return Promise.resolve(false);
+    return run(() => followUpQueueApi.action(threadId, "sendNow", itemId));
+  }, [run, threadId]);
+
   const handleEvent = useCallback((event: ProjectEvent) => {
     if (event.type !== "queue_changed" || event.threadId !== threadId) return;
     setItems(event.items || []);
     setError("");
   }, [threadId]);
 
-  return { items, loading, busy, error, enqueue, edit, remove, move, retry, refresh, handleEvent };
+  return { items, loading, busy, error, enqueue, edit, remove, move, retry, sendNow, refresh, handleEvent };
 }

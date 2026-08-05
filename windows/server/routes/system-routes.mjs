@@ -52,7 +52,10 @@ export const createSystemRoutes = ({ token, project, projectRoot, device, observ
       return true;
     }
     if (url.pathname.startsWith("/api/media/")) {
-      await media.serve(request, response, url.pathname.slice("/api/media/".length), url.searchParams.get("download") === "1");
+      await media.serve(request, response, url.pathname.slice("/api/media/".length), {
+        download: url.searchParams.get("download") === "1",
+        preview: url.searchParams.get("preview") === "1",
+      });
       return true;
     }
     if (url.pathname === "/api/status") {
