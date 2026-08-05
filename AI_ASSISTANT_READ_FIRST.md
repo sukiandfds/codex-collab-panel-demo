@@ -1,8 +1,8 @@
 # AI助手请先看这个
 
-> 本文是 `negus` 的 AI 开发交接入口。当前仓库目录和远程仓库仍保留 `codex-collab-panel-demo`；任何 AI 助手准备分析、修改或运行本项目之前，应先完整阅读本文，再按需查看具体代码和开发日志。
+> 本文是 `negus` 的 AI 开发交接入口。本地仓库目录和 `origin` 远程仓库统一使用 `negus`；任何 AI 助手准备分析、修改或运行本项目之前，应先完整阅读本文，再按需查看具体代码和开发日志。
 
-更新日期：2026-08-03
+更新日期：2026-08-05
 项目路径：以 `git rev-parse --show-toplevel` 返回的实际仓库根目录为准；本文不再把历史路径作为工作目录
 当前分支：`codex/publish-current-panel`
 当前阶段：优先收尾单人 Codex Web 对话与控制的基础体验和稳定性；项目群聊、多 Agent、固定公网入口和 Desktop/Web 统一控制继续保留，但暂不抢在单人基础能力之前扩展
@@ -435,7 +435,7 @@ P0 停止规则：同一任务出现第二种独立根因、第二次提权或�
 
 远端：
 
-- `origin`：`https://github.com/sukiandfds/codex-collab-panel-demo.git`
+- `origin`：`https://github.com/sukiandfds/negus.git`
 - `upstream`：`https://github.com/Fei-Away/Codex-Dream-Skin.git`
 
 当前开发分支：

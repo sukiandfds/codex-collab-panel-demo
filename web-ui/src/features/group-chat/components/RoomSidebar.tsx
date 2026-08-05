@@ -5,7 +5,7 @@ import styles from "./RoomSidebar.module.css";
 export function RoomSidebar({ project, members }: { project: string; members: GroupMember[] }) {
   return (
     <aside className={styles.sidebar}>
-      <div className={styles.brand}><span className={styles.brandMark}>C</span><span>Codex Collab</span></div>
+      <div className={styles.brand}><span className={styles.brandMark}>N</span><span>negus</span></div>
       <section className={styles.sidebarSection}>
         <span className={styles.sectionLabel}>当前项目</span>
         <div className={styles.projectRow}><FolderKanban /><span>{project}</span></div>

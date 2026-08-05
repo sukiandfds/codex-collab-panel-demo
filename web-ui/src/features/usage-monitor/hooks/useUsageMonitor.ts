@@ -3,12 +3,14 @@ import type { ExecutionStatus } from "../../execution/model/types";
 import { usageApi } from "../data/usageApi";
 import type { FushengUsageSnapshot } from "../model/types";
 
-const CACHE_KEY = "codex-collab:fusheng-usage";
+const CACHE_KEY = "negus:fusheng-usage";
+const LEGACY_CACHE_KEY = "codex-collab:fusheng-usage";
 const COMPLETION_REFRESH_DELAY_MS = 2_000;
 
 const readCachedSnapshot = (): FushengUsageSnapshot | null => {
   try {
-    const raw = window.localStorage.getItem(CACHE_KEY);
+    const raw = window.localStorage.getItem(CACHE_KEY)
+      || window.localStorage.getItem(LEGACY_CACHE_KEY);
     if (!raw) return null;
     const value = JSON.parse(raw) as Partial<FushengUsageSnapshot>;
     if (value.provider !== "fusheng"

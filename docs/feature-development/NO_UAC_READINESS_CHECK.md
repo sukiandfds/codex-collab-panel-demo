@@ -38,7 +38,7 @@ pwsh -NoProfile -File .\windows\scripts\check-dev-environment.ps1 -Json
 
 ```powershell
 pwsh -NoProfile -File .\windows\scripts\check-dev-environment.ps1 `
-  -ProjectRoot 'D:\projects\codex-collab-panel-demo' `
+  -ProjectRoot 'D:\projects\negus' `
   -Port 9360,9335,9350
 ```
 

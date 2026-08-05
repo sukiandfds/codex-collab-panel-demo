@@ -1,10 +1,12 @@
 import type { SessionDetail, SessionSummary } from "../model/types";
 
-const storageKey = "codex-collab-conversation-snapshot-v1";
+const storageKey = "negus-conversation-snapshot-v1";
+const legacyStorageKey = "codex-collab-conversation-snapshot-v1";
 const maxSnapshotBytes = 768 * 1024;
 const maxBootstrapBytes = 64 * 1024;
 const bootstrapMessageLimit = 8;
-const databaseName = "codex-collab-conversations";
+const databaseName = "negus-conversations";
+const legacyDatabaseName = "codex-collab-conversations";
 const databaseVersion = 1;
 const objectStoreName = "snapshots";
 const objectKey = "current";
@@ -24,20 +26,37 @@ const validSnapshot = (value: ConversationSnapshot | null): ConversationSnapshot
   return value;
 };
 
-export const readConversationSnapshot = (): ConversationSnapshot | null => {
+const selectNewestSnapshot = (...snapshots: Array<ConversationSnapshot | null>) => snapshots.reduce<ConversationSnapshot | null>(
+  (best, current) => {
+    if (!current) return best;
+    if (!best) return current;
+    const currentAt = Date.parse(current.savedAt) || 0;
+    const bestAt = Date.parse(best.savedAt) || 0;
+    if (currentAt !== bestAt) return currentAt > bestAt ? current : best;
+    return (current.session?.messages.length || 0) >= (best.session?.messages.length || 0) ? current : best;
+  },
+  null,
+);
+
+const readLocalSnapshot = (key: string) => {
   try {
-    return validSnapshot(JSON.parse(window.localStorage.getItem(storageKey) || "null") as ConversationSnapshot | null);
+    return validSnapshot(JSON.parse(window.localStorage.getItem(key) || "null") as ConversationSnapshot | null);
   } catch {
     return null;
   }
 };
 
-const openSnapshotDatabase = () => new Promise<IDBDatabase | null>((resolve, reject) => {
+export const readConversationSnapshot = (): ConversationSnapshot | null => selectNewestSnapshot(
+  readLocalSnapshot(storageKey),
+  readLocalSnapshot(legacyStorageKey),
+);
+
+const openSnapshotDatabase = (name: string) => new Promise<IDBDatabase | null>((resolve, reject) => {
   if (typeof window === "undefined" || !window.indexedDB) {
     resolve(null);
     return;
   }
-  const request = window.indexedDB.open(databaseName, databaseVersion);
+  const request = window.indexedDB.open(name, databaseVersion);
   request.onupgradeneeded = () => {
     const database = request.result;
     if (!database.objectStoreNames.contains(objectStoreName)) database.createObjectStore(objectStoreName);
@@ -46,8 +65,8 @@ const openSnapshotDatabase = () => new Promise<IDBDatabase | null>((resolve, rej
   request.onerror = () => reject(request.error || new Error("IndexedDB open failed"));
 });
 
-const readIndexedSnapshot = async (): Promise<ConversationSnapshot | null> => {
-  const database = await openSnapshotDatabase();
+const readIndexedSnapshotFrom = async (name: string): Promise<ConversationSnapshot | null> => {
+  const database = await openSnapshotDatabase(name);
   if (!database) return null;
   try {
     return await new Promise<ConversationSnapshot | null>((resolve, reject) => {
@@ -60,8 +79,16 @@ const readIndexedSnapshot = async (): Promise<ConversationSnapshot | null> => {
   }
 };
 
+const readIndexedSnapshot = async (): Promise<ConversationSnapshot | null> => {
+  const [current, legacy] = await Promise.all([
+    readIndexedSnapshotFrom(databaseName).catch(() => null),
+    readIndexedSnapshotFrom(legacyDatabaseName).catch(() => null),
+  ]);
+  return selectNewestSnapshot(current, legacy);
+};
+
 const writeIndexedSnapshot = async (snapshot: ConversationSnapshot) => {
-  const database = await openSnapshotDatabase();
+  const database = await openSnapshotDatabase(databaseName);
   if (!database) return;
   try {
     await new Promise<void>((resolve, reject) => {
@@ -80,15 +107,7 @@ export const readConversationSnapshotAsync = async (): Promise<ConversationSnaps
   const local = readConversationSnapshot();
   try {
     const indexed = await readIndexedSnapshot();
-    if (!indexed) return local;
-    if (!local) return indexed;
-    const indexedAt = Date.parse(indexed.savedAt) || 0;
-    const localAt = Date.parse(local.savedAt) || 0;
-    const indexedMessageCount = indexed.session?.messages.length || 0;
-    const localMessageCount = local.session?.messages.length || 0;
-    return indexedAt > localAt || (indexedAt === localAt && indexedMessageCount >= localMessageCount)
-      ? indexed
-      : local;
+    return selectNewestSnapshot(local, indexed);
   } catch {
     return local;
   }

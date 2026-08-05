@@ -1,14 +1,24 @@
 import type { StoredMember } from "../model/types";
 
-const memberKey = "codex-collab-group-member";
+const memberKey = "negus-group-member";
+const legacyMemberKey = "codex-collab-group-member";
+
+const parseStoredMember = (raw: string | null): StoredMember | null => {
+  if (!raw) return null;
+  const value = JSON.parse(raw) as StoredMember | null;
+  return value?.id && value?.name ? value : null;
+};
 
 export const createMemberId = () => globalThis.crypto?.randomUUID?.()
   || `member-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 export const readStoredMember = (): StoredMember | null => {
   try {
-    const value = JSON.parse(localStorage.getItem(memberKey) || "null") as StoredMember | null;
-    return value?.id && value?.name ? value : null;
+    const current = parseStoredMember(localStorage.getItem(memberKey));
+    if (current) return current;
+    const legacy = parseStoredMember(localStorage.getItem(legacyMemberKey));
+    if (legacy) localStorage.setItem(memberKey, JSON.stringify(legacy));
+    return legacy;
   } catch {
     return null;
   }

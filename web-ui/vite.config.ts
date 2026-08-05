@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
 const createVersionAssetPlugin = (buildId: string, builtAt: string): Plugin => ({
-  name: "codex-collab-version-asset",
+  name: "negus-version-asset",
   apply: "build",
   generateBundle() {
     this.emitFile({

@@ -33,7 +33,7 @@ test("maps uploaded files to Codex native input types", () => {
 });
 
 test("stores uploads inside the configured runtime directory and restores them", async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "codex-collab-upload-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "negus-upload-"));
   try {
     const media = createMediaService({ uploadRoot: root });
     const uploaded = await media.upload(Readable.from([Buffer.from("hello")]), { name: "notes.txt", mimeType: "text/plain" });
@@ -50,7 +50,7 @@ test("stores uploads inside the configured runtime directory and restores them",
 });
 
 test("reuses the same stored upload for identical retry content", async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "codex-collab-upload-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "negus-upload-"));
   try {
     const media = createMediaService({ uploadRoot: root });
     const first = await media.upload(Readable.from([Buffer.from("same content")]), { name: "notes.txt", mimeType: "text/plain" });
@@ -65,7 +65,7 @@ test("reuses the same stored upload for identical retry content", async () => {
 });
 
 test("returns stable dimensions for uploaded and restored images", async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "codex-collab-image-size-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "negus-image-size-"));
   try {
     const media = createMediaService({ uploadRoot: root });
     const uploaded = await media.upload(Readable.from([pngHeader(1200, 800)]), { name: "photo.png", mimeType: "image/png" });
@@ -85,7 +85,7 @@ test("returns stable dimensions for uploaded and restored images", async () => {
 });
 
 test("drops a media entry after its uploaded file is removed", async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "codex-collab-upload-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "negus-upload-"));
   try {
     const media = createMediaService({ uploadRoot: root });
     const uploaded = await media.upload(Readable.from([Buffer.from("temporary")]), { name: "temp.txt", mimeType: "text/plain" });
