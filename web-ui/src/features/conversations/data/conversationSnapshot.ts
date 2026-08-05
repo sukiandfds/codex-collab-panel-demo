@@ -15,6 +15,7 @@ let indexedWriteQueue = Promise.resolve();
 export interface ConversationSnapshot {
   version: 1;
   savedAt: string;
+  isPartial?: boolean;
   selectedId: string;
   sessions: SessionSummary[];
   session: SessionDetail | null;
@@ -119,18 +120,23 @@ export const writeConversationSnapshot = ({ selectedId, sessions, session }: {
   session: SessionDetail | null;
 }) => {
   try {
-    const cachedSession = session && session.threadId === selectedId
-      ? { ...session, messages: session.messages.slice(-60) }
-      : null;
-    const snapshot: ConversationSnapshot = {
-      version: 1,
-      savedAt: new Date().toISOString(),
-      selectedId,
-      sessions: sessions.slice(0, 50),
-      session: cachedSession,
-    };
+    const cachedMessageCount = session?.threadId === selectedId ? session.messages.length : 0;
+      const cachedSession = session && session.threadId === selectedId
+        ? { ...session, messages: session.messages.slice(-60) }
+        : null;
+      const snapshot: ConversationSnapshot = {
+        version: 1,
+        savedAt: new Date().toISOString(),
+        isPartial: Boolean(cachedSession && (
+          cachedMessageCount > cachedSession.messages.length || cachedSession.hasMore
+        )),
+        selectedId,
+        sessions: sessions.slice(0, 50),
+        session: cachedSession,
+      };
     let serialized = JSON.stringify(snapshot);
     while (serialized.length > maxSnapshotBytes && snapshot.session && snapshot.session.messages.length > 1) {
+      snapshot.isPartial = true;
       snapshot.session.messages = snapshot.session.messages.slice(Math.ceil(snapshot.session.messages.length / 4));
       serialized = JSON.stringify(snapshot);
     }
@@ -138,18 +144,17 @@ export const writeConversationSnapshot = ({ selectedId, sessions, session }: {
       let bootstrapSession = snapshot.session
         ? {
           ...snapshot.session,
-          contentVersion: undefined,
           messages: snapshot.session.messages.slice(-bootstrapMessageLimit),
         }
         : null;
-      let bootstrapSnapshot: ConversationSnapshot = { ...snapshot, session: bootstrapSession };
+      let bootstrapSnapshot: ConversationSnapshot = { ...snapshot, isPartial: Boolean(bootstrapSession), session: bootstrapSession };
       let bootstrapSerialized = JSON.stringify(bootstrapSnapshot);
       while (bootstrapSerialized.length > maxBootstrapBytes && bootstrapSession && bootstrapSession.messages.length > 1) {
         bootstrapSession = {
           ...bootstrapSession,
           messages: bootstrapSession.messages.slice(Math.ceil(bootstrapSession.messages.length / 2)),
         };
-        bootstrapSnapshot = { ...snapshot, session: bootstrapSession };
+        bootstrapSnapshot = { ...snapshot, isPartial: Boolean(bootstrapSession), session: bootstrapSession };
         bootstrapSerialized = JSON.stringify(bootstrapSnapshot);
       }
       if (bootstrapSerialized.length <= maxBootstrapBytes) window.localStorage.setItem(storageKey, bootstrapSerialized);

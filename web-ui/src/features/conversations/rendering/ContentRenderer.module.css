@@ -85,7 +85,14 @@
   max-height: min(44vh, 320px);
   object-fit: contain;
 }
-.imagePending { width: 104px; aspect-ratio: 1; visibility: hidden; }
+.imagePending,
+.imageFailed {
+  width: clamp(160px, calc((100% - 6px) / 2), 360px);
+  aspect-ratio: 4 / 3;
+}
+.imagePending {
+  visibility: hidden;
+}
 .panorama { width: 100%; }
 .landscape { width: clamp(160px, calc((100% - 6px) / 2), 360px); }
 .square { width: clamp(104px, calc((100% - 12px) / 3), 210px); }

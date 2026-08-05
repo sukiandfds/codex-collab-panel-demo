@@ -8,6 +8,20 @@ export interface SendMessageResult {
   migratedFromThreadId?: string;
 }
 
+export interface SubmissionStatusResult {
+  threadId: string;
+  submissionId: string;
+  status: "accepted" | "pending" | "failed" | "unknown";
+  turnId?: string;
+  messageId?: string;
+  error?: string;
+}
+
+export type SendMessageAttempt =
+  | { outcome: "accepted"; result: SendMessageResult }
+  | { outcome: "uncertain"; result: null }
+  | { outcome: "failed"; result: null };
+
 interface InterruptResult {
   threadId: string;
   turnId: string;
@@ -22,6 +36,10 @@ export const executionApi = {
   sendMessage: (threadId: string, text: string, attachmentIds: string[] = [], submissionId = "", signal?: AbortSignal) => postJson<SendMessageResult>(
     "/api/session/message",
     { threadId, text, attachmentIds, submissionId },
+    signal,
+  ),
+  submissionStatus: (threadId: string, submissionId: string, signal?: AbortSignal) => fetchJson<SubmissionStatusResult>(
+    `/api/session/submission?threadId=${encodeURIComponent(threadId)}&submissionId=${encodeURIComponent(submissionId)}`,
     signal,
   ),
   interrupt: (threadId: string, signal?: AbortSignal) => postJson<InterruptResult>(

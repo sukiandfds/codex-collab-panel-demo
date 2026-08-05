@@ -2,6 +2,7 @@ import type { MediaFile } from "../../../shared/model/media";
 
 export type MessageRole = "user" | "assistant";
 export type SessionSource = "codex" | "happy";
+export type ContentSyncState = "stable" | "syncing" | "recovering" | "degraded";
 
 export interface ProjectInfo {
   name: string;
@@ -21,6 +22,8 @@ export interface SessionMessage {
   id: string;
   role: MessageRole;
   text: string;
+  deliveryState?: "pending";
+  submissionId?: string;
   blocks?: ContentBlock[];
   createdAt?: string;
   turnId?: string;

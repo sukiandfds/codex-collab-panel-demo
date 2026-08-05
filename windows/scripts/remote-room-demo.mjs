@@ -9,6 +9,7 @@ import { createConversationVersionStore } from "../server/conversation-version-s
 import { createMediaService } from "../server/media-service.mjs";
 import { createRealtimeHub } from "../server/realtime-hub.mjs";
 import { createExecutionTracker } from "../server/execution-tracker.mjs";
+import { createSubmissionStore } from "../server/submission-store.mjs";
 import { createFollowUpQueueService } from "../server/follow-up-queue-service.mjs";
 import { createContextManagementService } from "../server/context-management-service.mjs";
 import { createRequestHandler } from "../server/request-handler.mjs";
@@ -43,6 +44,9 @@ const imageGenerationRuns = createImageGenerationRunStore({
   media,
 });
 const realtime = createRealtimeHub();
+const submissions = createSubmissionStore({
+  stateFile: path.join(projectRoot, "runtime", "session-submissions.json"),
+});
 let followUpQueue;
 const execution = createExecutionTracker({
   broadcast: realtime.broadcast,
@@ -123,7 +127,7 @@ const fushengUsage = createFushengUsageService({
 const serveStatic = createStaticFileServer(webRoot);
 const readWebVersion = createWebVersionReader(webRoot);
 const requestHandler = createRequestHandler({
-  token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
+  token, project, projectRoot, device, observerPort, conversations, execution, media, realtime, submissions,
   followUpQueue, contextManagement, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
 });
 const server = http.createServer(requestHandler);
@@ -132,6 +136,7 @@ const close = () => {
   realtime.close();
   void followUpQueue.close();
   void execution.close();
+  void submissions.close();
   conversations.close();
   void imageGenerationRuns.close();
   void contextManagement.close();

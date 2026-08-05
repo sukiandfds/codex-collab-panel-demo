@@ -57,6 +57,10 @@ function RenderedImage({ source, alt, width, height }: { source: string; alt: st
   const [failed, setFailed] = useState(!source);
   const [isOpen, setIsOpen] = useState(false);
   const shape = dimensions ? getImageShape(dimensions.width, dimensions.height) : null;
+  const imageClass = failed ? styles.imageFailed : shape ? styles[shape] : styles.imagePending;
+  const imageStyle = dimensions
+    ? { aspectRatio: `${dimensions.width} / ${dimensions.height}` }
+    : { aspectRatio: "4 / 3" };
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -102,8 +106,8 @@ function RenderedImage({ source, alt, width, height }: { source: string; alt: st
     <>
       <button
         type="button"
-        className={`${styles.imageThumbnail} ${failed ? styles.square : shape ? styles[shape] : styles.imagePending}`}
-        style={dimensions ? { aspectRatio: `${dimensions.width} / ${dimensions.height}` } : undefined}
+        className={`${styles.imageThumbnail} ${imageClass}`}
+        style={imageStyle}
         onClick={openViewer}
         aria-label={failed ? "图片无法显示" : `查看大图${alt ? `：${alt}` : ""}`}
         disabled={failed}

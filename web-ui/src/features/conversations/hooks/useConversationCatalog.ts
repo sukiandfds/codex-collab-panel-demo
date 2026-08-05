@@ -7,7 +7,7 @@ import type { InitialConversationState } from "../state/initialConversation";
 
 interface ConversationSelection {
   selectedIdRef: MutableRefObject<string>;
-  loadSession: (threadId: string, options?: { older?: boolean; quiet?: boolean; retry?: boolean }) => Promise<boolean>;
+  loadSession: (threadId: string, options?: { older?: boolean; quiet?: boolean; retry?: boolean; recovery?: boolean }) => Promise<boolean>;
   adoptSelection: (threadId: string, quiet: boolean) => Promise<boolean>;
   clearSelection: () => void;
   setCreatedSession: (detail: SessionDetail) => void;
@@ -154,7 +154,7 @@ export function useConversationCatalog(
     const hasCachedSession = Boolean(initial.session);
     if (hasCachedSession) selection.setSyncing(true);
     const initialSessionRequest = initial.selectedId
-      ? selection.loadSession(initial.selectedId, { quiet: hasCachedSession })
+      ? selection.loadSession(initial.selectedId, { quiet: hasCachedSession, recovery: initial.sessionIsPartial })
       : Promise.resolve(false);
     void Promise.all([
       conversationApi.project(controller.signal).then(setProject),

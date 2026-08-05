@@ -6,6 +6,8 @@
 .virtualRow { position: absolute; top: 0; left: 0; width: 100%; }
 .message { padding-bottom: 34px; }
 .body { color: var(--color-text); }
+.deliveryState { display: inline-flex; margin-left: 6px; color: var(--color-text-muted); vertical-align: middle; }
+.deliveryState svg { width: 14px; height: 14px; }
 .user .body { width: fit-content; max-width: min(620px, 82%); margin-left: auto; padding: 10px 14px; border: 1px solid rgba(255,255,255,.04); border-radius: 16px; background: #2b2b2b; }
 .assistant .body {
   width: 100%;

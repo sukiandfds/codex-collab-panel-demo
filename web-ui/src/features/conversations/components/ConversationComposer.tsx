@@ -57,7 +57,8 @@ export function ConversationComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submittingRef = useRef(false);
   const draft = useAttachmentDraft();
-  const inputDisabled = !selected || archived || sending || queueing || draft.uploading;
+  const inputDisabled = !selected || archived || sending || queueing || draft.uploading
+    || status.phase === "recovering" || status.phase === "unknown";
   const editing = Boolean(editingMessage);
   const inheritedAttachments = editingMessage?.blocks?.flatMap((block) => (
     "file" in block && block.file ? [block.file] : []

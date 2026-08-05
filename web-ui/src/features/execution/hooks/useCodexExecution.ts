@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { executionApi } from "../data/executionApi";
-import type { SendMessageResult } from "../data/executionApi";
+import type { SendMessageAttempt, SubmissionStatusResult } from "../data/executionApi";
 import type { ExecutionStatus, ProjectEvent } from "../model/types";
 
 const SEND_CONFIRM_TIMEOUT_MS = 20000;
@@ -27,6 +27,12 @@ const idleStatus = (threadId: string): ExecutionStatus => ({
   startedAt: null,
   updatedAt: null,
   durationMs: null,
+});
+
+const recoveringStatus = (threadId: string): ExecutionStatus => ({
+  ...idleStatus(threadId),
+  phase: "recovering",
+  label: "正在确认任务状态",
 });
 
 export function useCodexExecution(threadId: string) {
@@ -170,7 +176,7 @@ export function useCodexExecution(threadId: string) {
     lastEventSeqRef.current = 0;
     clearStreaming();
     setCommentaryText("");
-    setStatus(idleStatus(threadId));
+    setStatus(threadId ? recoveringStatus(threadId) : idleStatus(threadId));
     if (!threadId) {
       return;
     }
@@ -224,7 +230,7 @@ export function useCodexExecution(threadId: string) {
     text: string,
     attachmentIds: string[] = [],
     submissionId = "",
-  ): Promise<SendMessageResult | null> => {
+  ): Promise<SendMessageAttempt | null> => {
     const message = text.trim();
     if (!threadId || (!message && !attachmentIds.length) || sendingRef.current) return null;
     sendingRef.current = true;
@@ -262,7 +268,19 @@ export function useCodexExecution(threadId: string) {
     }
     try {
       const accepted = await executionApi.sendMessage(threadId, message, attachmentIds, acceptedSubmissionId, controller.signal);
-      if (accepted.threadId !== threadId) return accepted;
+      if (accepted.status === "pending") {
+        stateRevisionRef.current += 1;
+        setStatus((current) => ({
+          ...current,
+          phase: "unknown",
+          label: "正在确认指令是否已送达",
+          detail: "服务端尚未确认这条指令，不会重复提交",
+          active: true,
+          updatedAt: new Date().toISOString(),
+        }));
+        return { outcome: "uncertain", result: null };
+      }
+      if (accepted.threadId !== threadId) return { outcome: "accepted", result: accepted };
       if (accepted.turnId) {
         currentTurnIdRef.current = accepted.turnId;
         stateRevisionRef.current += 1;
@@ -274,7 +292,7 @@ export function useCodexExecution(threadId: string) {
           updatedAt: new Date().toISOString(),
         }));
       }
-      return accepted;
+      return { outcome: "accepted", result: accepted };
     } catch (reason) {
       const recovered = await refreshStatus(undefined, true);
       const acceptedAfterFailure = !steering
@@ -282,23 +300,29 @@ export function useCodexExecution(threadId: string) {
         && recovered?.turnId !== previousTurnId
         && !["failed", "systemError"].includes(recovered?.phase || "");
       if (acceptedAfterFailure) {
-        return { threadId, turnId: recovered?.turnId || "", status: recovered?.phase || "inProgress" };
+        return {
+          outcome: "accepted",
+          result: { threadId, turnId: recovered?.turnId || "", status: recovered?.phase || "inProgress" },
+        };
       }
-      const detail = controller.signal.aborted
+      const uncertain = controller.signal.aborted;
+      const detail = uncertain
         ? "发送确认超时，未重复提交；请确认任务状态后重试"
         : reason instanceof Error ? reason.message : String(reason);
       if (steering) {
-        setStatus((current) => ({ ...current, detail }));
+        setStatus((current) => uncertain
+          ? { ...current, phase: "unknown", label: "正在确认指令是否已送达", detail }
+          : { ...current, detail });
       } else {
         setStatus({
           ...idleStatus(threadId),
-          phase: "failed",
-          label: "指令发送失败",
+          phase: uncertain ? "unknown" : "failed",
+          label: uncertain ? "正在确认指令是否已送达" : "指令发送失败",
           detail,
           updatedAt: new Date().toISOString(),
         });
       }
-      return null;
+      return { outcome: uncertain ? "uncertain" : "failed", result: null };
     } finally {
       window.clearTimeout(timeout);
       window.clearTimeout(sendingSlowTimer.current);
@@ -308,6 +332,15 @@ export function useCodexExecution(threadId: string) {
       setSending(false);
     }
   }, [clearStreaming, refreshStatus, retireTurn, status.active, threadId]);
+
+  const reconcileSubmission = useCallback(async (submissionId: string, signal?: AbortSignal): Promise<SubmissionStatusResult | null> => {
+    if (!threadId || !submissionId) return null;
+    try {
+      return await executionApi.submissionStatus(threadId, submissionId, signal);
+    } catch {
+      return null;
+    }
+  }, [threadId]);
 
   const interrupt = useCallback(async () => {
     if (!threadId || !status.active || sendingRef.current) return false;
@@ -341,5 +374,5 @@ export function useCodexExecution(threadId: string) {
     }
   }, [refreshStatus, status.active, threadId]);
 
-  return { status, streamingText, commentaryText, sending, sendingSlow, handleEvent, sendMessage, interrupt, clearStreaming, refreshStatus };
+  return { status, streamingText, commentaryText, sending, sendingSlow, handleEvent, sendMessage, reconcileSubmission, interrupt, clearStreaming, refreshStatus };
 }

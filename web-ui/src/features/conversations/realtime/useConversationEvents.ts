@@ -59,6 +59,8 @@ export function useConversationEvents(
   useEffect(() => {
     if (!hasAccessToken) return;
     let eventTimer = 0;
+    const pendingSessionIds = new Set<string>();
+    let pendingAllSessions = false;
     let reconnectTimer = 0;
     let disconnectedTimer = 0;
     let recoveryTimer = 0;
@@ -157,8 +159,17 @@ export function useConversationEvents(
           if (isConversationProgressEvent(payload, threadIdRef.current)) lastProgressAt = Date.now();
           onEventRef.current(payload);
           if (payload.type === "sessions_changed") {
+            if (payload.threadId) pendingSessionIds.add(payload.threadId);
+            else pendingAllSessions = true;
             window.clearTimeout(eventTimer);
-            eventTimer = window.setTimeout(() => onSessionsChangedRef.current(payload.threadId), 180);
+            eventTimer = window.setTimeout(() => {
+              const allSessions = pendingAllSessions;
+              const threadIds = [...pendingSessionIds];
+              pendingSessionIds.clear();
+              pendingAllSessions = false;
+              if (allSessions || !threadIds.length) onSessionsChangedRef.current();
+              else threadIds.forEach((changedThreadId) => onSessionsChangedRef.current(changedThreadId));
+            }, 180);
           }
         } catch {
           console.warn("[realtime] ignored malformed event payload");
@@ -195,6 +206,8 @@ export function useConversationEvents(
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       window.clearTimeout(eventTimer);
+      pendingSessionIds.clear();
+      pendingAllSessions = false;
       window.clearTimeout(recoveryTimer);
       window.clearInterval(healthTimer);
       clearReconnectTimers();

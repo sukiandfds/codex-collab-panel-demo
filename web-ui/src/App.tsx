@@ -67,7 +67,7 @@ export function App() {
         <ConversationView
           session={conversations.session}
           loading={conversations.loadingSession}
-          syncing={conversations.syncing}
+          contentSyncState={conversations.contentSyncState}
           loadingOlder={conversations.loadingOlder}
           error={conversations.sessionError}
           listAvailable={!conversations.listError}
@@ -78,6 +78,8 @@ export function App() {
           forkingMessageId={conversations.forkingMessageId}
           onEditMessage={conversations.beginEditMessage}
           editingMessageId={conversations.editingMessageId}
+          onRetryMessage={conversations.retryPendingMessage}
+          retryingMessageId={conversations.retryingMessageId}
         />
       }
       composer={

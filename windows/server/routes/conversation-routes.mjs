@@ -10,16 +10,44 @@ const publicAttachment = ({ id, name, mimeType, url, width, height }) => ({
 });
 
 export const createConversationRoutes = ({
-  conversations, execution, followUpQueue, contextManagement, media,
+  conversations, execution, followUpQueue, contextManagement, media, submissionStore,
   broadcast = () => {}, publishThreadEvent = broadcast,
 }) => {
-  const submissions = new Map();
+  const inFlightSubmissions = new Map();
   const submissionTtlMs = 60000;
   const maxSubmissions = 200;
 
+  const submissionResult = (entry, status) => ({
+    body: {
+      threadId: entry.threadId,
+      turnId: status.turnId || entry.result?.turnId || "",
+      status: status.active && status.turnId ? status.phase : "pending",
+      submissionId: entry.submissionId,
+      messageId: entry.messageId,
+      ...(entry.result?.migratedFromThreadId ? { migratedFromThreadId: entry.result.migratedFromThreadId } : {}),
+      ...(status.turnId ? { recovered: true } : {}),
+    },
+    statusCode: 202,
+  });
+
+  const resolveStoredSubmission = async (entry) => {
+    if (!entry) return null;
+    if (entry.state === "accepted" && entry.result) return entry.result;
+    if (entry.state === "failed") return { body: { error: entry.error || "指令发送失败", submissionId: entry.submissionId }, statusCode: 409 };
+    const current = execution.getStatus(entry.threadId);
+    const startedAt = Date.parse(current.startedAt || "");
+    const submittedAt = Date.parse(entry.createdAt || "");
+    if (current.active && current.turnId && (!Number.isFinite(submittedAt) || !Number.isFinite(startedAt) || startedAt >= submittedAt - 1000)) {
+      const result = submissionResult(entry, current);
+      submissionStore?.complete(entry.submissionId, result);
+      return result;
+    }
+    return submissionResult(entry, current);
+  };
+
   const rememberSubmission = (submissionId, fingerprint, promise) => {
     if (!submissionId) return promise;
-    const existing = submissions.get(submissionId);
+    const existing = inFlightSubmissions.get(submissionId);
     if (existing) {
       if (existing.fingerprint !== fingerprint) {
         const error = new Error("submissionId was already used for a different message");
@@ -29,21 +57,21 @@ export const createConversationRoutes = ({
       return existing.promise;
     }
     const timer = setTimeout(() => {
-      if (submissions.get(submissionId)?.promise === promise) submissions.delete(submissionId);
+      if (inFlightSubmissions.get(submissionId)?.promise === promise) inFlightSubmissions.delete(submissionId);
     }, submissionTtlMs);
     timer.unref?.();
-    submissions.set(submissionId, { fingerprint, promise, timer });
-    while (submissions.size > maxSubmissions) {
-      const oldestId = submissions.keys().next().value;
-      const oldest = submissions.get(oldestId);
+    inFlightSubmissions.set(submissionId, { fingerprint, promise, timer });
+    while (inFlightSubmissions.size > maxSubmissions) {
+      const oldestId = inFlightSubmissions.keys().next().value;
+      const oldest = inFlightSubmissions.get(oldestId);
       clearTimeout(oldest?.timer);
-      submissions.delete(oldestId);
+      inFlightSubmissions.delete(oldestId);
     }
     void promise.catch(() => {
-      const entry = submissions.get(submissionId);
+      const entry = inFlightSubmissions.get(submissionId);
       if (entry?.promise === promise) {
         clearTimeout(entry.timer);
-        submissions.delete(submissionId);
+        inFlightSubmissions.delete(submissionId);
       }
     });
     return promise;
@@ -75,7 +103,7 @@ export const createConversationRoutes = ({
       text,
       attachmentIds: Array.isArray(body.attachmentIds) ? body.attachmentIds : [],
     });
-    const cachedSubmission = submissionId ? submissions.get(submissionId) : null;
+    const cachedSubmission = inFlightSubmissions.get(submissionId);
     if (cachedSubmission) {
       if (cachedSubmission.fingerprint !== fingerprint) {
         const error = new Error("submissionId was already used for a different message");
@@ -84,6 +112,17 @@ export const createConversationRoutes = ({
       }
       const cachedResult = await cachedSubmission.promise;
       sendJson(response, cachedResult.body, cachedResult.statusCode);
+      return true;
+    }
+    const storedSubmission = submissionStore?.get(submissionId);
+    if (storedSubmission) {
+      if (storedSubmission.fingerprint !== fingerprint) {
+        const error = new Error("submissionId was already used for a different message");
+        error.statusCode = 409;
+        throw error;
+      }
+      const resolved = await resolveStoredSubmission(storedSubmission);
+      sendJson(response, resolved.body, resolved.statusCode);
       return true;
     }
     const run = async () => {
@@ -127,12 +166,54 @@ export const createConversationRoutes = ({
         statusCode: 202,
       };
     };
+    const persistentEntry = submissionStore?.begin({
+      submissionId,
+      threadId,
+      fingerprint,
+      messageId,
+      createdAt,
+    });
+    if (persistentEntry?.state === "accepted" && persistentEntry.result) {
+      sendJson(response, persistentEntry.result.body, persistentEntry.result.statusCode);
+      return true;
+    }
     const submit = followUpQueue?.withThreadLock
       ? followUpQueue.withThreadLock(threadId, run)
       : run();
     const accepted = rememberSubmission(submissionId, fingerprint, submit);
-    const responsePayload = await accepted;
+    let responsePayload;
+    try {
+      responsePayload = await accepted;
+      submissionStore?.complete(submissionId, responsePayload);
+    } catch (error) {
+      submissionStore?.fail(submissionId, error);
+      throw error;
+    }
     sendJson(response, responsePayload.body, responsePayload.statusCode);
+    return true;
+  }
+  if (url.pathname === "/api/session/submission" && request.method === "GET") {
+    const threadId = String(url.searchParams.get("threadId") || "").trim();
+    const submissionId = String(url.searchParams.get("submissionId") || "").trim();
+    if (!threadId || !submissionId) {
+      sendJson(response, { error: "threadId and submissionId are required" }, 400);
+      return true;
+    }
+    const entry = submissionStore?.get(submissionId);
+    const resultThreadId = entry?.result?.body?.threadId || "";
+    if (!entry || (entry.threadId !== threadId && resultThreadId !== threadId)) {
+      sendJson(response, { threadId, submissionId, status: "unknown" });
+      return true;
+    }
+    const resolved = await resolveStoredSubmission(entry);
+    if (resolved?.body?.error) {
+      sendJson(response, { ...resolved.body, status: "failed" });
+      return true;
+    }
+    sendJson(response, {
+      ...resolved.body,
+      status: entry.state === "accepted" || resolved.body.status !== "pending" ? "accepted" : "pending",
+    });
     return true;
   }
   if (url.pathname === "/api/session/name" && request.method === "POST") {

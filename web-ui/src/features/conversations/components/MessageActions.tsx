@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, Edit3, GitBranch } from "lucide-react";
+import { Check, Copy, Edit3, GitBranch, RefreshCw } from "lucide-react";
 import styles from "./MessageActions.module.css";
 
 interface MessageActionsProps {
@@ -10,6 +10,9 @@ interface MessageActionsProps {
   editable: boolean;
   editing: boolean;
   onEdit: () => void;
+  retryable?: boolean;
+  retrying?: boolean;
+  onRetry?: () => Promise<boolean>;
 }
 
 const copyWithFallback = async (text: string) => {
@@ -29,7 +32,7 @@ const copyWithFallback = async (text: string) => {
   if (!copied) throw new Error("clipboard unavailable");
 };
 
-export function MessageActions({ text, forkable, forking, onFork, editable, editing, onEdit }: MessageActionsProps) {
+export function MessageActions({ text, forkable, forking, onFork, editable, editing, onEdit, retryable = false, retrying = false, onRetry }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const resetTimerRef = useRef<number | null>(null);
@@ -89,6 +92,18 @@ export function MessageActions({ text, forkable, forking, onFork, editable, edit
           onClick={onEdit}
         >
           <Edit3 aria-hidden="true" />
+        </button>
+      ) : null}
+      {retryable && onRetry ? (
+        <button
+          className={styles.button}
+          type="button"
+          aria-label={retrying ? "正在重新确认" : "重新确认指令"}
+          title={retrying ? "正在重新确认" : "重新确认指令"}
+          disabled={retrying}
+          onClick={() => void onRetry()}
+        >
+          <RefreshCw aria-hidden="true" className={retrying ? styles.spinning : undefined} />
         </button>
       ) : null}
     </div>

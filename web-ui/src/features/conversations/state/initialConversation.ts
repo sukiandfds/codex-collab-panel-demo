@@ -4,6 +4,7 @@ import type { SessionDetail, SessionSummary } from "../model/types";
 export interface InitialConversationState {
   selectedId: string;
   snapshotSavedAt: string;
+  sessionIsPartial: boolean;
   session: SessionDetail | null;
   sessions: SessionSummary[];
 }
@@ -16,5 +17,11 @@ export const readInitialConversationState = (): InitialConversationState => {
     || snapshot?.selectedId
     || "";
   const session = !archivedView && snapshot?.session?.threadId === selectedId ? snapshot.session : null;
-  return { selectedId, snapshotSavedAt: snapshot?.savedAt || "", session, sessions: snapshot?.sessions || [] };
+  return {
+    selectedId,
+    snapshotSavedAt: snapshot?.savedAt || "",
+    sessionIsPartial: Boolean(session && snapshot?.isPartial),
+    session,
+    sessions: snapshot?.sessions || [],
+  };
 };

@@ -9,7 +9,7 @@ import { createUsageRoutes } from "./routes/usage-routes.mjs";
 import { createVersionRoutes } from "./routes/version-routes.mjs";
 
 export const createRequestHandler = ({
-  token, project, projectRoot, device, observerPort, conversations, execution, media, realtime,
+  token, project, projectRoot, device, observerPort, conversations, execution, media, realtime, submissions,
   followUpQueue, contextManagement, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
 }) => {
   const routes = [
@@ -18,7 +18,7 @@ export const createRequestHandler = ({
     createGroupRoutes({ groupRoom, media, multiAgent, webOutputs }),
     createFollowUpQueueRoutes({ queue: followUpQueue, media }),
     createConversationRoutes({
-      conversations, execution, followUpQueue, contextManagement, media,
+      conversations, execution, followUpQueue, contextManagement, media, submissionStore: submissions,
       broadcast: realtime.broadcast,
       publishThreadEvent: execution.publishThreadEvent,
     }),

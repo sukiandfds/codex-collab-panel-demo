@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { Clock3 } from "lucide-react";
 import { JumpToLatest } from "../../../components/JumpToLatest/JumpToLatest";
-import type { SessionDetail, SessionMessage } from "../model/types";
+import type { ContentSyncState, SessionDetail, SessionMessage } from "../model/types";
 import { MessageActions } from "./MessageActions";
 import { ContentRenderer } from "../rendering/ContentRenderer";
 import { ExecutionTimeline } from "../../execution/components/ExecutionTimeline";
@@ -20,13 +21,32 @@ const messageTime = (value?: string) => {
     : `${date.getFullYear()}-${monthDayTime}`;
 };
 
-const finalMessageContainsStream = (message: SessionMessage, streamingText: string) => {
-  const persistedText = message.text.trim();
-  const bufferedText = streamingText.trim();
-  if (!persistedText && !message.blocks?.length) return false;
-  if (!bufferedText) return true;
-  return persistedText.length >= bufferedText.length && persistedText.includes(bufferedText);
-};
+const finalMessageMatchesStream = (message: SessionMessage, executionStatus: ExecutionStatus) => (
+  message.role === "assistant"
+  && Boolean(executionStatus.turnId)
+  && message.turnId === executionStatus.turnId
+  && (!executionStatus.streamingItemId || message.itemId === executionStatus.streamingItemId)
+);
+
+const waitForLayoutToSettle = (root: HTMLDivElement, measure: () => void) => new Promise<void>((resolve) => {
+  const deadline = performance.now() + 400;
+  let previousHeight = root.scrollHeight;
+  let stableFrames = 0;
+
+  const check = () => {
+    measure();
+    const nextHeight = root.scrollHeight;
+    stableFrames = nextHeight === previousHeight ? stableFrames + 1 : 0;
+    previousHeight = nextHeight;
+    if (stableFrames >= 2 || performance.now() >= deadline) {
+      resolve();
+      return;
+    }
+    requestAnimationFrame(check);
+  };
+
+  requestAnimationFrame(check);
+});
 
 function Message({
   message,
@@ -37,6 +57,9 @@ function Message({
   editable = false,
   editing = false,
   onEdit,
+  retryable = false,
+  retrying = false,
+  onRetry,
 }: {
   message: SessionMessage;
   streaming?: boolean;
@@ -46,6 +69,9 @@ function Message({
   editable?: boolean;
   editing?: boolean;
   onEdit: () => void;
+  retryable?: boolean;
+  retrying?: boolean;
+  onRetry?: () => Promise<boolean>;
 }) {
   const formattedTime = messageTime(message.createdAt);
   return (
@@ -53,6 +79,11 @@ function Message({
       {formattedTime ? <time className={styles.timestamp} dateTime={message.createdAt}>{formattedTime}</time> : null}
       <div className={styles.body}>
         {streaming ? <div className={styles.streamingText}>{message.text}<i className={styles.cursor} /></div> : <ContentRenderer message={message} />}
+        {message.deliveryState === "pending" ? (
+          <span className={styles.deliveryState} title="正在确认指令是否已送达" aria-label="正在确认指令是否已送达">
+            <Clock3 aria-hidden="true" />
+          </span>
+        ) : null}
       </div>
       {!streaming ? (
         <div className={styles.actionRow}>
@@ -64,6 +95,9 @@ function Message({
             editable={editable}
             editing={editing}
             onEdit={onEdit}
+            retryable={retryable}
+            retrying={retrying}
+            onRetry={onRetry}
           />
         </div>
       ) : null}
@@ -74,7 +108,7 @@ function Message({
 interface ConversationViewProps {
   session: SessionDetail | null;
   loading: boolean;
-  syncing: boolean;
+  contentSyncState: ContentSyncState;
   loadingOlder: boolean;
   error: string;
   listAvailable: boolean;
@@ -85,6 +119,8 @@ interface ConversationViewProps {
   forkingMessageId: string;
   onEditMessage: (message: SessionMessage) => void;
   editingMessageId: string;
+  onRetryMessage: (message: SessionMessage) => Promise<boolean>;
+  retryingMessageId: string;
 }
 
 type ConversationItem =
@@ -94,7 +130,7 @@ type ConversationItem =
 export function ConversationView({
   session,
   loading,
-  syncing,
+  contentSyncState,
   loadingOlder,
   error,
   listAvailable,
@@ -105,6 +141,8 @@ export function ConversationView({
   forkingMessageId,
   onEditMessage,
   editingMessageId,
+  onRetryMessage,
+  retryingMessageId,
 }: ConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingOlderRef = useRef(false);
@@ -120,13 +158,12 @@ export function ConversationView({
   );
   const latestAssistant = [...messages].reverse().find((message) => message.role === "assistant");
   const finalMessageLoaded = executionMatchesSession && (
-    messages.some((message) => message.role === "assistant"
-      && finalMessageContainsStream(message, streamingText)
-      && ((Boolean(executionStatus.turnId) && message.turnId === executionStatus.turnId)
-        || (Boolean(executionStatus.streamingItemId) && message.itemId === executionStatus.streamingItemId)))
+    messages.some((message) => finalMessageMatchesStream(message, executionStatus))
     || (completedExecution
       && Boolean(latestAssistant)
-      && finalMessageContainsStream(latestAssistant!, streamingText))
+      && Boolean(executionStatus.turnId)
+      && latestAssistant?.turnId === executionStatus.turnId
+      && (!executionStatus.streamingItemId || latestAssistant.itemId === executionStatus.streamingItemId))
   );
   const visibleStreamingText = executionMatchesSession && !finalMessageLoaded ? streamingText : "";
   const executionIndex = !executionStatus.active && messages.at(-1)?.role === "assistant"
@@ -205,28 +242,41 @@ export function ConversationView({
   useEffect(() => {
     const root = scrollRef.current;
     if (!root) return;
+    let disposed = false;
     const onScroll = async () => {
       const nearBottom = root.scrollHeight - root.scrollTop - root.clientHeight < 120;
       stickToBottomRef.current = nearBottom;
       if (nearBottom) setHasNewActivity(false);
-      if (root.scrollTop > 140 || !session?.hasMore || loadingOlderRef.current) return;
+      if (root.scrollTop > 140 || !session?.hasMore || loadingOlderRef.current || contentSyncState === "recovering") return;
       loadingOlderRef.current = true;
       const previousHeight = root.scrollHeight;
-      await onLoadOlder();
-      requestAnimationFrame(() => { root.scrollTop += root.scrollHeight - previousHeight; });
-      loadingOlderRef.current = false;
+      const previousScrollTop = root.scrollTop;
+      try {
+        await onLoadOlder();
+        await waitForLayoutToSettle(root, () => virtualizer.measure());
+        if (!disposed) root.scrollTop = previousScrollTop + root.scrollHeight - previousHeight;
+      } finally {
+        loadingOlderRef.current = false;
+      }
     };
     root.addEventListener("scroll", onScroll, { passive: true });
-    return () => root.removeEventListener("scroll", onScroll);
-  }, [onLoadOlder, session?.hasMore]);
+    return () => {
+      disposed = true;
+      root.removeEventListener("scroll", onScroll);
+    };
+  }, [contentSyncState, onLoadOlder, session?.hasMore, virtualizer]);
 
   return (
     <div className={styles.viewport}>
       <div className={styles.scrollArea} ref={scrollRef}>
         <section className={styles.conversation} aria-label="真实项目对话" aria-live="polite">
         {loading ? <div className={styles.loading}>正在读取对话…</div> : null}
-        {!loading && session && (error || syncing) ? (
-          <div className={styles.older}>{error || "正在同步最新内容…"}</div>
+        {!loading && session && (error || contentSyncState === "syncing" || contentSyncState === "recovering" || contentSyncState === "degraded") ? (
+          <div className={styles.older}>{error || (contentSyncState === "recovering"
+            ? "正在恢复最新内容…"
+            : contentSyncState === "degraded"
+              ? "当前显示上次稳定内容，最新内容暂未确认"
+              : "正在同步最新内容…")}</div>
         ) : null}
         {loadingOlder ? <div className={styles.older}>正在加载更早消息…</div> : null}
         {!loading && error && !session ? <div className={styles.state}>{error}</div> : null}
@@ -261,6 +311,9 @@ export function ConversationView({
                           && !session?.archived}
                         editing={editingMessageId === item.message.id}
                         onEdit={() => onEditMessage(item.message)}
+                        retryable={item.message.deliveryState === "pending"}
+                        retrying={retryingMessageId === item.message.id}
+                        onRetry={() => onRetryMessage(item.message)}
                       />
                     )}
                 </div>

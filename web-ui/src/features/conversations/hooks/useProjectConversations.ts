@@ -32,7 +32,7 @@ export function useProjectConversations() {
     let cancelled = false;
     void readConversationSnapshotAsync().then((snapshot) => {
       if (cancelled || !snapshot?.session) return;
-      selection.hydrateSnapshot(snapshot.session);
+      selection.hydrateSnapshot(snapshot.session, Boolean(snapshot.isPartial));
     });
     return () => { cancelled = true; };
   }, [initial, selection.hydrateSnapshot]);
@@ -50,6 +50,8 @@ export function useProjectConversations() {
   } | null>(null);
   const [editRequestVersion, setEditRequestVersion] = useState(0);
   const [renaming, setRenaming] = useState(false);
+  const [retryingMessageId, setRetryingMessageId] = useState("");
+  const reconcilingSubmissionsRef = useRef(new Set<string>());
   const contextManagement = useContextManagement(selection.selectedId);
   const onModelChanged = useCallback(() => {
     void contextManagement.refresh();
@@ -80,20 +82,39 @@ export function useProjectConversations() {
     editingMessageRef.current = editingMessage;
   }, [editingMessage]);
 
-  const sendDirectMessage = useCallback(async (text: string, attachments: MediaFile[] = []) => {
+  const sendDirectMessage = useCallback(async (text: string, attachments: MediaFile[] = [], existingSubmissionId = "") => {
     const threadId = selection.selectedIdRef.current;
     const messageText = text.trim();
     if (!threadId || (!messageText && !attachments.length)) return false;
 
-    const submissionId = createSubmissionId();
+    const submissionId = existingSubmissionId || createSubmissionId();
     const optimisticMessage = createOptimisticMessage(messageText, attachments, submissionId);
     selection.addOptimisticMessage(threadId, optimisticMessage);
 
-    const accepted = await execution.sendMessage(messageText, attachments.map((attachment) => attachment.id), submissionId);
-    if (!accepted) {
+    const attempt = await execution.sendMessage(messageText, attachments.map((attachment) => attachment.id), submissionId);
+    if (!attempt || attempt.outcome === "failed") {
       selection.removeOptimisticMessage(threadId, optimisticMessage.id);
       return false;
     }
+    if (attempt.outcome === "uncertain") {
+      selection.updateCurrentSession(threadId, (current) => ({
+        ...current,
+        messages: current.messages.map((message) => message.id === optimisticMessage.id
+          ? { ...message, deliveryState: "pending" as const }
+          : message),
+      }));
+      void selection.loadSession(threadId, { quiet: true, retry: false });
+      return true;
+    }
+    selection.updateCurrentSession(threadId, (current) => ({
+      ...current,
+      messages: current.messages.map((message) => {
+        if (message.id !== optimisticMessage.id) return message;
+        const { deliveryState: _deliveryState, ...resolvedMessage } = message;
+        return resolvedMessage;
+      }),
+    }));
+    const accepted = attempt.result;
     if (accepted.threadId !== threadId) {
       selection.removeOptimisticMessage(threadId, optimisticMessage.id);
       selection.addOptimisticMessage(accepted.threadId, optimisticMessage);
@@ -108,7 +129,57 @@ export function useProjectConversations() {
     selection.removeOptimisticMessage,
     selection.selectSession,
     selection.selectedIdRef,
+    selection.updateCurrentSession,
   ]);
+
+  useEffect(() => {
+    const threadId = selection.selectedId;
+    const pending = selection.session?.messages.filter((message) => message.deliveryState === "pending" && message.submissionId) || [];
+    if (!threadId || !pending.length) return;
+    let cancelled = false;
+    for (const message of pending) {
+      const submissionId = message.submissionId || "";
+      if (!submissionId || reconcilingSubmissionsRef.current.has(submissionId)) continue;
+      reconcilingSubmissionsRef.current.add(submissionId);
+      void (async () => {
+        try {
+          for (let attempt = 0; attempt < 6 && !cancelled; attempt += 1) {
+            const result = await execution.reconcileSubmission(submissionId);
+            if (result?.status === "accepted") {
+              selection.updateCurrentSession(threadId, (current) => ({
+                ...current,
+                messages: current.messages.map((currentMessage) => {
+                  if (currentMessage.id !== message.id) return currentMessage;
+                  const { deliveryState: _deliveryState, ...resolvedMessage } = currentMessage;
+                  return resolvedMessage;
+                }),
+              }));
+              void selection.loadSession(threadId, { quiet: true, retry: false, recovery: true });
+              break;
+            }
+            if (result?.status === "failed") {
+              selection.removeOptimisticMessage(threadId, message.id);
+              break;
+            }
+            await new Promise((resolve) => window.setTimeout(resolve, 2000));
+          }
+        } finally {
+          reconcilingSubmissionsRef.current.delete(submissionId);
+        }
+      })();
+    }
+    return () => { cancelled = true; };
+  }, [execution.reconcileSubmission, selection.loadSession, selection.removeOptimisticMessage, selection.selectedId, selection.session, selection.updateCurrentSession]);
+
+  const retryPendingMessage = useCallback(async (message: SessionMessage) => {
+    if (!message.submissionId || retryingMessageId) return false;
+    setRetryingMessageId(message.id);
+    try {
+      return await sendDirectMessage(message.text, attachmentsFromMessage(message), message.submissionId);
+    } finally {
+      setRetryingMessageId("");
+    }
+  }, [retryingMessageId, sendDirectMessage]);
 
   useEffect(() => {
     const pending = pendingEditRef.current;
@@ -230,6 +301,8 @@ export function useProjectConversations() {
     }
   }, [contextManagement.handleEvent, execution.handleEvent, followUpQueue.handleEvent, selection.addOptimisticMessage]);
   const recoverRealtime = useCallback((_reason: RealtimeRecoveryReason) => {
+    const selected = selection.selectedIdRef.current;
+    if (selected) void selection.loadSession(selected, { quiet: true, retry: false, recovery: true });
     void execution.refreshStatus(undefined, true).then(() => {
       onSessionsChanged(selection.selectedIdRef.current || undefined);
     });
@@ -254,6 +327,7 @@ export function useProjectConversations() {
     loadingSession: selection.loadingSession,
     loadingOlder: selection.loadingOlder,
     syncing: selection.syncing,
+    contentSyncState: selection.contentSyncState,
     connected,
     listError: catalog.listError,
     sessionError: selection.sessionError,
@@ -268,6 +342,8 @@ export function useProjectConversations() {
     forkingMessageId,
     editingMessage,
     editingMessageId: editingMessage?.id || "",
+    retryPendingMessage,
+    retryingMessageId,
     beginEditMessage,
     cancelEditMessage,
     renameSession,

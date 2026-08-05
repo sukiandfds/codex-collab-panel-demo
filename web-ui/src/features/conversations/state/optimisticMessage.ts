@@ -27,5 +27,5 @@ export const createOptimisticMessage = (
   createdAt = new Date().toISOString(),
 ): SessionMessage => {
   const id = optimisticMessageId(submissionId);
-  return { id, role: "user", text, blocks: optimisticBlocks(id, text, attachments), createdAt };
+  return { id, role: "user", text, blocks: optimisticBlocks(id, text, attachments), createdAt, submissionId };
 };
