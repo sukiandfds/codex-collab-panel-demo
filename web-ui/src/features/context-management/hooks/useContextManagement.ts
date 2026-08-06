@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { contextApi } from "../data/contextApi";
 import type { ContextStatus } from "../model/types";
 
+const MAX_CACHED_STATUSES = 100;
+const statusCache = new Map<string, ContextStatus>();
+
 const emptyStatus = (threadId: string): ContextStatus => ({
   type: "context_status",
   threadId,
@@ -16,8 +19,26 @@ const emptyStatus = (threadId: string): ContextStatus => ({
   updatedAt: null,
 });
 
+const rememberStatus = (status: ContextStatus) => {
+  if (!status.threadId) return status;
+  statusCache.delete(status.threadId);
+  statusCache.set(status.threadId, status);
+  while (statusCache.size > MAX_CACHED_STATUSES) {
+    const oldest = statusCache.keys().next().value;
+    if (!oldest) break;
+    statusCache.delete(oldest);
+  }
+  return status;
+};
+
 export function useContextManagement(threadId: string) {
-  const [status, setStatus] = useState<ContextStatus>(() => emptyStatus(threadId));
+  const [storedStatus, setStoredStatus] = useState<ContextStatus>(() => statusCache.get(threadId) ?? emptyStatus(threadId));
+  const status = storedStatus.threadId === threadId
+    ? storedStatus
+    : statusCache.get(threadId) ?? emptyStatus(threadId);
+  const setStatus = useCallback((value: ContextStatus | ((current: ContextStatus) => ContextStatus)) => {
+    setStoredStatus((current) => rememberStatus(typeof value === "function" ? value(current) : value));
+  }, []);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     if (!threadId) return null;
@@ -38,7 +59,7 @@ export function useContextManagement(threadId: string) {
   }, [threadId]);
 
   useEffect(() => {
-    setStatus(emptyStatus(threadId));
+    setStatus(statusCache.get(threadId) ?? emptyStatus(threadId));
     if (!threadId) return;
     const controller = new AbortController();
     void refresh(controller.signal);

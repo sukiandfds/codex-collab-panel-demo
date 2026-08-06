@@ -9,27 +9,33 @@ import { ConversationView } from "./features/conversations/components/Conversati
 import { useProjectConversations } from "./features/conversations/hooks/useProjectConversations";
 import { useDeviceInfo } from "./features/device/hooks/useDeviceInfo";
 import { GroupApp } from "./features/group-chat/GroupApp";
-import { prefetchGroupSnapshot } from "./features/group-chat/data/groupSnapshot";
 import { IntelligenceEfficiencyControl } from "./features/intelligence-efficiency/components/IntelligenceEfficiencyControl";
 import { UsageSummaryControl } from "./features/usage-monitor/components/UsageSummaryControl";
 import { useUsageMonitor } from "./features/usage-monitor/hooks/useUsageMonitor";
 
 type InteractiveSurface = Exclude<ViewSurface, "progress">;
+const surfaceStorageKey = "negus:last-surface";
 
-const readSurface = (): InteractiveSurface => window.location.pathname === "/group.html"
-  || new URLSearchParams(window.location.search).get("view") === "group"
-  ? "group"
-  : "conversation";
+const readSurface = (): InteractiveSurface => {
+  const params = new URLSearchParams(window.location.search);
+  if (window.location.pathname === "/group.html" || params.get("view") === "group") return "group";
+  if (params.has("thread") || params.has("archived") || params.get("view") === "conversation") return "conversation";
+  try {
+    return window.localStorage.getItem(surfaceStorageKey) === "group" ? "group" : "conversation";
+  } catch {
+    return "conversation";
+  }
+};
 
-function ConversationApp({ onViewChange }: { onViewChange: (surface: InteractiveSurface) => void }) {
+function ConversationApp({ active, onViewChange }: { active: boolean; onViewChange: (surface: InteractiveSurface) => void }) {
   const conversations = useProjectConversations();
   const device = useDeviceInfo(conversations.connected);
   const usage = useUsageMonitor(conversations.executionStatus);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   useEffect(() => {
-    if (conversations.loadingList || conversations.loadingSession || conversations.snapshotLoading) return;
+    if (conversations.snapshotLoading) return;
     window.dispatchEvent(new Event("negus:app-ready"));
-  }, [conversations.loadingList, conversations.loadingSession, conversations.snapshotLoading]);
+  }, [conversations.snapshotLoading]);
   const selectSession = useCallback((threadId: string) => {
     conversations.selectSession(threadId);
     setSidebarOpen(false);
@@ -84,6 +90,7 @@ function ConversationApp({ onViewChange }: { onViewChange: (surface: Interactive
       }
       conversation={
         <ConversationView
+          active={active}
           session={conversations.session}
           loading={conversations.loadingSession}
           contentSyncState={conversations.contentSyncState}
@@ -145,15 +152,18 @@ export function App() {
   const [groupMounted, setGroupMounted] = useState(() => readSurface() === "group");
 
   const showSurface = useCallback((next: InteractiveSurface, pushHistory = true) => {
+    if (next === surface) return;
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     if (next === "group") setGroupMounted(true);
     setSurface(next);
+    try { window.localStorage.setItem(surfaceStorageKey, next); } catch {}
     if (!pushHistory) return;
     const params = new URLSearchParams(window.location.search);
     params.delete("view");
     if (next === "group") params.set("view", "group");
     const query = params.toString();
     window.history.pushState({ surface: next }, "", `/${query ? `?${query}` : ""}`);
-  }, []);
+  }, [surface]);
 
   useEffect(() => {
     const handlePopState = () => showSurface(readSurface(), false);
@@ -161,22 +171,38 @@ export function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [showSurface]);
 
-  useEffect(() => {
-    if (groupMounted) return;
-    const timer = window.setTimeout(() => void prefetchGroupSnapshot(), 1800);
-    return () => window.clearTimeout(timer);
-  }, [groupMounted]);
-
   return (
-    <>
-      <div hidden={surface !== "conversation"} aria-hidden={surface !== "conversation"} style={{ width: "100%", height: "100%" }}>
-        <ConversationApp onViewChange={showSurface} />
+    <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+      <div
+        aria-hidden={surface !== "conversation"}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          visibility: surface === "conversation" ? "visible" : "hidden",
+          pointerEvents: surface === "conversation" ? "auto" : "none",
+          zIndex: surface === "conversation" ? 1 : 0,
+        }}
+      >
+        <ConversationApp active={surface === "conversation"} onViewChange={showSurface} />
       </div>
       {groupMounted ? (
-        <div hidden={surface !== "group"} aria-hidden={surface !== "group"} style={{ width: "100%", height: "100%" }}>
+        <div
+          aria-hidden={surface !== "group"}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            visibility: surface === "group" ? "visible" : "hidden",
+            pointerEvents: surface === "group" ? "auto" : "none",
+            zIndex: surface === "group" ? 1 : 0,
+          }}
+        >
           <GroupApp onViewChange={showSurface} />
         </div>
       ) : null}
-    </>
+    </div>
   );
 }

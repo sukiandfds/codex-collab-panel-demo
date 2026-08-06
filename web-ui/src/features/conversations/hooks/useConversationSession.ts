@@ -15,7 +15,7 @@ const isSessionDelta = (response: SessionResponse): response is SessionDelta => 
 export function useConversationSession(initial: InitialConversationState) {
   const [selectedId, setSelectedId] = useState(initial.selectedId);
   const [session, setSession] = useState<SessionDetail | null>(initial.session);
-  const [loadingSession, setLoadingSession] = useState(Boolean(initial.selectedId));
+  const [loadingSession, setLoadingSession] = useState(Boolean(initial.selectedId && !initial.session));
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [syncing, setSyncing] = useState(Boolean(initial.session));
   const [contentSyncState, setContentSyncState] = useState<ContentSyncState>(

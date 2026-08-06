@@ -10,11 +10,8 @@ let launchDismissed = false;
 const dismissLaunchScreen = () => {
   if (!launchScreen || launchDismissed) return;
   launchDismissed = true;
-  const delay = Math.max(0, 900 - performance.now());
-  window.setTimeout(() => {
-    launchScreen.classList.add("negus-launch-leaving");
-    window.setTimeout(() => launchScreen.remove(), 320);
-  }, delay);
+  launchScreen.classList.add("negus-launch-leaving");
+  window.setTimeout(() => launchScreen.remove(), 320);
 };
 
 window.addEventListener("negus:app-ready", dismissLaunchScreen, { once: true });

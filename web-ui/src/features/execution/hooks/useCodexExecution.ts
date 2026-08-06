@@ -6,6 +6,8 @@ import type { ExecutionStatus, ProjectEvent } from "../model/types";
 const SEND_CONFIRM_TIMEOUT_MS = 20000;
 const SEND_SLOW_NOTICE_MS = 3000;
 const MAX_RETIRED_TURNS = 20;
+const MAX_CACHED_STATUSES = 100;
+const statusCache = new Map<string, ExecutionStatus>();
 
 type RefreshStatus = (signal?: AbortSignal, reconcile?: boolean) => Promise<ExecutionStatus | null>;
 
@@ -35,8 +37,26 @@ const recoveringStatus = (threadId: string): ExecutionStatus => ({
   label: "正在确认任务状态",
 });
 
+const rememberStatus = (status: ExecutionStatus) => {
+  if (!status.threadId) return status;
+  statusCache.delete(status.threadId);
+  statusCache.set(status.threadId, status);
+  while (statusCache.size > MAX_CACHED_STATUSES) {
+    const oldest = statusCache.keys().next().value;
+    if (!oldest) break;
+    statusCache.delete(oldest);
+  }
+  return status;
+};
+
 export function useCodexExecution(threadId: string) {
-  const [status, setStatus] = useState<ExecutionStatus>(() => idleStatus(threadId));
+  const [storedStatus, setStoredStatus] = useState<ExecutionStatus>(() => statusCache.get(threadId) ?? idleStatus(threadId));
+  const status = storedStatus.threadId === threadId
+    ? storedStatus
+    : statusCache.get(threadId) ?? recoveringStatus(threadId);
+  const setStatus = useCallback((value: ExecutionStatus | ((current: ExecutionStatus) => ExecutionStatus)) => {
+    setStoredStatus((current) => rememberStatus(typeof value === "function" ? value(current) : value));
+  }, []);
   const [streamingText, setStreamingText] = useState("");
   const [commentaryText, setCommentaryText] = useState("");
   const streamingItemId = useRef("");
@@ -176,7 +196,7 @@ export function useCodexExecution(threadId: string) {
     lastEventSeqRef.current = 0;
     clearStreaming();
     setCommentaryText("");
-    setStatus(threadId ? recoveringStatus(threadId) : idleStatus(threadId));
+    setStatus(statusCache.get(threadId) ?? (threadId ? recoveringStatus(threadId) : idleStatus(threadId)));
     if (!threadId) {
       return;
     }

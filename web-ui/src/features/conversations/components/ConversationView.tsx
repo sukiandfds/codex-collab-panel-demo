@@ -94,6 +94,7 @@ function Message({
 }
 
 interface ConversationViewProps {
+  active?: boolean;
   session: SessionDetail | null;
   loading: boolean;
   contentSyncState: ContentSyncState;
@@ -117,6 +118,7 @@ type ConversationItem =
   | { id: string; type: "execution" };
 
 export function ConversationView({
+  active = true,
   session,
   loading,
   contentSyncState,
@@ -137,15 +139,22 @@ export function ConversationView({
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingOlderRef = useRef(false);
   const olderAnchorRef = useRef<{ id: string; top: number; messageCount: number } | null>(null);
+  const wasActiveRef = useRef(active);
+  const savedScrollTopRef = useRef<number | null>(null);
+  const observedActiveThreadsRef = useRef(new Set<string>());
   const stickToBottomRef = useRef(true);
   const [hasNewActivity, setHasNewActivity] = useState(false);
   const messages = session?.messages || [];
   const executionMatchesSession = executionStatus.threadId === session?.threadId;
   const completedExecution = ["completed", "failed", "interrupted", "systemError"].includes(executionStatus.phase);
+  if (executionMatchesSession && executionStatus.active && executionStatus.threadId) {
+    observedActiveThreadsRef.current.add(executionStatus.threadId);
+  }
+  const terminalExecutionWasObserved = observedActiveThreadsRef.current.has(executionStatus.threadId);
   const showExecution = executionMatchesSession && (
     executionStatus.active
-    || executionStatus.activities.length > 0
-    || (completedExecution && Boolean(executionStatus.startedAt))
+    || (!completedExecution && executionStatus.activities.length > 0)
+    || (completedExecution && terminalExecutionWasObserved && Boolean(executionStatus.startedAt))
   );
   const latestAssistant = [...messages].reverse().find((message) => message.role === "assistant");
   const finalMessageLoaded = executionMatchesSession && (
@@ -188,6 +197,7 @@ export function ConversationView({
   });
 
   useLayoutEffect(() => {
+    if (!active) return;
     const anchor = olderAnchorRef.current;
     const root = scrollRef.current;
     if (!anchor || !root || messages.length <= anchor.messageCount) return;
@@ -199,51 +209,74 @@ export function ConversationView({
       root.scrollTop += nextAnchor.getBoundingClientRect().top - anchor.top;
     }
     olderAnchorRef.current = null;
-  }, [messages.length, session?.threadId, virtualizer]);
+  }, [active, messages.length, session?.threadId, virtualizer]);
 
   useEffect(() => {
+    if (!active) return;
     if (!loading && session && scrollRef.current) {
       stickToBottomRef.current = true;
       setHasNewActivity(false);
       requestAnimationFrame(() => virtualizer.scrollToIndex(visibleItems.length - 1, { align: "end" }));
     }
-  }, [loading, session?.threadId]);
+  }, [active, loading, session?.threadId]);
 
   useEffect(() => {
+    const root = scrollRef.current;
+    if (!active) {
+      if (wasActiveRef.current && root) savedScrollTopRef.current = root.scrollTop;
+      wasActiveRef.current = false;
+      return;
+    }
+    if (wasActiveRef.current || !root || !session || loading) return;
+    wasActiveRef.current = true;
+    if (savedScrollTopRef.current !== null) {
+      const savedTop = savedScrollTopRef.current;
+      window.requestAnimationFrame(() => { root.scrollTop = savedTop; });
+      return;
+    }
+    window.requestAnimationFrame(() => virtualizer.scrollToIndex(visibleItems.length - 1, { align: "end" }));
+  }, [active, loading, session, virtualizer, visibleItems.length]);
+
+  useEffect(() => {
+    if (!active) return;
     if (!streamingText || !visibleItems.length) return;
     if (!stickToBottomRef.current) {
       setHasNewActivity(true);
       return;
     }
     requestAnimationFrame(() => virtualizer.scrollToIndex(visibleItems.length - 1, { align: "end" }));
-  }, [streamingText]);
+  }, [active, streamingText]);
 
   useEffect(() => {
+    if (!active) return;
     if (!executionStatus.active || !visibleItems.length) return;
     if (!stickToBottomRef.current) {
       setHasNewActivity(true);
       return;
     }
     requestAnimationFrame(() => virtualizer.scrollToIndex(visibleItems.length - 1, { align: "end" }));
-  }, [executionStatus.active, executionStatus.activities.length, executionStatus.label]);
+  }, [active, executionStatus.active, executionStatus.activities.length, executionStatus.label]);
 
   const lastMessageId = messages[messages.length - 1]?.id;
   useEffect(() => {
+    if (!active) return;
     if (!lastMessageId) return;
     if (!stickToBottomRef.current) {
       setHasNewActivity(true);
       return;
     }
     requestAnimationFrame(() => virtualizer.scrollToIndex(visibleItems.length - 1, { align: "end" }));
-  }, [lastMessageId, messages.length]);
+  }, [active, lastMessageId, messages.length]);
 
   const scrollToLatest = useCallback(() => {
+    if (!active) return;
     stickToBottomRef.current = true;
     setHasNewActivity(false);
     virtualizer.scrollToIndex(Math.max(0, visibleItems.length - 1), { align: "end" });
-  }, [virtualizer, visibleItems.length]);
+  }, [active, virtualizer, visibleItems.length]);
 
   useEffect(() => {
+    if (!active) return undefined;
     const root = scrollRef.current;
     if (!root || typeof ResizeObserver === "undefined") return undefined;
     let previousHeight = root.clientHeight;
@@ -263,9 +296,10 @@ export function ConversationView({
       observer.disconnect();
       window.cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [active]);
 
   useEffect(() => {
+    if (!active) return undefined;
     const root = scrollRef.current;
     if (!root) return;
     let disposed = false;
@@ -304,7 +338,7 @@ export function ConversationView({
       disposed = true;
       root.removeEventListener("scroll", onScroll);
     };
-  }, [contentSyncState, onLoadOlder, session?.hasMore, virtualizer]);
+  }, [active, contentSyncState, onLoadOlder, session?.hasMore, virtualizer]);
 
   return (
     <div className={styles.viewport}>
