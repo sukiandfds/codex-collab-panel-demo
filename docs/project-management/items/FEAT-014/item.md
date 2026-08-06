@@ -4,8 +4,8 @@ type: feature
 title: 项目对话归档与恢复
 category: development
 priority: P2
-status: implemented_uncommitted
-updated_at: 2026-08-03 14:47 +08:00
+status: pending_review
+updated_at: 2026-08-06
 source: docs/feature-development/features/FEAT-014-conversation-archive.md
 related: [FEAT-001]
 ---
@@ -40,7 +40,7 @@ related: [FEAT-001]
 
 ## 当前状态
 
-已实现但未提交；旧版 Codex 运行时兼容性和手机体验待确认。
+已实现并已进入提交历史；旧版 Codex 运行时兼容性和手机体验仍待确认。
 
 ## 当前证据
 

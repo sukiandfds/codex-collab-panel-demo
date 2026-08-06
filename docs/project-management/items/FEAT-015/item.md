@@ -5,16 +5,16 @@ title: 自然语言生图与自动化工作台
 category: development
 priority: P2
 status: in_progress
-updated_at: 2026-08-05 01:04 +08:00
+updated_at: 2026-08-06
 source: docs/feature-development/features/FEAT-015-image-generation-and-automation-workbench.md
 related: [FEAT-001, FEAT-002, FEAT-003, FEAT-007, FEAT-008]
 owner: product_and_runtime
 product_base_commit: 267a27cd9c6c8ab141dcc1e743d38d38a9d7f611
-product_commit: pending
-docs_commit: pending
+product_commit: f1ac977e4db3b797e636219f1958d704f19a10c8
+docs_commit: f1ac977e4db3b797e636219f1958d704f19a10c8
 audited_product_commit: pending
-sync_status: implementation_uncommitted
-next_action: 用户在手机和电脑网页验收真实对话生图、连续改图、结果去重和完成后继续发送
+sync_status: committed
+next_action: 用户验收现有对话生图；之后再开发专门工作台、Artifact、批量模板、队列和定时任务
 last_user_visible_change: 网页生图已进入真实 Codex Thread/Turn；2.35：1 4K、同会话自动引用上一张图编辑及普通后续对话均已真实通过
 ---
 
@@ -86,7 +86,7 @@ last_user_visible_change: 网页生图已进入真实 Codex Thread/Turn；2.35�
 
 ## 当前状态
 
-开发中。网页版关键词旁路和假 Turn 已删除，所有新生图请求均进入真实 Codex app-server Thread/Turn，由 GPT-5.6 读取用户完整原话、优化 Provider Prompt 并调用 `negus_image`。HappyEvering 默认等待最终结果；`2.35：1 + 4K` 已真实生成 `3840x1632`，同一 Thread 已真实完成自动引用上一张图编辑和普通后续对话。旧假会话首次续聊会把最近图片带入新真实 Thread，页面自动切换且旧记录退出活动列表。工具图片由原生 `mcpToolCall` 结果进入 Media，并在同一 Turn 内去重。API Key 从被 Git 忽略的 `runtime/secrets.env` 加载。Artifact、完整 `CapabilityRun`、自动化工作台和定时任务尚未实现。
+对话生图核心已完成：网页版关键词旁路和假 Turn 已删除，所有新请求进入真实 Codex app-server Thread/Turn，由 GPT-5.6 读取完整原话并调用 `negus_image`。HappyEvering 默认等待最终结果；`2.35：1 + 4K` 已真实生成 `3840x1632`，同一 Thread 已完成自动引用上一张图编辑和普通后续对话。工具图片进入 Media，并在同一 Turn 内去重。API Key 从被 Git 忽略的 `runtime/secrets.env` 加载。尚未实现的是 Artifact 登记、完整通用 `CapabilityRun`、自动化工作台和定时任务。
 
 ## 当前证据
 

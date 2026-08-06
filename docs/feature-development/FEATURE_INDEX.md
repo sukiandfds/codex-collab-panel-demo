@@ -1,7 +1,7 @@
 ---
 document_type: feature_index
 schema_version: 1
-last_updated: 2026-08-05 09:20 +08:00
+last_updated: 2026-08-06
 ---
 
 # 功能开发索引
@@ -12,21 +12,21 @@ AI 助手应先根据任务定位功能编号，再读取对应文件。不要�
 
 | 功能编号 | 功能 | 当前状态 | 当前版本 | 最近更新 | 当前结论 | 记录 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `FEAT-001` | 单人 Codex Web 对话与控制 | `implemented_pending_review` | `v0.10.9` | 2026-08-04 09:55 +08:00 | `I25` 四项 P0 回归已完成代码修复：同一提交身份驱动本机与跨 Web 设备即时消息、请求返回按最新缓存合并、旧版本响应不覆盖新内容、流式最终答案原子去重并在终态停止光标；Windows 测试 `84/84` 与 UI 构建通过，按用户要求未重启，等待真实手机验收 | [`FEAT-001-single-codex-web.md`](./features/FEAT-001-single-codex-web.md) |
+| `FEAT-001` | 单人 Codex Web 对话与控制 | `implemented_pending_review` | `v0.10.11` | 2026-08-06 | 已完成提交身份幂等、恢复与最终回复交接、加载完成前隐藏旧快照、历史消息加载位置保持等代码修复；当前只剩最新构建的真实刷新、重开、跨端和长任务体验确认，不再把已完成的代码修复列为待开发 | [`FEAT-001-single-codex-web.md`](./features/FEAT-001-single-codex-web.md) |
 | `FEAT-002` | 项目群聊与多 Agent 讨论 | `implemented_pending_review` | `v0.4.0` | 2026-07-28 15:47 +08:00 | 已有真实群聊和四个 Agent；基础体验需与单人 Codex 看齐，长期按模型无关 Agent/Provider 边界扩展不同模型 | [`FEAT-002-group-multi-agent.md`](./features/FEAT-002-group-multi-agent.md) |
 | `FEAT-003` | 附件与对话内容渲染 | `implemented_pending_review` | `v0.3.0` | 2026-07-25 22:49 +08:00 | 支持上传、图片/音频/视频/文件展示和 Markdown 本地图片登记；仍是 Demo 级上传协议 | [`FEAT-003-attachments-content-rendering.md`](./features/FEAT-003-attachments-content-rendering.md) |
 | `FEAT-004` | PWA、设备身份与移动/平板入口 | `implemented_pending_review` | `v0.2.0` | 2026-07-28 17:43 +08:00 | 新构建会提示用户刷新且不会自动打断任务；连接状态不再误报电脑离线，真实 PWA 更新流程待原开发电脑验证 | [`FEAT-004-pwa-device-identity.md`](./features/FEAT-004-pwa-device-identity.md) |
 | `FEAT-005` | Desktop/Web 连续性与同任务提示 | `discovery` | `v0.4.1` | 2026-07-28 22:20 +08:00 | Desktop 与 Web 共享持久化 Thread 但不共享实时事件；双端同时操作曾导致 Web app-server 失联，需先做同任务提示、最小控制权和受控恢复 | [`FEAT-005-desktop-web-continuity.md`](./features/FEAT-005-desktop-web-continuity.md) |
 | `FEAT-006` | 固定公网入口与正式访问控制 | `in_progress` | `v0.2.2` | 2026-07-28 23:19 +08:00 | 固定域名可通过香港 VPN 路由到 HKG，但当前依赖人工保持 VPN；活动任务期间不得切换 VPN/Tunnel，长期稳定线路仍待确定 | [`FEAT-006-stable-remote-access.md`](./features/FEAT-006-stable-remote-access.md) |
-| `FEAT-007` | Agent 交付物生成、预览与版本管理 | `implemented_uncommitted` | `v0.2.1` | 2026-07-27 22:23 +08:00 | M1 已实现交付物发布、预览、版本和审核；功能问题与防再犯记录已整理，等待用户体验 | [`FEAT-007-agent-artifacts.md`](./features/FEAT-007-agent-artifacts.md) |
-| `FEAT-008` | HTML 网页生成与 PDF 双文件交付 | `implemented_uncommitted` | `v0.2.0` | 2026-07-27 23:47 +08:00 | 已完成静态 HTML、Edge 转 PDF、安全网页打开和群聊双文件发布；基本检查通过，等待用户体验 | [`FEAT-008-html-page-pdf-generation.md`](./features/FEAT-008-html-page-pdf-generation.md) |
+| `FEAT-007` | Agent 交付物生成、预览与版本管理 | `implemented_pending_review` | `v0.2.1` | 2026-08-06 | M1 代码已提交：交付物发布、预览、版本和审核均已有实现；剩余是整体真实使用验收，不是未提交开发 | [`FEAT-007-agent-artifacts.md`](./features/FEAT-007-agent-artifacts.md) |
+| `FEAT-008` | HTML 网页生成与 PDF 双文件交付 | `implemented_pending_review` | `v0.2.0` | 2026-08-06 | 静态 HTML、Edge 转 PDF、安全打开和群聊双文件发布代码已提交；剩余是体验验收，不继续扩展网页编辑器或 Office 能力 | [`FEAT-008-html-page-pdf-generation.md`](./features/FEAT-008-html-page-pdf-generation.md) |
 | `FEAT-009` | 原开发电脑远程运行、开发与应急恢复 | `in_progress` | `v0.4.0` | 2026-07-28 17:43 +08:00 | 已完成无 UAC 的只读环境检查器；原电脑真实开发链路和独立紧急启动入口仍待验证/确认，向日葵继续作为兜底 | [`FEAT-009-remote-development-host.md`](./features/FEAT-009-remote-development-host.md) |
 | `FEAT-010` | Orca 群聊执行运行时适配技术试验（非路线 2） | `paused_experiment` | `v0.1.0` | 2026-07-29 18:34 +08:00 | 仅完成可选 Orca CLI 执行器及离线测试，没有迁移产品功能；因范围偏离用户目标而冻结，不计入路线 2 进度 | [`FEAT-010-orca-group-runtime-adapter.md`](./features/FEAT-010-orca-group-runtime-adapter.md) |
-| `FEAT-011` | 浮生云算用量监控 | `implemented_uncommitted` | `v0.1.0` | 2026-08-03 00:22 +08:00 | 单人 Codex 标题栏已接入今日用量、固定 GPT 分组倍率、更新时间和点击详情；页面打开不查询，真实回复完成后按 Turn 更新，等待服务重启和用户体验 | [`FEAT-011-fusheng-usage-monitor.md`](./features/FEAT-011-fusheng-usage-monitor.md) |
-| `FEAT-012` | 消息内容快捷复制 | `implemented_uncommitted` | `v0.1.0` | 2026-08-03 14:47 +08:00 | 消息下方可复制原始 Markdown/文本；等待手机和电脑浏览器点击确认 | [`FEAT-012-conversation-copy.md`](./features/FEAT-012-conversation-copy.md) |
-| `FEAT-013` | 从当前消息分叉继续 | `implemented_uncommitted` | `v0.1.0` | 2026-08-03 14:47 +08:00 | 已接入官方 `thread/fork` 路由和 Turn 边界；本机运行时能力待探测 | [`FEAT-013-conversation-fork.md`](./features/FEAT-013-conversation-fork.md) |
-| `FEAT-014` | 项目对话归档与恢复 | `implemented_uncommitted` | `v0.1.0` | 2026-08-03 14:47 +08:00 | 活动/归档列表、恢复和 JSONL fallback 隔离已接入；本机运行时和移动端体验待确认 | [`FEAT-014-conversation-archive.md`](./features/FEAT-014-conversation-archive.md) |
-| `FEAT-015` | 自然语言生图与自动化工作台 | `in_progress` | `v0.5.0` | 2026-08-05 01:04 +08:00 | 网页与原生 Codex 已统一为真实 Thread/Turn 生图；2.35:1 4K、连续改图、旧会话迁移、普通后续对话和结果去重通过，工作台与定时任务待后续开发 | [`FEAT-015-image-generation-and-automation-workbench.md`](./features/FEAT-015-image-generation-and-automation-workbench.md) |
+| `FEAT-011` | 浮生云算用量监控 | `implemented_pending_review` | `v0.1.1` | 2026-08-06 | 用量摘要、详情、按 Turn 去重、缓存和失败保留旧数据已提交；供应商查询和多端布局已有真实体验记录，不再列为未提交 | [`FEAT-011-fusheng-usage-monitor.md`](./features/FEAT-011-fusheng-usage-monitor.md) |
+| `FEAT-012` | 消息内容快捷复制 | `implemented_pending_review` | `v0.1.0` | 2026-08-06 | 复制和浏览器回退已提交；重新编辑入口也已接入会话流程，剩余只需确认不同浏览器权限下的体验 | [`FEAT-012-conversation-copy.md`](./features/FEAT-012-conversation-copy.md) |
+| `FEAT-013` | 从当前消息分叉继续 | `implemented_pending_review` | `v0.1.0` | 2026-08-06 | 官方 `thread/fork` 路由、Turn 边界、按钮和自动切换已提交；若当前运行时不支持，需保留明确不可用提示 | [`FEAT-013-conversation-fork.md`](./features/FEAT-013-conversation-fork.md) |
+| `FEAT-014` | 项目对话归档与恢复 | `implemented_pending_review` | `v0.1.0` | 2026-08-06 | 活动/归档列表、恢复、失败提示和 JSONL fallback 隔离已提交；剩余是本机运行时与移动端体验确认 | [`FEAT-014-conversation-archive.md`](./features/FEAT-014-conversation-archive.md) |
+| `FEAT-015` | 自然语言生图与自动化工作台 | `in_progress` | `v0.5.0` | 2026-08-06 | 对话生图核心已经完成并进入真实 Thread/Turn：自然语言触发、2.35:1 4K、连续改图、普通后续对话、旧会话迁移和结果去重已有实现；仍在开发的是专门工作台、Artifact、批量模板、队列和定时任务 | [`FEAT-015-image-generation-and-automation-workbench.md`](./features/FEAT-015-image-generation-and-automation-workbench.md) |
 | `FEAT-016` | 项目统一更名为 negus | `implemented_pending_review` | `v1.0.0` | 2026-08-05 09:28 +08:00 | 界面、PWA、包名和 GitHub 仓库已统一为 negus，浏览器旧数据保留兼容；本地目录将在当前活动 Turn 收口后由独立 Worker 迁移并恢复同一端口 | [`FEAT-016-project-identity-negus.md`](./features/FEAT-016-project-identity-negus.md) |
 
 `FEAT-010` 曾用于已暂停的 Orca 路线实验，本轮不复用该编号。
@@ -37,15 +37,15 @@ AI 助手应先根据任务定位功能编号，再读取对应文件。不要�
 
 | 编号 | 合并后的需求 | 对应功能与状态 | 当前实际使用体验 | 预计开发后体验 |
 | --- | --- | --- | --- | --- |
-| 1 | 单人 Codex Web 基础能力与持续过程同步 | `FEAT-001 v0.10.4` 已实现，恢复修复待实机验收 | 网页已有真实对话、发送、追加、停止和过程展示；事件重放、断档识别、权威状态校正和持久化会话补拉已接通，修复旧 `active` 阻断最终回复同步的问题，自动测试已通过 | Web 按 Codex 的真实执行事件持续显示分析、命令、文件修改、测试和最终回复；断线、漏事件或后台恢复后自动补齐，不要求用户重开页面。“修改文件”仍属于原有过程同步 |
+| 1 | 单人 Codex Web 基础能力与持续过程同步 | `FEAT-001 v0.10.11` 已完成代码修复，等待最新构建体验确认 | 网页已有真实对话、发送、追加、停止、队列、重新编辑、复制、归档、分叉和过程展示；消息幂等、最终回复交接、快照恢复、加载门和历史滚动锚点已经接通 | Web 按 Codex 的真实执行事件持续显示分析、命令、文件修改、测试和最终回复；刷新、重开、断线恢复和加载历史时先稳定再展示，当前只需确认真实体验，不再重复开发已完成能力 |
 | 2 | Desktop 与 Web 配合使用，并避免同一任务互相干扰 | `FEAT-005` 调研中；关联 `FEAT-001-I03` | 用户在原电脑前正常使用 Codex Desktop，离开电脑后用 Web 补充。Web 写入的内容在 Desktop 重开任务后能看到，但已打开的 Desktop 页面不热刷新；Web 当前也不知道 Desktop 是否正在同一任务内执行 | Desktop 保持正常使用。Web 打开同一任务时，如果检测到 Desktop 正在执行，明确提示“桌面端正在此任务工作”，默认以查看为主，避免重复发起任务；暂不要求 Desktop 反向提示 Web 正在执行 |
 | 3 | 项目群聊与多 Agent，基础体验先与单人 Codex 看齐 | `FEAT-002` 已实现待体验；关联 `FEAT-001`、`FEAT-005` | 群聊已有成员、四个真实 Agent、讨论/开发模式、`@`、附件和增量回复。但群聊的持续进度、断线恢复、停止/追加、错误反馈等没有与单人 Codex 形成统一标准；群聊特有的任务分工和协作方式仍未完全定义 | 群聊先具备与单人 Codex 一致的基础能力：可靠消息、持续过程、附件、断线恢复、失败提示和明确的执行对象；再单独定义项目经理分工、多个 Agent 讨论、审查和任务队列，不用群聊特性掩盖基础能力缺口 |
 | 4 | 附件与真实对话内容展示 | `FEAT-003` 已实现待体验 | 可以上传和展示图片、音频、视频及普通文件，也能登记 Markdown 中的本地图片；目前仍是 Demo 级上传链路，真实大文件、失败恢复和多端草稿保持未完整验收 | 单人和群聊使用同一套附件体验；上传、预览、下载、失败提示和重试可理解，网络或页面切换不会无提示丢失草稿和附件 |
-| 5 | Agent 交付物、HTML/PDF、版本与验收 | `FEAT-007`、`FEAT-008` 已实现未提交 | Agent 已能发布 Artifact，并生成、预览、下载 HTML/PDF，用户可批准或打回；目前主要完成了定向检查，尚未完成整体真实使用验收 | 用户在消息中直接看到成果、版本、文件和验证结果，可以预览、下载、要求修改或通过成果；成果验收与命令执行审批使用不同文案和入口 |
+| 5 | Agent 交付物、HTML/PDF、版本与验收 | `FEAT-007`、`FEAT-008` 已实现并已提交，等待整体体验验收 | Agent 已能发布 Artifact，并生成、预览、下载 HTML/PDF，用户可批准或打回；当前缺的是整体真实使用验收，不是基础代码开发 | 用户在消息中直接看到成果、版本、文件和验证结果，可以预览、下载、要求修改或通过成果；成果验收与命令执行审批使用不同文案和入口 |
 | 6 | 手机/PWA、设备身份和稳定远程入口 | `FEAT-004` 已实现待体验；`FEAT-006` 进行中 | 手机、iPad 和电脑浏览器已有适配；当前使用固定域名，香港线路仍依赖电脑保持 VPN，切换线路会中断活动任务 | 用户保存一个受保护的网址，在手机或其他电脑打开即可继续使用；长期线路不依赖人工 VPN，并准确区分电脑、网页服务和 Codex 任务状态 |
 | 7 | 原开发电脑继续运行项目，项目进程退出时可应急恢复 | `FEAT-009` 计划中；关联 `FEAT-001-I12`、`FEAT-006` | 项目仍需在原电脑手动启动 `9360`。一般不考虑电脑频繁重启，但项目进程可能被关闭；进程停止后现有网页也无法继续操作，只能回原电脑处理 | 优先提供一个最小“启动项目”应急入口或其他远程恢复方式；它只负责查看状态和拉起项目，不扩展成复杂发布系统。如果网页应急入口做不到或自身也离线，向日葵等远程桌面作为可接受兜底 |
 | 8 | 像 OpenClaw 一样尽量无感完成远程开发，不让 UAC 成为日常负担 | `FEAT-009` 已开始实施；关联 `FEAT-001-I11` | 已有只读检查器可核对用户目录、工具链、端口和常见 UAC 风险；当前电脑结果为 0 blocked，原开发电脑与真实修改/构建/Git 链路尚未验证 | 正常开发优先使用用户目录、项目依赖和无需提权的工具链。只有驱动、系统服务等真正系统级操作才报告为一次本机维护；日常网页开发不要求用户处理 UAC |
-| 9 | 在 Codex 标题栏查看浮生云算用量和倍率 | `FEAT-011 v0.1.0` 已实现未提交 | 页面加载不查询；服务重启后，回复完成会更新今日金额、固定 GPT 倍率和时间，点击可查看账户与全部分组详情 | 用户无需离开 Codex 页面即可判断今日消耗；多设备观察同一 Turn 不会重复请求，查询失败也不影响对话 |
+| 9 | 在 Codex 标题栏查看浮生云算用量和倍率 | `FEAT-011 v0.1.1` 已实现并已提交，等待持续体验确认 | 页面加载不查询；回复完成会更新今日金额、固定 GPT 倍率和时间，点击可查看账户与全部分组详情；同一 Turn 按身份去重并保留旧数据 | 用户无需离开 Codex 页面即可判断今日消耗；多设备观察同一 Turn 不会重复请求，查询失败也不影响对话 |
 | 10 | 自然语言生图与专门的生图自动化工作台 | `FEAT-015 v0.5.0` 开发中 | 网页与原生 Codex 共用真实 MCP Turn；4K 小数画幅、同会话改图、继续聊天和图片去重已通过 | 批量、模板、队列、历史和定时任务进入专门工作台，并与对话共用同一运行、媒体、交付物和审计链路 |
 | 11 | 项目品牌与仓库身份统一为 negus | `FEAT-016 v1.0.0` 已实现待体验 | 主对话、PWA、群聊、图标和 GitHub 仓库已统一；本地目录迁移将在当前 Turn 收口后自动执行 | 用户在电脑、手机、安装后的 PWA 和 GitHub 中看到一致的 negus；升级不丢失旧会话快照或设备身份 |
 
@@ -55,7 +55,7 @@ AI 助手应先根据任务定位功能编号，再读取对应文件。不要�
 
 | 顺序 | 功能项目 | 当前要做什么 | 前置条件或边界 |
 | --- | --- | --- | --- |
-| `P1` | `FEAT-001-I08` / `I15` / `I21` 持续过程与完成恢复 | 在手机和电脑浏览器验收 v0.10.4 的权威状态校正与会话补拉 | 使用 5 分钟以上真实任务、断网重连、后台切回和完成事件遗漏；确认最终回复无需关闭重开，不用高频整页轮询掩盖问题 |
+| `P1` | `FEAT-001-I08` / `I15` / `I21` 持续过程与完成恢复 | 在手机和电脑浏览器验收 v0.10.11 的加载门、权威状态校正与会话补拉 | 使用 5 分钟以上真实任务、断网重连、后台切回和完成事件遗漏；确认最终回复无需关闭重开，不用高频整页轮询掩盖问题 |
 | `P2` | `FEAT-001-I16` / `I17` 会话与 Turn 隔离 | 实机复核新对话是否稳定保留、上一 Turn 过程是否还会串入新消息 | 不修改基础 UI，不顺带处理 Desktop 或群聊 |
 | `P2.5` | `FEAT-001-I18` / `I19` 模型与上下文设置体验 | 已实现模型/思考程度合并入口和上下文二级菜单，等待手机体验 | 不新增第三行，不把低频设置重新暴露到输入框 |
 | `P2.5` | `FEAT-011` 浮生云算用量监控 | 服务重启后体验标题栏摘要、完成触发、详情和手机布局 | 页面打开不查询；不扩展趋势图、告警或多供应商账单 |

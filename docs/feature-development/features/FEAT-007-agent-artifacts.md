@@ -1,7 +1,7 @@
 ---
 feature_id: FEAT-007
 title: Agent 交付物生成、预览与版本管理
-status: implemented_uncommitted
+status: implemented_pending_review
 current_version: v0.2.1
 last_updated: 2026-07-27 22:23 +08:00
 owners: [artifacts, group_chat, agent_execution]

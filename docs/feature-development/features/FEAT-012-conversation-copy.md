@@ -1,7 +1,7 @@
 ---
 feature_id: FEAT-012
 title: 消息内容快捷复制
-status: implemented_uncommitted
+status: implemented_pending_review
 current_version: v0.1.0
 last_updated: 2026-08-03 14:47 +08:00
 owners: [web_ui, conversations]

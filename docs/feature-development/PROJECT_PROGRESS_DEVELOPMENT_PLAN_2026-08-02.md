@@ -2,7 +2,7 @@
 document_type: feature_development_plan
 plan_id: PROJECT-PROGRESS-002
 title: 项目进度面板结构化展示与日志追踪
-status: implemented_uncommitted
+status: implemented_pending_review
 date: 2026-08-02
 source_research: PROJECT_PROGRESS_MANAGEMENT_RESEARCH_2026-08-02.md
 ---
@@ -146,11 +146,11 @@ FEATURE_INDEX.md + FEAT-*.md
 - 定向 Node 路由测试：确认项目进度接口返回结构化条目和日志。
 - `git diff --check`
 
-本轮不启动或重启服务，不做视觉验收，不提交或推送。
+本轮不启动或重启服务，不做视觉验收；项目管理页面代码已进入提交历史，等待用户体验确认。
 
 ## 9. 实施记录
 
-### 2026-08-02 15:11 +08:00 | v0.1.0 | implemented_uncommitted
+### 2026-08-02 15:11 +08:00 | v0.1.0 | implemented_pending_review
 
 - 计划：把现有功能索引升级为结构化项目进度面板，保留用户原话、助手初步理解、用户体验内容和更新历史。
 - 实际：新增 `project-progress-store`，并行读取 `FEATURE_INDEX.md` 与 `FEAT-*.md`；接口返回项目计划、进行中条目、分类条目、条目详情和更新日志。
@@ -158,4 +158,4 @@ FEATURE_INDEX.md + FEAT-*.md
 - 数据边界：功能文档没有记录原始用户原话或助手初步理解时，页面明确显示“未记录/待补录”，没有把技术分析冒充用户原话。
 - 用户可见变化：打开项目进度页后，先看到当前计划、明确进行中的工作和最近变化；点击条目后再阅读完整内容，不再面对整张 Markdown 长表。
 - 验证：`node --test windows/tests/request-handler-routing.test.mjs` 4/4 通过；`pnpm build:ui` 通过；`git diff --check` 通过。
-- 未做：未启动或重启服务，未做视觉验收，未提交或推送。
+- 未做：未启动或重启服务，未做视觉验收；后续提交已包含本轮实现，当前等待用户体验确认。

@@ -1,7 +1,7 @@
 ---
 feature_id: FEAT-011
 title: 浮生云算用量监控
-status: implemented_uncommitted
+status: implemented_pending_review
 current_version: v0.1.1
 last_updated: 2026-08-03 02:01 +08:00
 owners: [usage_monitor, web_ui, windows_server]

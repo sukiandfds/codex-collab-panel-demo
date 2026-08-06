@@ -4,8 +4,8 @@ type: feature
 title: 单人 Codex Web 对话与控制
 category: development
 priority: P1
-status: in_progress
-updated_at: 2026-08-04 09:55 +08:00
+status: pending_review
+updated_at: 2026-08-06
 source: docs/feature-development/features/FEAT-001-single-codex-web.md
 related: [FEAT-005]
 ---
@@ -42,7 +42,7 @@ related: [FEAT-005]
 
 ## 当前状态
 
-产品提交 `63e8f948b8058d8236e7a4672b5c1f8bdbf8eb70` 的四项 P0 回归已完成源代码修复：恢复本机与跨 Web 设备即时消息、阻止旧会话响应覆盖新内容、终态停止流式光标并去除流式/持久化重复答案。Windows Node 测试 `84/84`、UI 生产构建、语法和补丁检查通过；按用户要求未重启服务，当前运行后端仍是旧代码，状态保持 `in_progress` 等待真实手机验收。
+当前产品提交 `ddf43a6c406d010357dce7ebdc133b97de66b5b9` 已包含消息身份幂等、恢复与最终回复交接、加载完成前隐藏旧快照、历史消息加载位置保持等修复。当前状态是代码已完成、等待最新构建的真实体验确认；不能再把这些修复描述成尚未开发。
 
 ## 当前证据
 

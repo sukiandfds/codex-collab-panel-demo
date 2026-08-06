@@ -4,8 +4,8 @@ type: feature
 title: 从当前消息分叉继续
 category: development
 priority: P2
-status: implemented_uncommitted
-updated_at: 2026-08-03 14:47 +08:00
+status: pending_review
+updated_at: 2026-08-06
 source: docs/feature-development/features/FEAT-013-conversation-fork.md
 related: [FEAT-001]
 ---
@@ -40,7 +40,7 @@ related: [FEAT-001]
 
 ## 当前状态
 
-已实现但未提交；当前本机 app-server 能力仍待真实探测。
+已实现并已进入提交历史；当前只剩本机 app-server 能力探测，若不支持则显示明确不可用状态。
 
 ## 当前证据
 

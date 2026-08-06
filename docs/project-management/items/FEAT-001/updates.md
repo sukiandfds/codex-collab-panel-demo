@@ -49,3 +49,10 @@
 - 验证：Windows Node 测试 `84/84`；`pnpm build:ui`；后端语法检查；`git diff --check`；构建产物确认包含 `user_message_submitted`。
 - 运行边界：按用户要求未启动或重启服务；当前运行后端仍是旧代码，本轮不宣称真实手机或跨设备验收通过。
 - 证据：`web-ui/src/features/conversations/hooks/useConversationSession.ts`；`web-ui/src/features/conversations/components/ConversationView.tsx`；`windows/server/routes/conversation-routes.mjs`；`windows/tests/conversation-routes.test.mjs`。
+
+### 2026-08-06 | 状态同步
+
+- 状态：pending_review
+- 本次更新：根据提交 `ddf43a6c406d010357dce7ebdc133b97de66b5b9` 更新当前结论。加载完成前不展示旧快照；刷新、重开和快照恢复进入统一加载门；加载较早消息使用可见消息锚点恢复阅读位置，并移除会反复改变布局的补偿循环。
+- 用户影响：相关代码已经开发并提交，当前不再列为待开发；剩余是用户确认最新构建下的刷新、重开、历史滚动、跨端消息和长任务体验。
+- 证据：`web-ui/src/App.tsx`、`web-ui/src/features/conversations/components/ConversationView.tsx`、`web-ui/src/features/conversations/hooks/useConversationSession.ts`、`web-ui/src/features/conversations/hooks/useProjectConversations.ts`。

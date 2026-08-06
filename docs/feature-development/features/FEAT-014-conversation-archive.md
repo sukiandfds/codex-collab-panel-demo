@@ -1,7 +1,7 @@
 ---
 feature_id: FEAT-014
 title: 项目对话归档与恢复
-status: implemented_uncommitted
+status: implemented_pending_review
 current_version: v0.1.0
 last_updated: 2026-08-03 14:47 +08:00
 owners: [app_server, jsonl_fallback, conversations, web_ui]

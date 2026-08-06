@@ -4,8 +4,8 @@ type: feature
 title: 独立项目管理系统
 category: development
 priority: P1
-status: in_progress
-updated_at: 2026-08-02 18:00 +08:00
+status: pending_review
+updated_at: 2026-08-06
 source: docs/feature-development/PROJECT_PROGRESS_DEVELOPMENT_PLAN_2026-08-02.md
 related: []
 ---
@@ -46,7 +46,7 @@ related: []
 
 ## 当前状态
 
-已实现，未提交。
+项目管理目录、结构化读取器、摘要接口、分类列表、详情面板和更新日志页面已经进入提交历史；当前只剩页面体验确认和本次状态记录同步，不再标记为“已实现未提交”。
 
 ## 当前证据
 

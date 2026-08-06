@@ -1,7 +1,7 @@
 ---
 feature_id: FEAT-013
 title: 从当前消息分叉继续
-status: implemented_uncommitted
+status: implemented_pending_review
 current_version: v0.1.0
 last_updated: 2026-08-03 14:47 +08:00
 owners: [app_server, conversations, web_ui]

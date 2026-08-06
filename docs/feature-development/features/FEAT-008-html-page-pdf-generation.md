@@ -1,7 +1,7 @@
 ---
 feature_id: FEAT-008
 title: HTML 网页生成与 PDF 双文件交付
-status: implemented_uncommitted
+status: implemented_pending_review
 current_version: v0.2.0
 last_updated: 2026-07-27 23:47 +08:00
 owners: [web_output, agent_execution]

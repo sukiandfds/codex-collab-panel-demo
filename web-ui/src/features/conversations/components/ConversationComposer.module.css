@@ -165,6 +165,5 @@
     background: var(--color-bg);
   }
 
-  .focused .settingsControls { display: none; }
   .focused textarea { max-height: 96px; }
 }
