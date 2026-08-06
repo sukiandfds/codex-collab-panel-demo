@@ -1,4 +1,4 @@
-.agentPanel { min-width: 0; border-left: 1px solid #2a2a2a; padding: 18px 12px; background: #171717; }
+.agentPanel { min-width: 0; border-top: 1px solid var(--color-border); padding: 18px 12px; background: var(--color-sidebar); }
 .panelHeading { display: flex; align-items: center; gap: 7px; padding: 0 7px 12px; color: #8f8f8f; font-size: 11px; font-weight: 600; }
 .panelHeading svg { width: 14px; height: 14px; }
 .agentList { display: grid; gap: 4px; }
@@ -15,4 +15,3 @@
 .agentActive { color: #86c176; }
 .agentIdle { color: #535353; }
 
-@media (max-width: 680px) { .agentPanel { display: none; } }

@@ -1,6 +1,6 @@
-.composerArea { position: relative; padding: 0 max(18px, calc((100% - 760px) / 2)) 18px; background: #101010; }
+.composerArea { position: absolute; z-index: 5; right: 0; bottom: 0; left: 0; width: 100%; min-width: 0; max-width: 100%; padding: 22px max(30px, calc((100% - var(--content-width)) / 2)) 14px; background: linear-gradient(180deg, transparent 0, var(--color-bg) 30%); }
 .errorText { margin: 0 4px 7px; color: #d58c83; font-size: 11px; }
-.composer { border: 1px solid #383838; border-radius: 8px; background: #1c1c1c; box-shadow: 0 8px 26px rgb(0 0 0 / 22%); }
+.composer { width: min(var(--content-width), 100%); max-width: 100%; margin: 0 auto; border: 1px solid var(--color-border-strong); border-radius: 16px; background: var(--color-composer); box-shadow: 0 18px 40px rgb(0 0 0 / 30%); }
 .composer:focus-within { border-color: #545454; }
 .composer textarea { display: block; width: 100%; min-height: 60px; max-height: 150px; overflow-y: auto; resize: none; border: 0; outline: 0; padding: 12px 13px 6px; background: transparent; color: #ededed; font-size: 13px; line-height: 1.5; }
 .composer textarea::placeholder { color: #707070; }
@@ -21,4 +21,15 @@
   .composerFooter { flex-wrap: wrap; }
   .composerFooter select { order: 3; width: 100%; max-width: none; }
   .modeHint { display: none; }
+}
+
+@media (any-pointer: coarse) {
+  .composerArea {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    width: 100%;
+    background: var(--color-bg);
+  }
 }

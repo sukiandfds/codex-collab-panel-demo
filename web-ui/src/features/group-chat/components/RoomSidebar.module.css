@@ -1,4 +1,4 @@
-.sidebar { min-width: 0; border-right: 1px solid #2a2a2a; background: #171717; }
+.sidebar { min-width: 0; background: var(--color-sidebar); }
 .brand { display: flex; height: 54px; align-items: center; gap: 10px; padding: 0 15px; border-bottom: 1px solid #262626; color: #f2f2f2; font-size: 13px; font-weight: 600; }
 .brandMark { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid #464646; border-radius: 6px; background: #ececec; color: #141414; font-weight: 750; }
 .sidebarSection { padding: 18px 12px 6px; }
@@ -13,4 +13,3 @@
 .avatar { display: grid; width: 24px; height: 24px; flex: 0 0 24px; place-items: center; border-radius: 50%; background: #333; color: #ddd; font-size: 11px; }
 .emptyText { display: block; padding: 8px; color: #777; font-size: 12px; }
 
-@media (max-width: 900px) { .sidebar { display: none; } }
