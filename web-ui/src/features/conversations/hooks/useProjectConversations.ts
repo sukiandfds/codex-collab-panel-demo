@@ -25,14 +25,20 @@ const attachmentsFromMessage = (message: SessionMessage): MediaFile[] => {
 
 export function useProjectConversations() {
   const [initial] = useState(readInitialConversationState);
+  const [snapshotLoading, setSnapshotLoading] = useState(true);
   const selection = useConversationSession(initial);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("archived") === "1") return;
+    if (new URLSearchParams(window.location.search).get("archived") === "1") {
+      setSnapshotLoading(false);
+      return;
+    }
     let cancelled = false;
     void readConversationSnapshotAsync().then((snapshot) => {
       if (cancelled || !snapshot?.session) return;
       selection.hydrateSnapshot(snapshot.session, Boolean(snapshot.isPartial));
+    }).finally(() => {
+      if (!cancelled) setSnapshotLoading(false);
     });
     return () => { cancelled = true; };
   }, [initial, selection.hydrateSnapshot]);
@@ -325,6 +331,7 @@ export function useProjectConversations() {
     session: selection.session,
     loadingList: catalog.loadingList,
     loadingSession: selection.loadingSession,
+    snapshotLoading,
     loadingOlder: selection.loadingOlder,
     syncing: selection.syncing,
     contentSyncState: selection.contentSyncState,

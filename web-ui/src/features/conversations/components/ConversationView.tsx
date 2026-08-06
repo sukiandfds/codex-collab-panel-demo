@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Clock3, LoaderCircle } from "lucide-react";
 import { JumpToLatest } from "../../../components/JumpToLatest/JumpToLatest";
@@ -35,26 +35,6 @@ const finalMessageMatchesStream = (message: SessionMessage, executionStatus: Exe
     || (Boolean(streamingText.trim()) && normalizedText(message.text) === normalizedText(streamingText))
   )
 );
-
-const waitForLayoutToSettle = (root: HTMLDivElement, measure: () => void) => new Promise<void>((resolve) => {
-  const deadline = performance.now() + 400;
-  let previousHeight = root.scrollHeight;
-  let stableFrames = 0;
-
-  const check = () => {
-    measure();
-    const nextHeight = root.scrollHeight;
-    stableFrames = nextHeight === previousHeight ? stableFrames + 1 : 0;
-    previousHeight = nextHeight;
-    if (stableFrames >= 2 || performance.now() >= deadline) {
-      resolve();
-      return;
-    }
-    requestAnimationFrame(check);
-  };
-
-  requestAnimationFrame(check);
-});
 
 function Message({
   message,
@@ -156,6 +136,7 @@ export function ConversationView({
 }: ConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingOlderRef = useRef(false);
+  const olderAnchorRef = useRef<{ id: string; top: number; messageCount: number } | null>(null);
   const stickToBottomRef = useRef(true);
   const [hasNewActivity, setHasNewActivity] = useState(false);
   const messages = session?.messages || [];
@@ -205,6 +186,20 @@ export function ConversationView({
     overscan: 6,
     getItemKey: (index) => visibleItems[index]?.id || index,
   });
+
+  useLayoutEffect(() => {
+    const anchor = olderAnchorRef.current;
+    const root = scrollRef.current;
+    if (!anchor || !root || messages.length <= anchor.messageCount) return;
+
+    virtualizer.measure();
+    const nextAnchor = Array.from(root.querySelectorAll<HTMLElement>("[data-message-id]"))
+      .find((element) => element.dataset.messageId === anchor.id);
+    if (nextAnchor) {
+      root.scrollTop += nextAnchor.getBoundingClientRect().top - anchor.top;
+    }
+    olderAnchorRef.current = null;
+  }, [messages.length, session?.threadId, virtualizer]);
 
   useEffect(() => {
     if (!loading && session && scrollRef.current) {
@@ -280,14 +275,28 @@ export function ConversationView({
       if (nearBottom) setHasNewActivity(false);
       if (root.scrollTop > 140 || !session?.hasMore || loadingOlderRef.current || contentSyncState === "recovering") return;
       loadingOlderRef.current = true;
-      const previousHeight = root.scrollHeight;
-      const previousScrollTop = root.scrollTop;
+      const rootTop = root.getBoundingClientRect().top;
+      const anchor = Array.from(root.querySelectorAll<HTMLElement>("[data-message-id]"))
+        .map((element) => ({ element, rect: element.getBoundingClientRect() }))
+        .find(({ rect }) => rect.bottom > rootTop);
+      if (anchor) {
+        olderAnchorRef.current = {
+          id: anchor.element.dataset.messageId || "",
+          top: anchor.rect.top,
+          messageCount: messages.length,
+        };
+      }
       try {
         await onLoadOlder();
-        await waitForLayoutToSettle(root, () => virtualizer.measure());
-        if (!disposed) root.scrollTop = previousScrollTop + root.scrollHeight - previousHeight;
       } finally {
         loadingOlderRef.current = false;
+        if (!disposed) {
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              olderAnchorRef.current = null;
+            });
+          });
+        }
       }
     };
     root.addEventListener("scroll", onScroll, { passive: true });
@@ -311,7 +320,6 @@ export function ConversationView({
       <div className={styles.scrollArea} ref={scrollRef}>
         <section className={styles.conversation} aria-label="真实项目对话" aria-live="polite">
         {loading ? <div className={styles.loading} role="status" aria-label="正在读取对话"><LoaderCircle aria-hidden="true" /></div> : null}
-        {loadingOlder ? <div className={styles.older}>正在加载更早消息…</div> : null}
         {!loading && !error && !session && listAvailable ? <div className={styles.state}>当前项目暂无可显示对话</div> : null}
         {!loading && session ? (
           <div className={styles.virtualList} style={{ height: virtualizer.getTotalSize() }}>
@@ -321,6 +329,7 @@ export function ConversationView({
                 <div
                   className={styles.virtualRow}
                   data-index={virtualRow.index}
+                  data-message-id={item.type === "message" ? item.message.id : undefined}
                   key={virtualRow.key}
                   ref={virtualizer.measureElement}
                   style={{ transform: `translateY(${virtualRow.start}px)` }}
@@ -355,6 +364,7 @@ export function ConversationView({
         ) : null}
         </section>
       </div>
+      {loadingOlder ? <div className={styles.older} role="status" aria-label="正在加载更早消息"><LoaderCircle aria-hidden="true" /></div> : null}
       <JumpToLatest visible={hasNewActivity} className={styles.jumpToLatest} onClick={scrollToLatest} />
     </div>
   );

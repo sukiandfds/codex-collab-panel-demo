@@ -16,9 +16,9 @@ export function App() {
   const usage = useUsageMonitor(conversations.executionStatus);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   useEffect(() => {
-    if (conversations.loadingList || conversations.loadingSession) return;
+    if (conversations.loadingList || conversations.loadingSession || conversations.snapshotLoading) return;
     window.dispatchEvent(new Event("negus:app-ready"));
-  }, [conversations.loadingList, conversations.loadingSession]);
+  }, [conversations.loadingList, conversations.loadingSession, conversations.snapshotLoading]);
   const selectSession = useCallback((threadId: string) => {
     conversations.selectSession(threadId);
     setSidebarOpen(false);
