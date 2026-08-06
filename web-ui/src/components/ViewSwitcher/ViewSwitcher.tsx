@@ -1,4 +1,5 @@
 import { Bot, ListChecks, MessagesSquare } from "lucide-react";
+import type { MouseEvent } from "react";
 import styles from "./ViewSwitcher.module.css";
 
 export type ViewSurface = "conversation" | "group" | "progress";
@@ -16,7 +17,7 @@ export function ViewSwitcher({ current, onViewChange }: {
   current: ViewSurface;
   onViewChange?: (surface: "conversation" | "group") => void;
 }) {
-  const handleView = (surface: "conversation" | "group") => (event: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleView = (surface: "conversation" | "group") => (event: MouseEvent<HTMLAnchorElement>) => {
     if (!onViewChange || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     onViewChange(surface);

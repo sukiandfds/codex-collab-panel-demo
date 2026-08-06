@@ -12,4 +12,3 @@
 .memberRow i { width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: #71bd76; }
 .avatar { display: grid; width: 24px; height: 24px; flex: 0 0 24px; place-items: center; border-radius: 50%; background: #333; color: #ddd; font-size: 11px; }
 .emptyText { display: block; padding: 8px; color: #777; font-size: 12px; }
-
