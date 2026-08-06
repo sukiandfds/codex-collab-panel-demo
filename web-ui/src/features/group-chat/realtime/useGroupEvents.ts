@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { ArtifactRealtimeEvent } from "../../artifacts/model/types";
 import { groupApi } from "../data/groupApi";
+import { upsertGroupMessage } from "../data/groupMessageState";
 import type { GroupEvent, GroupSnapshot } from "../model/types";
 
 export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapshot | null>>) {
@@ -19,9 +20,10 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
       try {
         const event = JSON.parse(message.data) as GroupEvent;
         if (event.type === "group_message_created") {
-          setSnapshot((current) => current && current.messages.some((item) => item.id === event.message.id)
-            ? current
-            : current && { ...current, messages: [...current.messages, event.message] });
+          setSnapshot((current) => current && {
+            ...current,
+            messages: upsertGroupMessage(current.messages, event.message),
+          });
           if (event.message.agentId) {
             const nextBuffer = { ...streamingBuffer.current };
             delete nextBuffer[event.message.agentId];
@@ -35,7 +37,7 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
         } else if (event.type === "group_message_updated") {
           setSnapshot((current) => current && {
             ...current,
-            messages: current.messages.map((item) => item.id === event.message.id ? event.message : item),
+            messages: upsertGroupMessage(current.messages, event.message),
           });
         } else if (event.type === "group_agent_updated") {
           setSnapshot((current) => current && {

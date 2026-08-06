@@ -31,16 +31,21 @@ export const createGroupRoutes = ({ groupRoom, media, multiAgent, webOutputs }) 
     targetAgentIds.splice(0, targetAgentIds.length, "developer");
     mode = "development";
   }
-  const message = await groupRoom.addMessage({
+  const { message, created } = await groupRoom.addMessageWithStatus({
     type: "human",
     authorId: member.id,
     authorName: member.name,
+    clientMessageId: body.clientMessageId,
     agentId: targetAgentIds[0],
     targetAgentIds,
     mode,
     text,
     attachments: attachments.map(({ id, name, mimeType, url: attachmentUrl }) => ({ id, name, mimeType, url: attachmentUrl })),
   });
+  if (!created) {
+    sendJson(response, { message, execution: null, deduplicated: true }, 202);
+    return true;
+  }
   const execution = await multiAgent.enqueueDiscussion({
     agentIds: targetAgentIds,
     mode,

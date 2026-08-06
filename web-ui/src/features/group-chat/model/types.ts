@@ -24,6 +24,9 @@ export interface GroupAgent {
 
 export interface GroupMessage {
   id: string;
+  clientMessageId?: string | null;
+  sequence?: number;
+  pending?: boolean;
   type: "human" | "agent" | "system";
   authorId: string;
   authorName: string;
@@ -47,6 +50,12 @@ export interface GroupSnapshot {
 export interface StoredMember {
   id: string;
   name: string;
+}
+
+export interface GroupSendResponse {
+  message: GroupMessage;
+  execution: { jobId: string; agentIds: string[]; status: string } | null;
+  deduplicated?: boolean;
 }
 
 export type GroupEvent =

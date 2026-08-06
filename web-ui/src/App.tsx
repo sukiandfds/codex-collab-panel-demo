@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "./components/AppShell/AppShell";
+import type { ViewSurface } from "./components/ViewSwitcher/ViewSwitcher";
 import { WindowBar } from "./components/WindowBar/WindowBar";
 import { ConversationComposer } from "./features/conversations/components/ConversationComposer";
 import { ConversationHeader } from "./features/conversations/components/ConversationHeader";
@@ -7,10 +8,20 @@ import { ConversationSidebar } from "./features/conversations/components/Convers
 import { ConversationView } from "./features/conversations/components/ConversationView";
 import { useProjectConversations } from "./features/conversations/hooks/useProjectConversations";
 import { useDeviceInfo } from "./features/device/hooks/useDeviceInfo";
+import { GroupApp } from "./features/group-chat/GroupApp";
+import { prefetchGroupSnapshot } from "./features/group-chat/data/groupSnapshot";
+import { IntelligenceEfficiencyControl } from "./features/intelligence-efficiency/components/IntelligenceEfficiencyControl";
 import { UsageSummaryControl } from "./features/usage-monitor/components/UsageSummaryControl";
 import { useUsageMonitor } from "./features/usage-monitor/hooks/useUsageMonitor";
 
-export function App() {
+type InteractiveSurface = Exclude<ViewSurface, "progress">;
+
+const readSurface = (): InteractiveSurface => window.location.pathname === "/group.html"
+  || new URLSearchParams(window.location.search).get("view") === "group"
+  ? "group"
+  : "conversation";
+
+function ConversationApp({ onViewChange }: { onViewChange: (surface: InteractiveSurface) => void }) {
   const conversations = useProjectConversations();
   const device = useDeviceInfo(conversations.connected);
   const usage = useUsageMonitor(conversations.executionStatus);
@@ -58,13 +69,17 @@ export function App() {
           onRename={conversations.renameSession}
           renaming={conversations.renaming}
           usage={
-            <UsageSummaryControl
-              snapshot={usage.snapshot}
-              loading={usage.loading}
-              error={usage.error}
-              onRefresh={() => void usage.refresh(true)}
-            />
+            <>
+              <UsageSummaryControl
+                snapshot={usage.snapshot}
+                loading={usage.loading}
+                error={usage.error}
+                onRefresh={() => void usage.refresh(true)}
+              />
+              <IntelligenceEfficiencyControl />
+            </>
           }
+          onViewChange={onViewChange}
         />
       }
       conversation={
@@ -122,5 +137,46 @@ export function App() {
         />
       }
     />
+  );
+}
+
+export function App() {
+  const [surface, setSurface] = useState<InteractiveSurface>(readSurface);
+  const [groupMounted, setGroupMounted] = useState(() => readSurface() === "group");
+
+  const showSurface = useCallback((next: InteractiveSurface, pushHistory = true) => {
+    if (next === "group") setGroupMounted(true);
+    setSurface(next);
+    if (!pushHistory) return;
+    const params = new URLSearchParams(window.location.search);
+    params.delete("view");
+    if (next === "group") params.set("view", "group");
+    const query = params.toString();
+    window.history.pushState({ surface: next }, "", `/${query ? `?${query}` : ""}`);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => showSurface(readSurface(), false);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [showSurface]);
+
+  useEffect(() => {
+    if (groupMounted) return;
+    const timer = window.setTimeout(() => void prefetchGroupSnapshot(), 1800);
+    return () => window.clearTimeout(timer);
+  }, [groupMounted]);
+
+  return (
+    <>
+      <div hidden={surface !== "conversation"} aria-hidden={surface !== "conversation"} style={{ width: "100%", height: "100%" }}>
+        <ConversationApp onViewChange={showSurface} />
+      </div>
+      {groupMounted ? (
+        <div hidden={surface !== "group"} aria-hidden={surface !== "group"} style={{ width: "100%", height: "100%" }}>
+          <GroupApp onViewChange={showSurface} />
+        </div>
+      ) : null}
+    </>
   );
 }

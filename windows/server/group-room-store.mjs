@@ -54,19 +54,23 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
   const savedAgents = new Map((Array.isArray(stored.agents) ? stored.agents : []).map((agent) => [agent.id, agent]));
   const agents = new Map(agentDefinitions.map((definition) => [definition.id, initialAgent(definition, savedAgents.get(definition.id))]));
   const messages = (Array.isArray(stored.messages) ? stored.messages : [])
-    .filter((message) => message?.id && message?.text && message?.createdAt)
-    .map((message) => ({
+    .filter((message) => message?.id && message?.createdAt
+      && (message?.text || (Array.isArray(message?.attachments) && message.attachments.length)))
+    .map((message, index) => ({
       ...message,
+      clientMessageId: cleanText(message.clientMessageId, 80) || null,
+      sequence: Number.isSafeInteger(message.sequence) && message.sequence > 0 ? message.sequence : index + 1,
       artifactIds: [...new Set((Array.isArray(message.artifactIds) ? message.artifactIds : [])
         .map((id) => cleanText(id, 80)).filter(Boolean))],
     }))
     .slice(-300);
   const members = new Map();
+  let nextMessageSequence = messages.reduce((latest, message) => Math.max(latest, message.sequence), 0);
   let writeQueue = Promise.resolve();
 
   const persist = () => {
     const payload = JSON.stringify({
-      version: 1,
+      version: 2,
       messages: messages.slice(-300),
       agents: [...agents.values()].map(({ instructions, ...agent }) => agent),
     }, null, 2);
@@ -103,8 +107,24 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     return member;
   };
 
-  const addMessage = async ({ type = "human", authorId, authorName, agentId = null, targetAgentIds = [], mode = "discussion", text, attachments = [] }) => {
+  const addMessageWithStatus = async ({
+    type = "human",
+    authorId,
+    authorName,
+    agentId = null,
+    targetAgentIds = [],
+    mode = "discussion",
+    text,
+    attachments = [],
+    clientMessageId = null,
+  }) => {
     const content = cleanText(text, 12000);
+    const cleanAuthorId = cleanText(authorId, 80);
+    const cleanClientMessageId = cleanText(clientMessageId, 80) || null;
+    const existing = cleanClientMessageId
+      ? messages.find((message) => message.authorId === cleanAuthorId && message.clientMessageId === cleanClientMessageId)
+      : null;
+    if (existing) return { message: existing, created: false };
     const files = (Array.isArray(attachments) ? attachments : []).slice(0, 6).map((file) => ({
       id: cleanText(file.id, 80),
       name: cleanText(file.name, 160),
@@ -117,8 +137,10 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
       .filter((id) => agents.has(id)))];
     const message = {
       id: randomUUID(),
+      clientMessageId: cleanClientMessageId,
+      sequence: ++nextMessageSequence,
       type,
-      authorId: cleanText(authorId, 80),
+      authorId: cleanAuthorId,
       authorName: cleanText(authorName, 40),
       agentId: agentId || targets[0] || null,
       targetAgentIds: targets,
@@ -132,8 +154,10 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     if (messages.length > 300) messages.splice(0, messages.length - 300);
     await persist();
     broadcast({ type: "group_message_created", message });
-    return message;
+    return { message, created: true };
   };
+
+  const addMessage = async (params) => (await addMessageWithStatus(params)).message;
 
   const getAgent = (agentId) => agents.get(agentId) || null;
   const getMessage = (messageId) => messages.find((message) => message.id === messageId) || null;
@@ -162,5 +186,15 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
   };
 
   await persist();
-  return { snapshot, touchMember, addMessage, getAgent, getMessage, attachArtifact, updateAgent, close: () => writeQueue };
+  return {
+    snapshot,
+    touchMember,
+    addMessage,
+    addMessageWithStatus,
+    getAgent,
+    getMessage,
+    attachArtifact,
+    updateAgent,
+    close: () => writeQueue,
+  };
 };

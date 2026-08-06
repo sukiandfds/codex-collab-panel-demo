@@ -1,6 +1,6 @@
 import { useCallback, useState, type ReactNode } from "react";
 import { Check, Edit3, Folder, PanelLeft, Share2, X } from "lucide-react";
-import { ViewSwitcher } from "../../../components/ViewSwitcher/ViewSwitcher";
+import { ViewSwitcher, type ViewSurface } from "../../../components/ViewSwitcher/ViewSwitcher";
 import { ShareConversationDialog } from "../../conversation-sharing/components/ShareConversationDialog";
 import { DeviceStatus } from "../../device/components/DeviceStatus";
 import type { ProjectInfo, SessionDetail } from "../model/types";
@@ -15,9 +15,10 @@ interface ConversationHeaderProps {
   onRename: (name: string) => Promise<boolean>;
   renaming: boolean;
   usage?: ReactNode;
+  onViewChange?: (surface: Exclude<ViewSurface, "progress">) => void;
 }
 
-export function ConversationHeader({ project, session, deviceName, connected, onOpenSidebar, onRename, renaming, usage }: ConversationHeaderProps) {
+export function ConversationHeader({ project, session, deviceName, connected, onOpenSidebar, onRename, renaming, usage, onViewChange }: ConversationHeaderProps) {
   const [sharing, setSharing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -95,7 +96,7 @@ export function ConversationHeader({ project, session, deviceName, connected, on
           <button className={styles.iconButton} type="button" aria-label="分享当前对话" title="分享" onClick={() => setSharing(true)}>
             <Share2 aria-hidden="true" />
           </button>
-          <ViewSwitcher current="conversation" />
+          <ViewSwitcher current="conversation" onViewChange={onViewChange} />
         </div>
         <div className={styles.statusbar}>
           <DeviceStatus name={deviceName} connected={connected} />

@@ -1,3 +1,4 @@
+model_reasoning_summary = "auto"
 [mcp_servers.negus_image]
 command = "node"
 args = ["windows/server/image-generation/mcp-server.mjs"]

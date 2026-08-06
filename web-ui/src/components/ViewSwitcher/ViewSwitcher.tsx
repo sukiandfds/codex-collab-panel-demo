@@ -1,17 +1,35 @@
 import { Bot, ListChecks, MessagesSquare } from "lucide-react";
 import styles from "./ViewSwitcher.module.css";
 
-export function ViewSwitcher({ current }: { current: "conversation" | "group" | "progress" }) {
-  const query = window.location.search;
+export type ViewSurface = "conversation" | "group" | "progress";
+
+const surfaceHref = (surface: ViewSurface) => {
+  const params = new URLSearchParams(window.location.search);
+  params.delete("view");
+  if (surface === "group") params.set("view", "group");
+  const query = params.toString();
+  const path = surface === "progress" ? "/progress" : "/";
+  return `${path}${query ? `?${query}` : ""}`;
+};
+
+export function ViewSwitcher({ current, onViewChange }: {
+  current: ViewSurface;
+  onViewChange?: (surface: "conversation" | "group") => void;
+}) {
+  const handleView = (surface: "conversation" | "group") => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!onViewChange || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    onViewChange(surface);
+  };
   return (
     <nav className={styles.root} aria-label="切换对话模式">
-      <a className={current === "conversation" ? styles.active : ""} href={`/${query}`} title="单人 Codex 对话" aria-label="单人 Codex 对话">
+      <a className={current === "conversation" ? styles.active : ""} href={surfaceHref("conversation")} onClick={handleView("conversation")} title="单人 Codex 对话" aria-label="单人 Codex 对话">
         <Bot aria-hidden="true" /><span>对话</span>
       </a>
-      <a className={current === "group" ? styles.active : ""} href={`/group.html${query}`} title="项目群聊" aria-label="项目群聊">
+      <a className={current === "group" ? styles.active : ""} href={surfaceHref("group")} onClick={handleView("group")} title="项目群聊" aria-label="项目群聊">
         <MessagesSquare aria-hidden="true" /><span>群聊</span>
       </a>
-      <a className={current === "progress" ? styles.active : ""} href={`/progress${query}`} title="项目管理" aria-label="项目管理">
+      <a className={current === "progress" ? styles.active : ""} href={surfaceHref("progress")} title="项目管理" aria-label="项目管理">
         <ListChecks aria-hidden="true" /><span>进度</span>
       </a>
     </nav>

@@ -1,0 +1,73 @@
+.root { position: relative; flex: 0 0 auto; }
+.trigger, .closeButton, .actionButton { display: grid; place-items: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--color-text-secondary); cursor: pointer; }
+.trigger { width: 22px; height: 22px; border-radius: 5px; }
+.trigger svg { width: 15px; height: 15px; stroke-width: 1.8; }
+.trigger[aria-expanded="true"] { background: var(--color-surface-active); color: var(--color-text); }
+.popover { position: fixed; z-index: 70; top: calc(var(--windowbar-height) + var(--topbar-height) + 28px + 10px); right: 24px; width: min(1120px, calc(100vw - 48px)); max-height: min(78dvh, 760px); overflow: hidden; border: 1px solid var(--color-border-strong); border-radius: 8px; background: var(--color-surface); box-shadow: 0 12px 30px rgb(0 0 0 / .35); color: var(--color-text); }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 14px 10px; }
+.header h2 { margin: 0; font-size: 14px; font-weight: 650; }
+.header p { margin: 3px 0 0; color: var(--color-text-muted); font-size: 11px; }
+.headerActions { display: flex; align-items: center; gap: 3px; }
+.closeButton, .actionButton { width: 30px; height: 30px; flex: 0 0 30px; }
+.closeButton svg, .actionButton svg { width: 15px; height: 15px; }
+.actionButton:disabled { cursor: default; opacity: .45; }
+.controls { display: grid; gap: 8px; padding: 0 14px 10px; }
+.filterRow, .sortRow { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.controlLabel, .sortLabel { flex: 0 0 auto; margin-right: 3px; color: var(--color-text-muted); font-size: 11px; }
+.filterButton, .textButton { display: inline-flex; align-items: center; justify-content: center; min-height: 26px; padding: 0 8px; border: 1px solid var(--color-border-strong); border-radius: 5px; background: var(--color-surface-soft); color: var(--color-text-secondary); font-size: 11px; line-height: 1; white-space: nowrap; cursor: pointer; }
+.filterButton.active { border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border-strong)); background: color-mix(in srgb, var(--color-accent) 13%, transparent); color: var(--color-text); }
+.sortRow select { height: 26px; padding: 0 22px 0 7px; border: 1px solid var(--color-border-strong); border-radius: 5px; background: var(--color-surface-soft); color: var(--color-text); font: inherit; font-size: 11px; }
+.textButton { gap: 4px; border-color: transparent; }
+.textButton svg { width: 13px; height: 13px; }
+.cardViewport { max-height: min(620px, calc(78dvh - 130px)); overflow: auto; padding: 0 14px 14px; border-block: 1px solid var(--color-border); }
+.modelGroup { --group-accent: #f5b800; --group-border: rgba(245, 184, 0, .36); margin-top: 12px; }
+.modelGroup h3 { display: none; }
+.cardGrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px 14px; }
+.card { display: grid; grid-template-columns: minmax(0, 1fr) 58px; overflow: hidden; min-width: 0; border: 1px solid var(--group-border); border-top: 3px solid var(--group-accent); border-radius: 8px; background: color-mix(in srgb, var(--group-accent) 8%, var(--color-surface)); }
+.cardHead { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 5px; min-width: 0; min-height: 29px; padding: 0 8px; border-bottom: 1px solid var(--group-border); color: var(--color-text-secondary); font-size: 11px; }
+.cardHead strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cardHead span { flex: 0 0 auto; padding: 1px 4px; border: 1px solid var(--group-border); border-radius: 4px; color: var(--group-accent); font-size: 9px; }
+.cardMain { display: flex; align-items: center; min-height: 57px; padding: 0 8px; color: var(--group-accent); font-size: 38px; line-height: 1; font-weight: 750; font-variant-numeric: tabular-nums; }
+.cardMeta { display: grid; grid-template-rows: 1fr 1fr; border-left: 1px solid var(--group-border); color: var(--group-accent); font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.cardMeta span { display: flex; align-items: center; justify-content: center; padding: 0 4px; white-space: nowrap; }
+.cardMeta span + span { border-top: 1px solid var(--group-border); }
+.sol { --group-accent: #f5b800; --group-border: rgba(245, 184, 0, .36); }
+.terra { --group-accent: #4385f5; --group-border: rgba(67, 133, 245, .4); }
+.luna { --group-accent: #cbd5e1; --group-border: rgba(203, 213, 225, .35); }
+.fiveFive { --group-accent: #00d7ee; --group-border: rgba(0, 215, 238, .38); }
+.deepseek { --group-accent: #8b5cf6; --group-border: rgba(139, 92, 246, .42); }
+.defaultTone { --group-accent: var(--color-accent); --group-border: color-mix(in srgb, var(--color-accent) 35%, var(--color-border)); }
+.state, .empty { display: grid; min-height: 180px; place-items: center; align-content: center; gap: 12px; color: var(--color-text-muted); font-size: 12px; }
+.state p { margin: 0; }
+.state button { min-height: 30px; padding: 0 12px; border: 1px solid var(--color-border-strong); border-radius: 6px; background: var(--color-surface-hover); color: var(--color-text); }
+.footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; padding: 0 14px; color: var(--color-text-muted); font-size: 10px; }
+.footer a { color: var(--color-accent); text-decoration: none; }
+.spinning { animation: radar-spin .8s linear infinite; }
+@media (hover: hover) { .trigger:hover, .closeButton:hover, .actionButton:hover:not(:disabled), .filterButton:hover, .textButton:hover { background: var(--color-surface-hover); color: var(--color-text); } .card:hover { filter: brightness(1.08); } }
+@media (max-width: 1500px) { .cardGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 1050px) { .popover { right: 16px; width: min(900px, calc(100vw - 32px)); } .cardGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) {
+  .popover { top: calc(env(safe-area-inset-top) + var(--topbar-height) + 8px); right: 8px; left: 8px; width: auto; max-height: calc(100dvh - var(--topbar-height) - env(safe-area-inset-top) - 16px); }
+  .header { padding: 11px 11px 8px; }
+  .header h2 { font-size: 13px; }
+  .header p { font-size: 10px; }
+  .closeButton, .actionButton { width: 26px; height: 26px; flex-basis: 26px; }
+  .controls { gap: 6px; padding: 0 10px 8px; }
+  .filterRow { flex-wrap: nowrap; overflow-x: auto; gap: 4px; padding-bottom: 2px; scrollbar-width: none; }
+  .filterRow::-webkit-scrollbar { display: none; }
+  .filterRow .controlLabel { position: sticky; left: 0; z-index: 1; padding-right: 4px; background: var(--color-surface); }
+  .filterButton, .textButton { min-height: 24px; padding-inline: 6px; font-size: 10px; }
+  .sortRow { gap: 4px; }
+  .sortRow select { height: 24px; font-size: 10px; }
+  .cardViewport { max-height: calc(100dvh - var(--topbar-height) - env(safe-area-inset-top) - 138px); padding: 0 8px 10px; }
+  .modelGroup { margin-top: 8px; }
+  .cardGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .card { grid-template-columns: minmax(0, 1fr) 44px; border-top-width: 2px; border-radius: 7px; }
+  .cardHead { min-height: 24px; padding-inline: 6px; font-size: 9px; }
+  .cardHead span { padding-inline: 3px; font-size: 8px; }
+  .cardMain { min-height: 43px; padding-inline: 6px; font-size: 27px; }
+  .cardMeta { font-size: 9px; }
+  .cardMeta span { padding-inline: 2px; }
+  .footer { min-height: 32px; padding-inline: 10px; font-size: 9px; }
+}
+@keyframes radar-spin { to { transform: rotate(360deg); } }

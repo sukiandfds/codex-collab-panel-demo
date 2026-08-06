@@ -1,5 +1,28 @@
 # FEAT-002 更新记录
 
+### 2026-08-06 22:59 +08:00
+
+- 状态：in_progress
+- 本次更新：完成 M1 的第一组代码改动。群聊发送请求增加 `clientMessageId`；服务端对同一成员的同一客户端消息进行幂等写入并分配持久 `sequence`；前端发送后立即插入临时消息并清空输入框，SSE 或接口正式消息到达时按消息 ID/客户端 ID 原位对账；请求失败时只撤回对应临时消息。
+- 用户影响：文本消息不再必须等服务器响应后才出现在群里；接口重试不会再次创建同一条正式消息或重复启动同一轮 Agent 讨论；正式消息按服务端顺序显示。附件上传仍需在消息提交前完成，不属于本次速度改动。
+- 兼容处理：前端允许当前运行中的旧后台暂时不返回 `clientMessageId`，接口响应后仍会合并临时消息和正式消息，避免在受控重启前长期留下两条。
+- 额外修复：群聊状态文件恢复时不再丢弃只有附件、没有文字的消息。
+- 验证：`node --test windows/tests/group-room-store.test.mjs windows/tests/group-routes.test.mjs windows/tests/multi-agent-service.test.mjs windows/tests/artifact-service.test.mjs` 8/8 通过；相关 Node 语法检查通过；`pnpm build:ui` 通过；定向 `git diff --check` 通过。
+- 未验证：没有启动或重启服务；服务端幂等逻辑尚未加载到当前进程；没有进行真实手机、多网页、断线重连和请求超时验收。因此 M1 仍为部分实现，不能标记完成。
+- 下一步：受控重启并验收 M1；通过后进入 M2，将内存讨论队列升级为可恢复的 Task、AgentRun 和 ActivityEvent 账本。
+
+### 2026-08-06 22:48 +08:00
+
+- 状态：planned
+- 本次更新：根据用户确认，把 FEAT-002 的目标收敛为“单机多模型、多 Agent 协作地基”。用户从一个群聊入口发送消息；项目经理默认接收并判断直接回答、创建任务或请求补充信息；用户明确 `@` 时由目标 Agent 直接响应；被安排的 Worker 完成后在群内汇报结果。多电脑协作仅保留扩展可能，Orca 暂不作为初版底座或强依赖。
+- 计划评估：原计划总体方向合理，但不能直接开工。必须把消息幂等/顺序、任务账本、AgentRun、可恢复状态、上下文任务包、重复回复控制、停止/重试/审批和真实用户场景验收提前纳入。否则只能证明“模型被调用”，不能证明群聊协作可靠。
+- 计划调整：M0 目标基线；M1 消息可靠性；M2 Task/AgentRun/ActivityEvent；M3 项目经理路由；M4 `@Agent`；M5 Worker 任务包与群内汇报；M6 项目经理汇总与冲突；M7 继续/停止/重试/审批；M8 Runtime/Provider 扩展；M9 真实场景验收与文档交付。
+- 用户影响：初版完成后，用户不需要自己判断应该调用哪个模型；普通消息由项目经理判断，明确点名时直接找到对应 Agent；任务、进度、结果和交付物都能在原群聊中追踪，刷新或重连不应造成重复、乱序或任务消失。
+- 主要风险：当前原型的执行队列仍主要在内存中，Agent 调度仍以有限轮次讨论为主，尚无正式 Task/AgentRun 账本；服务重启恢复、重复事件幂等、统一汇报和高风险审批尚未实现。当前计划已将这些列为正式阶段门。
+- 证据：`windows/server/group-room-store.mjs`、`windows/server/multi-agent-service.mjs`、`docs/feature-development/features/FEAT-002-group-multi-agent.md`、`docs/feature-development/P0_INCIDENT_REVIEW_2026-07-29_ORCA_ROUTE2_SCOPE.md`。
+- 基线：`product_base_commit=d5b39e8be1e6273299d3606eef3d1153ba001f3e`；本次只更新项目管理记录，尚未产生产品代码提交或审计提交。
+- 下一步：等待用户确认本计划后，建立 FEAT-002 实施基线，先做 M1 消息可靠性与 M2 任务账本，不先增加 Agent 数量、不先接入 Orca 或多电脑调度。
+
 ### 2026-08-06 18:00 +08:00
 
 - 状态：direction_updated

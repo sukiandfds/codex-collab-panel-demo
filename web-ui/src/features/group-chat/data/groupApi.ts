@@ -1,5 +1,5 @@
 import { fetchJson, postJson, withAccessToken } from "../../../shared/api/http";
-import type { GroupMode, GroupSnapshot, StoredMember } from "../model/types";
+import type { GroupMode, GroupSendResponse, GroupSnapshot, StoredMember } from "../model/types";
 
 export const groupApi = {
   snapshot: (signal?: AbortSignal) => fetchJson<GroupSnapshot>("/api/group/snapshot", signal),
@@ -11,9 +11,9 @@ export const groupApi = {
     memberId: member.id,
     name: member.name,
   }, signal),
-  send: (member: StoredMember, mode: GroupMode, agentIds: string[], text: string, attachmentIds: string[] = [], signal?: AbortSignal) => postJson(
+  send: (member: StoredMember, mode: GroupMode, agentIds: string[], text: string, clientMessageId: string, attachmentIds: string[] = [], signal?: AbortSignal) => postJson<GroupSendResponse>(
     "/api/group/message",
-    { memberId: member.id, authorName: member.name, mode, agentIds, text, attachmentIds },
+    { memberId: member.id, authorName: member.name, mode, agentIds, text, attachmentIds, clientMessageId },
     signal,
   ),
   eventsUrl: () => withAccessToken("/events"),
