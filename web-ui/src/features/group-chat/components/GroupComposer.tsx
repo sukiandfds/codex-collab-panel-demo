@@ -152,18 +152,22 @@ export function GroupComposer({ mode, agentId, agents, members, disabled, error,
           onRemove={draft.removeFile}
           onCancelUpload={draft.cancelUpload}
         />
-        <div className={styles.composerFooter}>
-          <AttachmentButton disabled={disabled || draft.uploading} onFiles={draft.addFiles} />
-          <div className={styles.modeSwitch}>
-            <button className={mode === "discussion" ? styles.activeMode : ""} type="button" onClick={() => onModeChange("discussion")}><MessagesSquare />商讨</button>
-            <button className={mode === "development" ? styles.activeMode : ""} type="button" onClick={() => onModeChange("development")}><Bot />开发</button>
+        <div className={styles.footer}>
+          <div className={styles.leadingControls}>
+            <AttachmentButton disabled={disabled || draft.uploading} onFiles={draft.addFiles} />
           </div>
-          {mode === "development" ? (
-            <select value={agentId} onChange={(event) => onAgentChange(event.target.value)} aria-label="选择执行 Agent">
-              {agents.map((agent) => <option value={agent.id} key={agent.id}>{agent.name}</option>)}
-            </select>
-          ) : <span className={styles.modeHint}>项目经理 Agent</span>}
           <span className={styles.composerSpacer} />
+          <div className={styles.settingsControls}>
+            <div className={styles.modeSwitch}>
+              <button className={mode === "discussion" ? styles.activeMode : ""} type="button" onClick={() => onModeChange("discussion")}><MessagesSquare />商讨</button>
+              <button className={mode === "development" ? styles.activeMode : ""} type="button" onClick={() => onModeChange("development")}><Bot />开发</button>
+            </div>
+            {mode === "development" ? (
+              <select value={agentId} onChange={(event) => onAgentChange(event.target.value)} aria-label="选择执行 Agent">
+                {agents.map((agent) => <option value={agent.id} key={agent.id}>{agent.name}</option>)}
+              </select>
+            ) : <span className={styles.modeHint}>项目经理 Agent</span>}
+          </div>
           <button className={styles.sendButton} type="button" title="发送" aria-label="发送" disabled={disabled || draft.uploading || (!text.trim() && !draft.attachments.length)} onClick={() => void submit()}><ArrowUp /></button>
         </div>
       </div>

@@ -1,14 +1,15 @@
 .sidebar { min-width: 0; background: var(--color-sidebar); }
-.brand { display: flex; height: 54px; align-items: center; gap: 10px; padding: 0 15px; border-bottom: 1px solid #262626; color: #f2f2f2; font-size: 13px; font-weight: 600; }
-.brandMark { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid #464646; border-radius: 6px; background: #ececec; color: #141414; font-weight: 750; }
-.sidebarSection { padding: 18px 12px 6px; }
+.brandRow { display: flex; height: var(--topbar-height); align-items: center; padding: 0 16px; }
+.brand { font-size: 18px; font-weight: 670; }
+.projectHeader { display: flex; min-height: 38px; align-items: center; gap: 9px; margin: 0 7px 5px; padding: 0 9px; border-radius: 6px; color: var(--color-text); font-size: 13px; font-weight: 600; }
+.projectHeader svg { width: 16px; height: 16px; flex: 0 0 16px; color: var(--color-text-secondary); stroke-width: 1.7; }
+.projectHeader span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memberSection { padding: 12px 12px 8px; border-top: 1px solid var(--color-border); }
 .sectionLabel { display: flex; align-items: center; gap: 6px; margin: 0 4px 8px; color: #858585; font-size: 11px; font-weight: 600; }
 .sectionLabel svg { width: 13px; height: 13px; }
-.projectRow, .memberRow { display: flex; min-width: 0; align-items: center; gap: 9px; min-height: 36px; padding: 7px 8px; color: #d5d5d5; font-size: 13px; }
-.projectRow { border-radius: 6px; background: #222; }
-.projectRow svg { width: 15px; height: 15px; color: #a3a3a3; }
-.projectRow span, .memberRow span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memberRow { display: flex; min-width: 0; min-height: 36px; align-items: center; gap: 9px; padding: 6px 7px; border-radius: 6px; color: var(--color-text-secondary); font-size: 12px; }
+.memberRow span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .memberList { display: grid; gap: 2px; }
 .memberRow i { width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: #71bd76; }
-.avatar { display: grid; width: 24px; height: 24px; flex: 0 0 24px; place-items: center; border-radius: 50%; background: #333; color: #ddd; font-size: 11px; }
+.avatar { display: grid; width: 26px; height: 26px; flex: 0 0 26px; place-items: center; border: 1px solid var(--color-border-strong); border-radius: 6px; background: var(--color-surface-soft); color: var(--color-text-secondary); font-size: 11px; }
 .emptyText { display: block; padding: 8px; color: #777; font-size: 12px; }

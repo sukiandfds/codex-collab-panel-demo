@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { LoaderCircle } from "lucide-react";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { WindowBar } from "../../components/WindowBar/WindowBar";
 import type { ViewSurface } from "../../components/ViewSwitcher/ViewSwitcher";
@@ -12,6 +13,7 @@ import { useGroupRoom } from "./hooks/useGroupRoom";
 import type { GroupMode } from "./model/types";
 import { useDeviceInfo } from "../device/hooks/useDeviceInfo";
 import { useArtifacts } from "../artifacts/hooks/useArtifacts";
+import { RefreshNotice } from "../app-update/components/AppUpdateNotice";
 import styles from "./GroupApp.module.css";
 
 export function GroupApp({ active = true, onViewChange }: { active?: boolean; onViewChange?: (surface: Exclude<ViewSurface, "progress">) => void }) {
@@ -74,7 +76,17 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
             onRetryArtifact={artifactState.loadOne}
             onReviewArtifact={artifactState.review}
           />
-        ) : <main className={styles.loading}>{group.error || "正在连接项目群..."}</main>}
+        ) : group.error ? (
+          <main className={styles.loading}>
+            <RefreshNotice
+              surface="group"
+              title="项目群暂时未连接"
+              detail="连接没有响应，请刷新网页后重试。"
+              actionLabel="刷新网页"
+              onAction={() => window.location.reload()}
+            />
+          </main>
+        ) : <main className={styles.loading} role="status" aria-label="正在连接项目群"><LoaderCircle className={styles.spinner} aria-hidden="true" /></main>}
         composer={snapshot ? (
         <GroupComposer
           mode={mode}

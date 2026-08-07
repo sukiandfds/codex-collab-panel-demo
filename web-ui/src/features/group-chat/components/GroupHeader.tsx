@@ -1,4 +1,4 @@
-import { MessageSquareText, PanelLeft } from "lucide-react";
+import { MessageSquareText, PanelLeft, UserRound } from "lucide-react";
 import { ViewSwitcher, type ViewSurface } from "../../../components/ViewSwitcher/ViewSwitcher";
 import { DeviceStatus } from "../../device/components/DeviceStatus";
 import type { GroupAgent, GroupMember, StoredMember } from "../model/types";
@@ -26,10 +26,15 @@ export function GroupHeader({ roomName, connected, deviceName, members, agents, 
           <PanelLeft aria-hidden="true" />
         </button>
         <MessageSquareText className={styles.titleIcon} aria-hidden="true" />
-        <div className={styles.heading}><strong>{roomName}</strong><span>{activityText}</span></div>
+        <div className={styles.heading}>
+          <div className={styles.titleRow}><h1 className={styles.title}>{roomName}</h1></div>
+          <span className={styles.meta}>{activityText}</span>
+        </div>
         <span className={styles.spacer} />
         <ViewSwitcher current="group" onViewChange={onViewChange} />
-        <button className={styles.memberButton} type="button" onClick={onEditMember}>{member?.name || "设置身份"}</button>
+        <button className={styles.iconButton} type="button" aria-label="设置群聊身份" title={member?.name || "设置身份"} onClick={onEditMember}>
+          <UserRound aria-hidden="true" />
+        </button>
       </div>
       <div className={styles.statusbar}>
         <DeviceStatus name={deviceName} connected={connected} />

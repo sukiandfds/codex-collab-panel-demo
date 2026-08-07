@@ -31,16 +31,17 @@
   gap: 1px;
 }
 
-.heading strong,
-.heading span,
+.title,
+.meta,
 .activity {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.heading strong { color: var(--color-text); font-size: 14px; font-weight: 600; }
-.heading span { color: var(--color-text-muted); font-size: 11px; }
+.titleRow { display: flex; min-width: 0; align-items: center; gap: 3px; }
+.title { min-width: 0; margin: 0; color: var(--color-text); font-size: 14px; font-weight: 600; }
+.meta { color: var(--color-text-muted); font-size: 11px; }
 .spacer { flex: 1; }
 
 .statusbar {
@@ -55,24 +56,6 @@
 
 .statusDivider { flex: 0 0 auto; font-size: 11px; }
 .activity { min-width: 0; font-size: 11px; }
-
-.memberButton {
-  display: inline-flex;
-  min-height: 30px;
-  max-width: 120px;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 0 10px;
-  background: var(--color-surface-soft);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .iconButton {
   display: grid;
@@ -90,7 +73,6 @@
 .mobileOnly { display: none; }
 
 @media (hover: hover) {
-  .memberButton:hover,
   .iconButton:hover { background: var(--color-surface-hover); color: var(--color-text); }
 }
 
@@ -100,7 +82,6 @@
   .mobileOnly { display: grid; }
   .titleIcon { display: none; }
   .heading { flex: 1; }
-  .heading span { display: none; }
+  .meta { display: none; }
   .spacer { display: none; }
-  .memberButton { max-width: 78px; }
 }
