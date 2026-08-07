@@ -115,7 +115,7 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
     return threadId;
   };
 
-  const runAgent = async ({ agentId, mode, requestText, followUp, attachments, outputJob }) => {
+  const runAgent = async ({ agentId, mode, attachments, outputJob }) => {
     if (closed) throw new Error("多 Agent 服务已关闭");
     const agent = room.getAgent(agentId);
     if (!agent) throw Object.assign(new Error("Agent 不存在"), { statusCode: 404 });
@@ -125,7 +125,15 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
     const outputInstructions = outputJob && outputJob.agentId === agentId
       ? webOutputs.buildAgentInstructions(outputJob)
       : "";
-    const prompt = buildDiscussionPrompt({ agent, mode, requestText, snapshot: room.snapshot(), followUp, outputInstructions });
+    const roomSnapshot = room.snapshot();
+    const context = room.getAgentContext(agentId);
+    const prompt = buildDiscussionPrompt({
+      agent,
+      agents: roomSnapshot.agents,
+      mode,
+      messages: context.messages,
+      outputInstructions,
+    });
     activeModes.set(agentId, mode);
 
     let resolveRun;
@@ -146,7 +154,9 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
         input: inputFromAttachments(prompt, attachments),
         cwd: projectRoot,
       });
-      return await completion;
+      const result = await completion;
+      if (result.status === "completed") await room.advanceAgentContext(agentId, context.throughSequence);
+      return result;
     } catch (error) {
       if (currentRun?.threadId === threadId) currentRun = null;
       clearTimeout(timer);
@@ -173,9 +183,8 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
       if ((runCounts.get(agentId) || 0) >= limit) continue;
       if (agentId === "manager" && needsManagerFollowUp) needsManagerFollowUp = false;
 
-      const followUp = turns > 0;
       try {
-        const result = await runAgent({ agentId, mode, requestText, followUp, attachments, outputJob });
+        const result = await runAgent({ agentId, mode, attachments, outputJob });
         turns += 1;
         runCounts.set(agentId, (runCounts.get(agentId) || 0) + 1);
         if (outputJob && outputJob.agentId === agentId) {

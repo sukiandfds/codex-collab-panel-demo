@@ -34,6 +34,7 @@ const agentDefinitions = [
 ];
 
 const cleanText = (value, maxLength) => String(value || "").trim().slice(0, maxLength);
+const safeSequence = (value) => Number.isSafeInteger(value) && value >= 0 ? value : 0;
 
 const initialAgent = (definition, saved = {}) => ({
   ...definition,
@@ -52,7 +53,13 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
   } catch {}
 
   const savedAgents = new Map((Array.isArray(stored.agents) ? stored.agents : []).map((agent) => [agent.id, agent]));
+  const storedContextSequences = stored.agentContextSequences && typeof stored.agentContextSequences === "object"
+    && !Array.isArray(stored.agentContextSequences) ? stored.agentContextSequences : {};
   const agents = new Map(agentDefinitions.map((definition) => [definition.id, initialAgent(definition, savedAgents.get(definition.id))]));
+  const agentContextSequences = new Map(agentDefinitions.map((definition) => [
+    definition.id,
+    safeSequence(storedContextSequences[definition.id]),
+  ]));
   const messages = (Array.isArray(stored.messages) ? stored.messages : [])
     .filter((message) => message?.id && message?.createdAt
       && (message?.text || (Array.isArray(message?.attachments) && message.attachments.length)))
@@ -70,9 +77,10 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
 
   const persist = () => {
     const payload = JSON.stringify({
-      version: 2,
+      version: 3,
       messages: messages.slice(-300),
       agents: [...agents.values()].map(({ instructions, ...agent }) => agent),
+      agentContextSequences: Object.fromEntries(agentContextSequences),
     }, null, 2);
     writeQueue = writeQueue
       .catch(() => {})
@@ -161,6 +169,26 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
 
   const getAgent = (agentId) => agents.get(agentId) || null;
   const getMessage = (messageId) => messages.find((message) => message.id === messageId) || null;
+  const getAgentContext = (agentId) => {
+    const afterSequence = agentContextSequences.get(agentId) || 0;
+    const throughSequence = nextMessageSequence;
+    return {
+      afterSequence,
+      throughSequence,
+      messages: messages.filter((message) => message.sequence > afterSequence
+        && message.sequence <= throughSequence),
+    };
+  };
+
+  const advanceAgentContext = async (agentId, sequence) => {
+    if (!agents.has(agentId)) throw Object.assign(new Error("Agent does not exist"), { statusCode: 404 });
+    const current = agentContextSequences.get(agentId) || 0;
+    const next = Math.max(current, safeSequence(sequence));
+    if (next === current) return current;
+    agentContextSequences.set(agentId, next);
+    await persist();
+    return next;
+  };
 
   const attachArtifact = async (messageId, artifactId) => {
     const message = getMessage(cleanText(messageId, 80));
@@ -193,6 +221,8 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     addMessageWithStatus,
     getAgent,
     getMessage,
+    getAgentContext,
+    advanceAgentContext,
     attachArtifact,
     updateAgent,
     close: () => writeQueue,
