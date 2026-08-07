@@ -117,16 +117,6 @@ type ConversationItem =
   | { id: string; type: "message"; message: SessionMessage; streaming: boolean }
   | { id: string; type: "execution" };
 
-type OlderAnchor = {
-  id: string;
-  top: number;
-  firstMessageId: string;
-  messageCount: number;
-  scrollTop: number;
-  scrollHeight: number;
-  threadId: string;
-};
-
 export function ConversationView({
   active = true,
   session,
@@ -149,7 +139,6 @@ export function ConversationView({
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingOlderThreadsRef = useRef(new Set<string>());
   const olderLoadTimersRef = useRef(new Map<string, number>());
-  const olderAnchorRef = useRef<OlderAnchor | null>(null);
   const scrollPositionsRef = useRef(new Map<string, number>());
   const followLatestFrameRef = useRef(0);
   const initialPositionFrameRef = useRef(0);
@@ -157,7 +146,6 @@ export function ConversationView({
   const stickToBottomRef = useRef(true);
   const [hasNewActivity, setHasNewActivity] = useState(false);
   const messages = session?.messages || [];
-  const firstMessageId = messages[0]?.id || "";
   const executionMatchesSession = executionStatus.threadId === session?.threadId;
   const completedExecution = ["completed", "failed", "interrupted", "systemError"].includes(executionStatus.phase);
   if (executionMatchesSession && executionStatus.active && executionStatus.threadId) {
@@ -209,29 +197,14 @@ export function ConversationView({
       : visibleItems[index]?.message.role === "user" ? 84 : 160,
     overscan: 6,
     getItemKey: (index) => visibleItems[index]?.id || index,
+    anchorTo: "end",
+    followOnAppend: false,
   });
 
   const rememberScrollPosition = useCallback((root = scrollRef.current, threadId = session?.threadId) => {
     if (!root || !threadId) return;
     scrollPositionsRef.current.set(threadId, root.scrollTop);
   }, [session?.threadId]);
-
-  const captureOlderAnchor = useCallback((root: HTMLDivElement, threadId: string) => {
-    const rootTop = root.getBoundingClientRect().top;
-    const anchor = Array.from(root.querySelectorAll<HTMLElement>("[data-message-id]"))
-      .map((element) => ({ element, rect: element.getBoundingClientRect() }))
-      .find(({ rect }) => rect.bottom > rootTop);
-    if (!anchor) return;
-    olderAnchorRef.current = {
-      id: anchor.element.dataset.messageId || "",
-      top: anchor.rect.top,
-      firstMessageId,
-      messageCount: messages.length,
-      scrollTop: root.scrollTop,
-      scrollHeight: root.scrollHeight,
-      threadId,
-    };
-  }, [firstMessageId, messages.length]);
 
   const scheduleFollowLatest = useCallback(() => {
     window.cancelAnimationFrame(followLatestFrameRef.current);
@@ -245,32 +218,6 @@ export function ConversationView({
   useLayoutEffect(() => {
     if (!active) window.cancelAnimationFrame(followLatestFrameRef.current);
   }, [active]);
-
-  useLayoutEffect(() => {
-    if (!active) return;
-    const anchor = olderAnchorRef.current;
-    const root = scrollRef.current;
-    if (!anchor || !root || session?.threadId !== anchor.threadId) return;
-    if (messages.length <= anchor.messageCount || firstMessageId === anchor.firstMessageId) return;
-
-    const restoreAnchor = () => {
-      const nextAnchor = Array.from(root.querySelectorAll<HTMLElement>("[data-message-id]"))
-        .find((element) => element.dataset.messageId === anchor.id);
-      if (nextAnchor) {
-        root.scrollTop += nextAnchor.getBoundingClientRect().top - anchor.top;
-      } else {
-        root.scrollTop = anchor.scrollTop + Math.max(0, root.scrollHeight - anchor.scrollHeight);
-      }
-      rememberScrollPosition(root, anchor.threadId);
-    };
-
-    restoreAnchor();
-    window.requestAnimationFrame(() => {
-      if (olderAnchorRef.current !== anchor || !scrollRef.current) return;
-      restoreAnchor();
-      olderAnchorRef.current = null;
-    });
-  }, [active, firstMessageId, messages.length, rememberScrollPosition, session?.threadId, virtualizer]);
 
   useLayoutEffect(() => {
     if (!active) return;
@@ -377,11 +324,9 @@ export function ConversationView({
         window.clearTimeout(pendingTimer);
         olderLoadTimersRef.current.delete(threadId);
         loadingOlderThreadsRef.current.delete(threadId);
-        if (olderAnchorRef.current?.threadId === threadId) olderAnchorRef.current = null;
         return;
       }
       if (threadId && loadingOlderThreadsRef.current.has(threadId)) {
-        captureOlderAnchor(root, threadId);
         return;
       }
       if (
@@ -391,23 +336,14 @@ export function ConversationView({
         || contentSyncState === "recovering"
       ) return;
       loadingOlderThreadsRef.current.add(threadId);
-      captureOlderAnchor(root, threadId);
       const timer = window.setTimeout(() => {
         olderLoadTimersRef.current.delete(threadId);
         if (disposed || !active || session?.threadId !== threadId || root.scrollTop > 140 || !session?.hasMore) {
           loadingOlderThreadsRef.current.delete(threadId);
-          if (olderAnchorRef.current?.threadId === threadId) olderAnchorRef.current = null;
           return;
         }
         void onLoadOlder().finally(() => {
           loadingOlderThreadsRef.current.delete(threadId);
-          if (!disposed) {
-            window.requestAnimationFrame(() => {
-              window.requestAnimationFrame(() => {
-                if (olderAnchorRef.current?.threadId === threadId) olderAnchorRef.current = null;
-              });
-            });
-          }
         });
       }, 140);
       olderLoadTimersRef.current.set(threadId, timer);
@@ -424,7 +360,7 @@ export function ConversationView({
         loadingOlderThreadsRef.current.delete(threadId);
       }
     };
-  }, [active, captureOlderAnchor, contentSyncState, onLoadOlder, rememberScrollPosition, session, session?.hasMore, virtualizer]);
+  }, [active, contentSyncState, onLoadOlder, rememberScrollPosition, session, session?.hasMore]);
 
   return (
     <div className={styles.viewport}>
