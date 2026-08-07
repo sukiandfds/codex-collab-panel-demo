@@ -120,6 +120,7 @@ type ConversationItem =
 type OlderAnchor = {
   id: string;
   top: number;
+  firstMessageId: string;
   messageCount: number;
   scrollTop: number;
   scrollHeight: number;
@@ -151,10 +152,12 @@ export function ConversationView({
   const olderAnchorRef = useRef<OlderAnchor | null>(null);
   const scrollPositionsRef = useRef(new Map<string, number>());
   const followLatestFrameRef = useRef(0);
+  const initialPositionFrameRef = useRef(0);
   const observedActiveThreadsRef = useRef(new Set<string>());
   const stickToBottomRef = useRef(true);
   const [hasNewActivity, setHasNewActivity] = useState(false);
   const messages = session?.messages || [];
+  const firstMessageId = messages[0]?.id || "";
   const executionMatchesSession = executionStatus.threadId === session?.threadId;
   const completedExecution = ["completed", "failed", "interrupted", "systemError"].includes(executionStatus.phase);
   if (executionMatchesSession && executionStatus.active && executionStatus.threadId) {
@@ -222,12 +225,13 @@ export function ConversationView({
     olderAnchorRef.current = {
       id: anchor.element.dataset.messageId || "",
       top: anchor.rect.top,
+      firstMessageId,
       messageCount: messages.length,
       scrollTop: root.scrollTop,
       scrollHeight: root.scrollHeight,
       threadId,
     };
-  }, [messages.length]);
+  }, [firstMessageId, messages.length]);
 
   const scheduleFollowLatest = useCallback(() => {
     window.cancelAnimationFrame(followLatestFrameRef.current);
@@ -246,9 +250,9 @@ export function ConversationView({
     if (!active) return;
     const anchor = olderAnchorRef.current;
     const root = scrollRef.current;
-    if (!anchor || !root || loadingOlder || session?.threadId !== anchor.threadId || messages.length <= anchor.messageCount) return;
+    if (!anchor || !root || session?.threadId !== anchor.threadId) return;
+    if (messages.length <= anchor.messageCount || firstMessageId === anchor.firstMessageId) return;
 
-    virtualizer.measure();
     const restoreAnchor = () => {
       const nextAnchor = Array.from(root.querySelectorAll<HTMLElement>("[data-message-id]"))
         .find((element) => element.dataset.messageId === anchor.id);
@@ -263,30 +267,34 @@ export function ConversationView({
     restoreAnchor();
     window.requestAnimationFrame(() => {
       if (olderAnchorRef.current !== anchor || !scrollRef.current) return;
-      virtualizer.measure();
       restoreAnchor();
       olderAnchorRef.current = null;
     });
-  }, [active, loadingOlder, messages.length, rememberScrollPosition, session?.threadId, virtualizer]);
+  }, [active, firstMessageId, messages.length, rememberScrollPosition, session?.threadId, virtualizer]);
 
   useLayoutEffect(() => {
     if (!active) return;
     if (!loading && session && scrollRef.current) {
       const savedTop = scrollPositionsRef.current.get(session.threadId);
+      const threadId = session.threadId;
       setHasNewActivity(false);
       window.cancelAnimationFrame(followLatestFrameRef.current);
-      virtualizer.measure();
-      if (savedTop !== undefined) {
-        virtualizer.scrollToOffset(savedTop, { align: "start" });
+      window.cancelAnimationFrame(initialPositionFrameRef.current);
+      initialPositionFrameRef.current = window.requestAnimationFrame(() => {
         const root = scrollRef.current;
-        stickToBottomRef.current = root.scrollHeight - root.scrollTop - root.clientHeight < 120;
-        rememberScrollPosition(root, session.threadId);
-        return;
-      }
-      stickToBottomRef.current = true;
-      virtualizer.scrollToIndex(Math.max(0, visibleItemsLengthRef.current - 1), { align: "end" });
-      rememberScrollPosition(scrollRef.current, session.threadId);
+        if (!root) return;
+        if (savedTop !== undefined) {
+          virtualizer.scrollToOffset(savedTop, { align: "start" });
+          stickToBottomRef.current = root.scrollHeight - root.scrollTop - root.clientHeight < 120;
+          rememberScrollPosition(root, threadId);
+          return;
+        }
+        stickToBottomRef.current = true;
+        virtualizer.scrollToIndex(Math.max(0, visibleItemsLengthRef.current - 1), { align: "end" });
+        rememberScrollPosition(root, threadId);
+      });
     }
+    return () => window.cancelAnimationFrame(initialPositionFrameRef.current);
   }, [active, loading, rememberScrollPosition, session?.threadId, virtualizer]);
 
   useEffect(() => {

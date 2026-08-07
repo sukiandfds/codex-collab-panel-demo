@@ -153,7 +153,7 @@ const cleanUserAttachmentEnvelope = (blocks) => blocks.flatMap((block) => {
   if (block.type !== "markdown") return [block];
   const text = String(block.text || "");
   if (!text.trimStart().startsWith("# Files mentioned by the user:")) return [block];
-  const marker = /^## My request for Codex:\s*$/mu.exec(text);
+  const marker = /^## My request(?: for Codex)?:\s*$/mu.exec(text);
   if (!marker) return [block];
   const cleaned = text.slice(marker.index + marker[0].length).trim();
   return cleaned ? [{ ...block, text: cleaned }] : [];

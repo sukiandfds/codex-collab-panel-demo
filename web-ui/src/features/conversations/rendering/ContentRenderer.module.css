@@ -94,12 +94,30 @@
 .imagePending {
   visibility: hidden;
 }
-@media (max-width: 760px) {
-  .imagePending,
-  .imageReady,
-  .imageFailed {
-    width: calc((100% - 12px) / 2);
-  }
+.imageGallery {
+  display: grid;
+  width: min(100%, 520px);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  margin: 6px 0;
+}
+.imageGallerySingle {
+  display: block;
+  width: min(100%, 360px);
+}
+.imageGallery .imageThumbnail {
+  width: 100%;
+  max-height: none;
+  margin: 0;
+}
+.imageGallery .imageThumbnail img {
+  max-height: none;
+}
+.imageGallery .galleryImage img {
+  object-fit: cover;
+}
+.imageGallery .singleImage img {
+  object-fit: contain;
 }
 .imageError {
   display: flex;

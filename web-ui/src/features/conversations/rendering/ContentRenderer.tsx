@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Download, FileText, ImageOff, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ContentBlock, SessionMessage } from "../model/types";
+import type { ContentBlock, ImageBlock, SessionMessage } from "../model/types";
 import { withAccessToken } from "../../../shared/api/http";
 import styles from "./ContentRenderer.module.css";
 
@@ -43,7 +43,21 @@ function rememberImageDimensions(source: string, dimensions: ImageDimensions) {
   imageDimensionsCache.set(source, dimensions);
 }
 
-function RenderedImage({ source, alt, width, height }: { source: string; alt: string; width?: number; height?: number }) {
+type ImageLayout = "default" | "gallery" | "single";
+
+function RenderedImage({
+  source,
+  alt,
+  width,
+  height,
+  layout = "default",
+}: {
+  source: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  layout?: ImageLayout;
+}) {
   const url = sourceUrl(source);
   const thumbnailUrl = previewUrl(source);
   const [dimensions, setDimensions] = useState<ImageDimensions | null>(() => {
@@ -53,6 +67,7 @@ function RenderedImage({ source, alt, width, height }: { source: string; alt: st
   const [failed, setFailed] = useState(!source);
   const [isOpen, setIsOpen] = useState(false);
   const imageClass = failed ? styles.imageFailed : dimensions ? styles.imageReady : styles.imagePending;
+  const layoutClass = layout === "gallery" ? styles.galleryImage : layout === "single" ? styles.singleImage : "";
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -98,7 +113,7 @@ function RenderedImage({ source, alt, width, height }: { source: string; alt: st
     <>
       <button
         type="button"
-        className={`${styles.imageThumbnail} ${imageClass}`}
+        className={`${styles.imageThumbnail} ${imageClass} ${layoutClass}`}
         onClick={openViewer}
         aria-label={failed ? "图片无法显示" : `查看大图${alt ? `：${alt}` : ""}`}
         disabled={failed}
@@ -150,6 +165,24 @@ function RenderedImage({ source, alt, width, height }: { source: string; alt: st
   );
 }
 
+function ImageGallery({ blocks }: { blocks: ImageBlock[] }) {
+  const single = blocks.length === 1;
+  return (
+    <div className={`${styles.imageGallery} ${single ? styles.imageGallerySingle : ""}`}>
+      {blocks.map((block) => (
+        <RenderedImage
+          key={block.id}
+          source={block.source}
+          alt={block.alt || block.file?.name || "对话图片"}
+          width={block.width || block.file?.width}
+          height={block.height || block.file?.height}
+          layout={single ? "single" : "gallery"}
+        />
+      ))}
+    </div>
+  );
+}
+
 function Block({ block }: { block: ContentBlock }) {
   if (block.type === "markdown") {
     return (
@@ -196,5 +229,21 @@ export function ContentRenderer({ message }: { message: SessionMessage }) {
   const blocks = message.blocks?.length
     ? message.blocks
     : [{ id: `${message.id}-text`, type: "markdown" as const, text: message.text }];
-  return <div className={styles.content}>{blocks.map((block) => <Block key={block.id} block={block} />)}</div>;
+  const content = [];
+  for (let index = 0; index < blocks.length;) {
+    const block = blocks[index];
+    if (block.type !== "image") {
+      content.push(<Block key={block.id} block={block} />);
+      index += 1;
+      continue;
+    }
+
+    const images: ImageBlock[] = [];
+    while (index < blocks.length && blocks[index].type === "image") {
+      images.push(blocks[index] as ImageBlock);
+      index += 1;
+    }
+    content.push(<ImageGallery key={`gallery-${images[0].id}`} blocks={images} />);
+  }
+  return <div className={styles.content}>{content}</div>;
 }
