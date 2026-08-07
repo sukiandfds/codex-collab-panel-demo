@@ -9,12 +9,6 @@
   background: var(--color-sidebar);
 }
 
-.brandRow,
-.projectHeader { display: flex; align-items: center; }
-.brandRow { justify-content: space-between; height: var(--topbar-height); padding: 0 11px 0 16px; }
-.brand { display: flex; align-items: center; gap: 4px; font-size: 18px; font-weight: 670; }
-.actions { display: flex; align-items: center; }
-
 .iconButton {
   display: grid;
   place-items: center;
@@ -30,10 +24,6 @@
 .iconButton svg { width: 15px; height: 15px; stroke-width: 1.7; }
 .iconButton:disabled { opacity: .45; }
 .activeAction { background: var(--color-surface-active); color: var(--color-text); }
-.projectHeader { gap: 9px; min-height: 38px; margin: 0 7px 5px; padding: 0 9px; border-radius: 6px; color: var(--color-text); font-size: 13px; font-weight: 600; }
-.projectHeader svg { width: 16px; height: 16px; flex: 0 0 16px; color: var(--color-text-secondary); stroke-width: 1.7; }
-.projectHeader span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 @media (hover: hover) {
   .iconButton:hover { background: var(--color-surface-hover); color: var(--color-text); }
 }

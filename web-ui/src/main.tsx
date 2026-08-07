@@ -15,6 +15,7 @@ const dismissLaunchScreen = () => {
 };
 
 window.addEventListener("negus:app-ready", dismissLaunchScreen, { once: true });
+window.setTimeout(dismissLaunchScreen, 100);
 
 let viewportFrame = 0;
 const applyViewportGeometry = () => {

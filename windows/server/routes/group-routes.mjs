@@ -10,6 +10,18 @@ export const createGroupRoutes = ({ groupRoom, media, multiAgent, webOutputs }) 
     sendJson(response, groupRoom.touchMember(body.memberId, body.name));
     return true;
   }
+  if (url.pathname === "/api/group/agent-settings" && request.method === "POST") {
+    const body = await readJson(request);
+    const agentId = String(body.agentId || "").trim();
+    const model = String(body.model || "").trim();
+    const reasoningEffort = String(body.reasoningEffort || "").trim();
+    if (!agentId || !model || !reasoningEffort) {
+      sendJson(response, { error: "Agent、模型和推理强度不能为空" }, 400);
+      return true;
+    }
+    sendJson(response, await multiAgent.updateAgentSettings(agentId, { model, reasoningEffort }));
+    return true;
+  }
   if (url.pathname !== "/api/group/message" || request.method !== "POST") return false;
 
   const body = await readJson(request);

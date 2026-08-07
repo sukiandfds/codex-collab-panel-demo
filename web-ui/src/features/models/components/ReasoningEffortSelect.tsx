@@ -1,5 +1,5 @@
 import type { CodexModel } from "../model/types";
-import { formatReasoningEffort } from "../model/reasoningEffortLabels";
+import { formatReasoningEffort, reasoningEffortDescription } from "../model/reasoningEffortLabels";
 import styles from "./ModelSelect.module.css";
 
 interface ReasoningEffortSelectProps {
@@ -28,11 +28,14 @@ export function ReasoningEffortSelect({
       onChange={(event) => void onChange(event.target.value)}
     >
       {!selected ? <option value="">推理强度</option> : null}
-      {options.map((entry) => (
-        <option key={entry.reasoningEffort} value={entry.reasoningEffort}>
-          {formatReasoningEffort(entry.reasoningEffort)}
-        </option>
-      ))}
+      {options.map((entry) => {
+        const description = reasoningEffortDescription(entry.reasoningEffort);
+        return (
+          <option key={entry.reasoningEffort} value={entry.reasoningEffort}>
+            {formatReasoningEffort(entry.reasoningEffort)}{description ? ` · ${description}` : ""}
+          </option>
+        );
+      })}
     </select>
   );
 }

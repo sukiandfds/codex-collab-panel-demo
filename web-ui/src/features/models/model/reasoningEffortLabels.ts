@@ -1,13 +1,16 @@
 const reasoningEffortLabels: Record<string, string> = {
-  low: "低",
-  medium: "中",
-  high: "高",
-  xhigh: "超高",
-  max: "极高",
-  ultra: "最高",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "Extra High",
+  max: "Max",
+  ultra: "Ultra",
 };
 
 export function formatReasoningEffort(reasoningEffort: string): string {
-  const label = reasoningEffortLabels[reasoningEffort];
-  return label ? `${label} (${reasoningEffort})` : reasoningEffort;
+  return reasoningEffortLabels[reasoningEffort] || reasoningEffort;
+}
+
+export function reasoningEffortDescription(reasoningEffort: string): string {
+  return reasoningEffort === "ultra" ? "更快消耗使用额度" : "";
 }

@@ -14,6 +14,8 @@ export interface GroupAgent {
   name: string;
   shortName: string;
   responsibility: string;
+  model?: string;
+  reasoningEffort?: string;
   threadId: string | null;
   phase: string;
   label: string;
@@ -46,6 +48,10 @@ export interface GroupSnapshot {
   agents: GroupAgent[];
   members: GroupMember[];
 }
+
+export type GroupProfile =
+  | { kind: "agent"; profile: GroupAgent }
+  | { kind: "member"; profile: GroupMember };
 
 export interface StoredMember {
   id: string;

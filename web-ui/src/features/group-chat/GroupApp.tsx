@@ -7,10 +7,11 @@ import { AgentRoster } from "./components/AgentRoster";
 import { GroupComposer } from "./components/GroupComposer";
 import { GroupHeader } from "./components/GroupHeader";
 import { MemberDialog } from "./components/MemberDialog";
+import { MemberProfileDrawer } from "./components/MemberProfileDrawer";
 import { MessageTimeline } from "./components/MessageTimeline";
 import { RoomSidebar } from "./components/RoomSidebar";
 import { useGroupRoom } from "./hooks/useGroupRoom";
-import type { GroupMode } from "./model/types";
+import type { GroupMode, GroupProfile } from "./model/types";
 import { useDeviceInfo } from "../device/hooks/useDeviceInfo";
 import { useArtifacts } from "../artifacts/hooks/useArtifacts";
 import { RefreshNotice } from "../app-update/components/AppUpdateNotice";
@@ -21,14 +22,13 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
   const device = useDeviceInfo(group.connected);
   const [mode, setMode] = useState<GroupMode>("discussion");
   const [agentId, setAgentId] = useState("manager");
-  const [editingMember, setEditingMember] = useState(false);
+  const [profile, setProfile] = useState<GroupProfile | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const snapshot = group.snapshot;
   const artifactIds = useMemo(() => snapshot?.messages.flatMap((message) => message.artifactIds || []) || [], [snapshot?.messages]);
   const artifactState = useArtifacts(artifactIds, group.artifactEvent);
   const join = async (name: string) => {
     await group.join(name);
-    setEditingMember(false);
   };
 
   useEffect(() => {
@@ -47,8 +47,8 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
         onCloseSidebar={() => setSidebarOpen(false)}
         sidebar={
           <div className={styles.sidebarContent}>
-            <RoomSidebar project={snapshot?.project || "Negus"} members={members} />
-            <AgentRoster agents={agents} selectedId={agentId} onSelect={(id) => { setAgentId(id); setMode("development"); setSidebarOpen(false); }} />
+            <RoomSidebar project={snapshot?.project || "Negus"} members={members} onOpenProfile={(member) => { setProfile({ kind: "member", profile: member }); setSidebarOpen(false); }} />
+            <AgentRoster agents={agents} onOpenProfile={(agent) => { setProfile({ kind: "agent", profile: agent }); setSidebarOpen(false); }} />
           </div>
         }
         header={
@@ -58,8 +58,6 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
             deviceName={device?.name}
             members={members}
             agents={agents}
-            member={group.member}
-            onEditMember={() => setEditingMember(true)}
             onOpenSidebar={() => setSidebarOpen(true)}
             onViewChange={onViewChange}
           />
@@ -68,6 +66,7 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
           <MessageTimeline
             messages={snapshot.messages}
             agents={agents}
+            members={members}
             streaming={group.streaming}
             artifacts={artifactState.artifacts}
             artifactLoadErrors={artifactState.loadErrors}
@@ -75,6 +74,7 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
             reviewerName={group.member?.name || "当前成员"}
             onRetryArtifact={artifactState.loadOne}
             onReviewArtifact={artifactState.review}
+            onOpenProfile={setProfile}
           />
         ) : group.error ? (
           <main className={styles.loading}>
@@ -101,7 +101,12 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
         />
         ) : <div className={styles.composerPlaceholder} />}
       />
-      <MemberDialog initialName={group.member?.name || ""} open={!group.member || editingMember} onSubmit={join} />
+      <MemberDialog initialName={group.member?.name || ""} open={!group.member} onSubmit={join} />
+      <MemberProfileDrawer
+        profile={profile}
+        onClose={() => setProfile(null)}
+        onAgentUpdated={(agent) => setProfile({ kind: "agent", profile: agent })}
+      />
     </>
   );
 }

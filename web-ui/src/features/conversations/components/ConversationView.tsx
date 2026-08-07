@@ -292,11 +292,16 @@ export function ConversationView({
     const root = scrollRef.current;
     if (!root || typeof ResizeObserver === "undefined") return undefined;
     let previousHeight = root.clientHeight;
+    let previousViewportHeight = Math.round(window.visualViewport?.height || window.innerHeight);
     let frame = 0;
     const observer = new ResizeObserver(() => {
       const nextHeight = root.clientHeight;
+      const nextViewportHeight = Math.round(window.visualViewport?.height || window.innerHeight);
+      const viewportChanged = nextViewportHeight !== previousViewportHeight;
+      previousViewportHeight = nextViewportHeight;
       if (nextHeight === previousHeight) return;
       previousHeight = nextHeight;
+      if (!viewportChanged) return;
       if (!stickToBottomRef.current) return;
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(scheduleFollowLatest);

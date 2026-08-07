@@ -56,7 +56,6 @@ export function ConversationComposer({
   onReasoningEffortChange,
 }: ConversationComposerProps) {
   const [text, setText] = useState("");
-  const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submittingRef = useRef(false);
   const draft = useAttachmentDraft();
@@ -102,7 +101,7 @@ export function ConversationComposer({
     const textarea = textareaRef.current;
     if (!textarea) return;
     textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+    textarea.style.height = `${textarea.scrollHeight}px`;
   }, [text]);
 
   return (
@@ -118,7 +117,7 @@ export function ConversationComposer({
         onSendNow={onSendQueueItem}
       />
       <div
-        className={`${styles.composer} ${focused ? styles.focused : ""}`}
+        className={styles.composer}
         aria-label="Codex 对话输入"
         onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }}
         onDrop={(event) => {
@@ -150,8 +149,6 @@ export function ConversationComposer({
           value={text}
           placeholder={!selected ? "请选择一个对话" : archived ? "已归档，请先恢复对话" : status.active ? "追加指令，引导当前任务" : "给 Codex 发送指令"}
           disabled={inputDisabled}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           onChange={(event) => setText(event.target.value)}
           onPaste={(event) => {
             if (!event.clipboardData.files.length) return;

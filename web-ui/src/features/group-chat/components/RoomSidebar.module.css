@@ -7,7 +7,8 @@
 .memberSection { padding: 12px 12px 8px; border-top: 1px solid var(--color-border); }
 .sectionLabel { display: flex; align-items: center; gap: 6px; margin: 0 4px 8px; color: #858585; font-size: 11px; font-weight: 600; }
 .sectionLabel svg { width: 13px; height: 13px; }
-.memberRow { display: flex; min-width: 0; min-height: 36px; align-items: center; gap: 9px; padding: 6px 7px; border-radius: 6px; color: var(--color-text-secondary); font-size: 12px; }
+.memberRow { display: flex; width: 100%; min-width: 0; min-height: 36px; align-items: center; gap: 9px; border: 0; border-radius: 6px; padding: 6px 7px; background: transparent; color: var(--color-text-secondary); cursor: pointer; font: inherit; font-size: 12px; text-align: left; }
+.memberRow:hover { background: var(--color-surface-hover); color: var(--color-text); }
 .memberRow span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .memberList { display: grid; gap: 2px; }
 .memberRow i { width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: #71bd76; }

@@ -8,12 +8,12 @@ const APP_SHELL = [
   "/project-management.html",
   "/progress",
   "/project-management",
-  "/manifest.webmanifest",
-  "/icons/negus-icon-v1.svg",
-  "/icons/negus-icon-192-v1.png",
-  "/icons/negus-icon-512-v1.png",
-  "/icons/negus-icon-maskable-512-v1.png",
-  "/icons/negus-apple-touch-icon-v1.png",
+  "/manifest.webmanifest?v=negus-4",
+  "/icons/negus-icon-v2.svg",
+  "/icons/negus-icon-192-v2.png",
+  "/icons/negus-icon-512-v2.png",
+  "/icons/negus-icon-maskable-512-v2.png",
+  "/icons/negus-apple-touch-icon-v2.png",
 ];
 
 self.addEventListener("install", (event) => {

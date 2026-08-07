@@ -5,16 +5,16 @@ title: 项目群聊与多 Agent 协作
 category: development
 priority: P1
 status: in_progress
-updated_at: 2026-08-06 22:59 +08:00
+updated_at: 2026-08-06 23:24 +08:00
 source: docs/feature-development/features/FEAT-002-group-multi-agent.md
 related: [FEAT-001, FEAT-003, FEAT-005, FEAT-007, FEAT-010]
 product_base_commit: d5b39e8be1e6273299d3606eef3d1153ba001f3e
-product_commit: pending
+product_commit: 21d3671f5cb4a761ef14a374e6405acb2f911bf1
 docs_commit: pending
 audited_product_commit: pending
 sync_status: docs_pending
-next_action: 受控重启后验收 M1 消息即时显示、重试防重和顺序稳定，再进入 M2 任务账本
-last_user_visible_change: 群聊前端发送后立即显示并清空输入框；服务端重试防重需重启加载后生效
+next_action: 用户在手机和电脑上验收对话/群聊切换速度、布局连续性和返回后的状态保留，再进入 M2 任务账本
+last_user_visible_change: 对话与群聊改为同一页面内切换，共用稳定外壳和手机视口处理，各自保留独立业务状态与快照
 ---
 
 # 项目群聊与多 Agent 协作

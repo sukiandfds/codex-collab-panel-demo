@@ -41,6 +41,7 @@
 
 .titleRow { display: flex; min-width: 0; align-items: center; gap: 3px; }
 .title { min-width: 0; margin: 0; color: var(--color-text); font-size: 14px; font-weight: 600; }
+.memberCount { color: var(--color-text-muted); font-size: 11px; }
 .meta { color: var(--color-text-muted); font-size: 11px; }
 .spacer { flex: 1; }
 

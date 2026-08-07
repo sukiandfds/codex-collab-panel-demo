@@ -6,6 +6,9 @@ import { completeOutputJob } from "./multi-agent/output-job.mjs";
 import { agentStateFromItem, terminalAgentPhases } from "./multi-agent/protocol-state.mjs";
 
 const maxDiscussionTurns = 4;
+const missingThreadPattern = /\bthread(?:\s+id)?\s+not\s+found\b/iu;
+
+const isMissingThreadError = (error) => missingThreadPattern.test(String(error?.message || error));
 
 export { buildDiscussionPrompt, mentionedAgentIds } from "./multi-agent/discussion-prompt.mjs";
 
@@ -29,6 +32,34 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
   const finishStatus = (agentId, patch) => {
     activeModes.delete(agentId);
     void setStatus(agentId, { active: false, ...patch });
+  };
+
+  const clearAgentThread = async (agent) => {
+    const threadId = agent?.threadId;
+    if (!threadId) return room.getAgent(agent?.id) || agent;
+    threadAgents.delete(threadId);
+    const current = room.getAgent(agent.id);
+    if (!current || current.threadId !== threadId) return current || agent;
+    return room.updateAgent(agent.id, {
+      threadId: null,
+      phase: "idle",
+      label: "尚未启动",
+      detail: "",
+      active: false,
+    });
+  };
+
+  const applyAgentSettings = async (agent) => {
+    if (!agent.threadId) return true;
+    try {
+      if (agent.model) await client.request("thread/settings/update", { threadId: agent.threadId, model: agent.model });
+      if (agent.reasoningEffort) await client.request("thread/settings/update", { threadId: agent.threadId, effort: agent.reasoningEffort });
+      return true;
+    } catch (error) {
+      if (!isMissingThreadError(error)) throw error;
+      await clearAgentThread(agent);
+      return false;
+    }
   };
 
   const settleRun = (threadId, status, errorMessage = "") => {
@@ -97,22 +128,54 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
   const unsubscribe = client.subscribe(handleProtocolMessage);
 
   const ensureThread = async (agent) => {
-    if (agent.threadId) {
-      await client.request("thread/resume", { threadId: agent.threadId, persistExtendedHistory: true });
-      threadAgents.set(agent.threadId, agent.id);
-      return agent.threadId;
+    let currentAgent = agent;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      if (currentAgent.threadId) {
+        try {
+          await client.request("thread/resume", { threadId: currentAgent.threadId, persistExtendedHistory: true });
+        } catch (error) {
+          if (!isMissingThreadError(error)) throw error;
+          currentAgent = await clearAgentThread(currentAgent);
+          continue;
+        }
+        if (await applyAgentSettings(currentAgent)) {
+          threadAgents.set(currentAgent.threadId, currentAgent.id);
+          return currentAgent.threadId;
+        }
+        currentAgent = room.getAgent(currentAgent.id) || { ...currentAgent, threadId: null };
+        continue;
+      }
+
+      const result = await client.request("thread/start", {
+        cwd: projectRoot,
+        developerInstructions: currentAgent.instructions,
+        ephemeral: false,
+        serviceName: "negus",
+      });
+      const threadId = result.thread.id;
+      threadAgents.set(threadId, currentAgent.id);
+      await client.request("thread/name/set", { threadId, name: `${currentAgent.name} · ${currentAgent.responsibility}` });
+      const nextAgent = await room.updateAgent(currentAgent.id, { threadId, phase: "idle", label: "等待任务", detail: "", active: false });
+      if (await applyAgentSettings(nextAgent)) return threadId;
+      currentAgent = room.getAgent(currentAgent.id) || { ...nextAgent, threadId: null };
     }
-    const result = await client.request("thread/start", {
-      cwd: projectRoot,
-      developerInstructions: agent.instructions,
-      ephemeral: false,
-      serviceName: "negus",
-    });
-    const threadId = result.thread.id;
-    threadAgents.set(threadId, agent.id);
-    await client.request("thread/name/set", { threadId, name: `${agent.name} · ${agent.responsibility}` });
-    await room.updateAgent(agent.id, { threadId, phase: "idle", label: "等待任务", detail: "", active: false });
-    return threadId;
+    throw new Error("无法建立 Agent Thread");
+  };
+
+  const updateAgentSettings = async (agentId, settings) => {
+    const agent = room.getAgent(agentId);
+    if (!agent) throw Object.assign(new Error("Agent 不存在"), { statusCode: 404 });
+    const nextSettings = {
+      model: String(settings.model || "").trim().slice(0, 120),
+      reasoningEffort: String(settings.reasoningEffort || "").trim().slice(0, 40),
+    };
+    if (!nextSettings.model || !nextSettings.reasoningEffort) {
+      throw Object.assign(new Error("模型和推理强度不能为空"), { statusCode: 400 });
+    }
+    if (!currentRun || currentRun.agentId !== agentId) {
+      await applyAgentSettings({ ...agent, ...nextSettings });
+    }
+    return room.updateAgent(agentId, nextSettings);
   };
 
   const runAgent = async ({ agentId, mode, attachments, outputJob }) => {
@@ -246,5 +309,5 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
     client.close();
   };
 
-  return { enqueueDiscussion, close };
+  return { enqueueDiscussion, updateAgentSettings, close };
 };

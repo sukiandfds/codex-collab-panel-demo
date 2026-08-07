@@ -38,6 +38,8 @@ const safeSequence = (value) => Number.isSafeInteger(value) && value >= 0 ? valu
 
 const initialAgent = (definition, saved = {}) => ({
   ...definition,
+  model: cleanText(saved.model, 120) || cleanText(definition.model, 120) || "",
+  reasoningEffort: cleanText(saved.reasoningEffort, 40) || cleanText(definition.reasoningEffort, 40) || "",
   threadId: cleanText(saved.threadId, 80) || null,
   phase: "idle",
   label: saved.threadId ? "等待新任务" : "尚未启动",

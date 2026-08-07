@@ -6,7 +6,7 @@ import { JumpToLatest } from "../../../components/JumpToLatest/JumpToLatest";
 import { AttachmentDisplay } from "../../attachments/components/AttachmentDisplay";
 import { ArtifactCollection } from "../../artifacts/components/ArtifactCollection";
 import type { Artifact, ArtifactReviewDecision } from "../../artifacts/model/types";
-import type { GroupAgent, GroupMessage } from "../model/types";
+import type { GroupAgent, GroupMember, GroupMessage, GroupProfile } from "../model/types";
 import styles from "./MessageTimeline.module.css";
 
 const timeText = (value: string) => new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
@@ -20,6 +20,7 @@ const dayText = (value: string) => {
 export function MessageTimeline({
   messages,
   agents,
+  members,
   streaming,
   artifacts,
   artifactLoadErrors,
@@ -27,9 +28,11 @@ export function MessageTimeline({
   reviewerName,
   onRetryArtifact,
   onReviewArtifact,
+  onOpenProfile,
 }: {
   messages: GroupMessage[];
   agents: GroupAgent[];
+  members: GroupMember[];
   streaming: Record<string, { itemId: string; text: string }>;
   artifacts: Record<string, Artifact>;
   artifactLoadErrors: Record<string, boolean>;
@@ -37,6 +40,7 @@ export function MessageTimeline({
   reviewerName: string;
   onRetryArtifact: (artifactId: string) => Promise<void>;
   onReviewArtifact: (artifactId: string, decision: ArtifactReviewDecision, note: string, reviewedBy: string) => Promise<void>;
+  onOpenProfile: (profile: GroupProfile) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -68,13 +72,33 @@ export function MessageTimeline({
         {!messages.length && !streams.length ? (
           <div className={styles.emptyRoom}><Bot /><strong>暂无消息</strong></div>
         ) : null}
-        {messages.map((message, index) => (
+        {messages.map((message, index) => {
+          const agent = message.type === "agent"
+            ? agents.find((item) => item.id === message.agentId || item.id === message.authorId)
+            : null;
+          const member = message.type === "human"
+            ? members.find((item) => item.id === message.authorId)
+              || { id: message.authorId, name: message.authorName, lastSeenAt: message.createdAt }
+            : null;
+          const profile: GroupProfile | null = agent
+            ? { kind: "agent", profile: agent }
+            : member ? { kind: "member", profile: member } : null;
+          return (
           <Fragment key={message.id}>
             {index === 0 || dayKey(messages[index - 1].createdAt) !== dayKey(message.createdAt)
               ? <div className={styles.dateDivider}><span>{dayText(message.createdAt)}</span></div>
               : null}
             <article className={`${styles.message} ${message.type === "system" ? styles.systemMessage : ""}`}>
-              <span className={`${styles.messageAvatar} ${message.type === "agent" ? styles.agentMessageAvatar : ""}`}>{message.type === "agent" ? "AI" : message.type === "system" ? "!" : message.authorName.slice(0, 1)}</span>
+              {profile ? (
+                <button
+                  className={`${styles.messageAvatar} ${message.type === "agent" ? styles.agentMessageAvatar : ""}`}
+                  type="button"
+                  aria-label={`查看${profile.profile.name}的个人信息`}
+                  onClick={() => onOpenProfile(profile)}
+                >
+                  {message.type === "agent" ? "AI" : message.authorName.slice(0, 1)}
+                </button>
+              ) : <span className={`${styles.messageAvatar} ${message.type === "agent" ? styles.agentMessageAvatar : ""}`}>{message.type === "agent" ? "AI" : message.type === "system" ? "!" : message.authorName.slice(0, 1)}</span>}
               <div className={styles.messageContent}>
                 <div className={styles.messageMeta}><strong>{message.authorName}</strong><span>{timeText(message.createdAt)}</span>{message.mode === "development" ? <em>开发</em> : null}</div>
                 {message.type === "agent" ? <div className={styles.markdown}><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text}</ReactMarkdown></div> : message.text ? <p>{message.text}</p> : null}
@@ -91,12 +115,15 @@ export function MessageTimeline({
               </div>
             </article>
           </Fragment>
-        ))}
+          );
+        })}
         {streams.map(([agentId, value]) => {
           const agent = agents.find((item) => item.id === agentId);
           return (
             <article className={styles.message} key={`${agentId}-${value.itemId}`}>
-              <span className={`${styles.messageAvatar} ${styles.agentMessageAvatar}`}>AI</span>
+              {agent ? (
+                <button className={`${styles.messageAvatar} ${styles.agentMessageAvatar}`} type="button" aria-label={`查看${agent.name}的个人信息`} onClick={() => onOpenProfile({ kind: "agent", profile: agent })}>AI</button>
+              ) : <span className={`${styles.messageAvatar} ${styles.agentMessageAvatar}`}>AI</span>}
               <div className={styles.messageContent}>
                 <div className={styles.messageMeta}><strong>{agent?.name || "Codex Agent"}</strong><span>正在回复</span></div>
                 <p className={styles.streamingText}>{value.text}<i className={styles.cursor} /></p>

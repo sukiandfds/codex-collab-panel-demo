@@ -9,14 +9,38 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
   const [connected, setConnected] = useState(false);
   const [streaming, setStreaming] = useState<Record<string, { itemId: string; text: string }>>({});
   const [artifactEvent, setArtifactEvent] = useState<ArtifactRealtimeEvent | null>(null);
+  const sourceRef = useRef<EventSource | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
   const streamingBuffer = useRef<Record<string, { itemId: string; text: string }>>({});
   const streamingFrame = useRef(0);
 
   useEffect(() => {
-    const events = new EventSource(groupApi.eventsUrl());
-    events.onopen = () => setConnected(true);
-    events.onerror = () => setConnected(false);
-    events.onmessage = (message) => {
+    let disposed = false;
+
+    const clearReconnectTimer = () => {
+      if (reconnectTimerRef.current === null) return;
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    };
+
+    const connect = () => {
+      if (disposed) return;
+      sourceRef.current?.close();
+      const events = new EventSource(groupApi.eventsUrl(), { withCredentials: true });
+      sourceRef.current = events;
+      events.onopen = () => {
+        clearReconnectTimer();
+        setConnected(true);
+      };
+      events.onerror = () => {
+        setConnected(false);
+        if (reconnectTimerRef.current !== null) return;
+        reconnectTimerRef.current = window.setTimeout(() => {
+          reconnectTimerRef.current = null;
+          connect();
+        }, 4000);
+      };
+      events.onmessage = (message) => {
       try {
         const event = JSON.parse(message.data) as GroupEvent;
         if (event.type === "group_message_created") {
@@ -67,9 +91,26 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
       } catch {
         // Ignore malformed realtime events and wait for the next snapshot/event.
       }
+      };
     };
+
+    const reconnectWhenAvailable = () => {
+      if (document.visibilityState === "hidden" || !navigator.onLine) return;
+      clearReconnectTimer();
+      setConnected(false);
+      connect();
+    };
+
+    connect();
+    window.addEventListener("online", reconnectWhenAvailable);
+    document.addEventListener("visibilitychange", reconnectWhenAvailable);
     return () => {
-      events.close();
+      disposed = true;
+      clearReconnectTimer();
+      window.removeEventListener("online", reconnectWhenAvailable);
+      document.removeEventListener("visibilitychange", reconnectWhenAvailable);
+      sourceRef.current?.close();
+      sourceRef.current = null;
       if (streamingFrame.current) window.cancelAnimationFrame(streamingFrame.current);
     };
   }, [setSnapshot]);

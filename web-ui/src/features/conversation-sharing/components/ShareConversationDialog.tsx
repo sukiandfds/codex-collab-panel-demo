@@ -6,10 +6,11 @@ import styles from "./ShareConversationDialog.module.css";
 interface ShareConversationDialogProps {
   open: boolean;
   title: string;
+  heading?: string;
   onClose: () => void;
 }
 
-export function ShareConversationDialog({ open, title, onClose }: ShareConversationDialogProps) {
+export function ShareConversationDialog({ open, title, heading = "分享当前对话", onClose }: ShareConversationDialogProps) {
   const linkInputRef = useRef<HTMLInputElement>(null);
   const [shareUrl, setShareUrl] = useState("");
   const [qrCodeUrl, setQrCodeUrl] = useState("");
@@ -78,7 +79,7 @@ export function ShareConversationDialog({ open, title, onClose }: ShareConversat
       <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="share-dialog-title">
         <header className={styles.header}>
           <div>
-            <h2 id="share-dialog-title">分享当前对话</h2>
+            <h2 id="share-dialog-title">{heading}</h2>
             <p>{title}</p>
           </div>
           <button className={styles.iconButton} type="button" aria-label="关闭分享" title="关闭" onClick={onClose}>

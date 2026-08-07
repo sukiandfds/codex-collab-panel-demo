@@ -10,7 +10,8 @@
 .emptyRoom svg { width: 25px; height: 25px; }
 .emptyRoom strong { color: #aaa; font-size: 13px; }
 .message { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 11px; margin: 0 0 24px; }
-.messageAvatar { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid #3b3b3b; border-radius: 7px; background: #2d2d2d; color: #dedede; font-size: 11px; font-weight: 700; }
+.messageAvatar { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid #3b3b3b; border-radius: 7px; padding: 0; background: #2d2d2d; color: #dedede; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; }
+.messageAvatar:hover { border-color: #777; }
 .agentMessageAvatar { border-color: #55704d; background: #233020; color: #bde39b; }
 .systemMessage .messageAvatar { border-color: #6d5145; background: #30221d; color: #e0a886; }
 .messageContent { min-width: 0; padding-top: 1px; }

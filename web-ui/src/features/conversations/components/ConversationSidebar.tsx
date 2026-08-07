@@ -1,4 +1,5 @@
-import { Archive, ArchiveRestore, Folder, RefreshCw, SquarePen } from "lucide-react";
+import { Archive, ArchiveRestore, RefreshCw, SquarePen } from "lucide-react";
+import { SidebarHeader } from "../../../components/Sidebar/SidebarHeader";
 import type { ProjectInfo, SessionSummary } from "../model/types";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { SessionList } from "./SessionList";
@@ -45,11 +46,11 @@ export function ConversationSidebar({
 
   return (
     <aside className={styles.sidebar} aria-label="当前项目会话">
-      <div className={styles.brandRow}>
-        <div className={styles.brand}>
-          <span>NEGUS</span>
-        </div>
-        <div className={styles.actions}>
+      <SidebarHeader
+        project={workspaceName}
+        projectTitle={project?.root}
+        actions={(
+          <>
           <button className={styles.iconButton} type="button" aria-label="新建对话" title="新建对话" disabled={creating} onClick={() => void onCreate()}>
             <SquarePen aria-hidden="true" />
           </button>
@@ -66,12 +67,9 @@ export function ConversationSidebar({
           >
             {archivedView ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
           </button>
-        </div>
-      </div>
-      <div className={styles.projectHeader} title={project?.root || undefined}>
-        <Folder aria-hidden="true" />
-        <span>{workspaceName}</span>
-      </div>
+          </>
+        )}
+      />
       <SessionList
         sessions={sessions}
         selectedId={selectedId}

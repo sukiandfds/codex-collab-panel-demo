@@ -1,4 +1,5 @@
 import type { CodexModel } from "../model/types";
+import { formatModelDisplayName } from "../model/modelDisplayName";
 import styles from "./ModelSelect.module.css";
 
 interface ModelSelectProps {
@@ -29,7 +30,7 @@ export function ModelSelect({
     >
       {!currentModel ? <option value="">{loading ? "读取模型" : "选择模型"}</option> : null}
       {options.map((entry) => (
-        <option key={entry.id} value={entry.model}>{entry.displayName || entry.model}</option>
+        <option key={entry.id} value={entry.model}>{formatModelDisplayName(entry.model, entry.displayName)}</option>
       ))}
     </select>
   );
