@@ -26,6 +26,7 @@ export function useConversationSession(initial: InitialConversationState) {
   const requestRef = useRef<AbortController | null>(null);
   const retryTimerRef = useRef(0);
   const sessionLoadsRef = useRef(new Map<string, Promise<boolean>>());
+  const sessionRequestControllersRef = useRef(new Map<string, AbortController>());
   const pendingSessionSyncRef = useRef(new Map<string, boolean>());
   const pendingOptimisticMessagesRef = useRef(new Map<string, SessionMessage[]>());
   const sessionCache = useRef(new Map<string, SessionDetail>(initial.session
@@ -40,18 +41,27 @@ export function useConversationSession(initial: InitialConversationState) {
     recovery = false,
   }: LoadOptions = {}) => {
     const cached = sessionCache.current.get(threadId);
+    const isSelected = () => selectedIdRef.current === threadId;
     if (!older) {
       requestRef.current?.abort();
-      if (cached) setSession(cached);
-      if (!quiet && !cached) setLoadingSession(true);
+      if (cached) {
+        setSession(cached);
+        setLoadingSession(false);
+      } else if (!cached) {
+        setLoadingSession(true);
+      }
+      setSyncing(true);
       setContentSyncState(recovery ? "recovering" : "syncing");
       setSessionError("");
     } else {
       if (!cached?.hasMore || (!cached.nextCursor && (cached.nextBefore === null || cached.nextBefore === undefined))) return false;
-      setLoadingOlder(true);
+      if (isSelected()) setLoadingOlder(true);
     }
     const controller = new AbortController();
-    if (!older) requestRef.current = controller;
+    if (!older) {
+      requestRef.current = controller;
+      sessionRequestControllersRef.current.set(threadId, controller);
+    }
     let loadSucceeded = false;
     try {
       const response = await conversationApi.session(threadId, older ? {
@@ -91,17 +101,20 @@ export function useConversationSession(initial: InitialConversationState) {
       const resolved = mergePendingOptimisticMessages(next, pendingOptimistic);
       sessionCache.current.set(threadId, resolved);
       if (pendingOptimistic.length) pendingOptimisticMessagesRef.current.delete(threadId);
-      if (selectedIdRef.current === threadId) setSession(resolved);
-      setSessionError("");
+      if (isSelected()) {
+        setSession(resolved);
+        setSessionError("");
+      }
       loadSucceeded = true;
       return true;
     } catch (reason) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && isSelected()) {
         const detail = reason instanceof Error ? reason.message : String(reason);
         setSessionError(detail.includes("同步超时") ? "同步较慢，正在重试" : detail);
-        if (!older && retry && selectedIdRef.current === threadId) {
+        if (!older && retry) {
           window.clearTimeout(retryTimerRef.current);
           retryTimerRef.current = window.setTimeout(() => {
+            if (!isSelected()) return;
             setSyncing(true);
             void loadSessionRef.current(threadId, { quiet: true, retry: false, recovery: true });
           }, 10000);
@@ -110,11 +123,18 @@ export function useConversationSession(initial: InitialConversationState) {
       }
       return false;
     } finally {
-      if (!controller.signal.aborted) {
-        setLoadingSession(false);
-        setLoadingOlder(false);
-        setSyncing(false);
-        if (!older && loadSucceeded) setContentSyncState("stable");
+      if (!controller.signal.aborted && isSelected()) {
+        if (older) {
+          setLoadingOlder(false);
+        } else {
+          setLoadingSession(false);
+          setSyncing(false);
+          if (loadSucceeded) setContentSyncState("stable");
+        }
+      }
+      if (!older && sessionRequestControllersRef.current.get(threadId) === controller) {
+        sessionRequestControllersRef.current.delete(threadId);
+        if (requestRef.current === controller) requestRef.current = null;
       }
     }
   }, []);
@@ -123,13 +143,16 @@ export function useConversationSession(initial: InitialConversationState) {
     if (options.older) return loadSessionOnce(threadId, options);
     const inFlight = sessionLoadsRef.current.get(threadId);
     if (inFlight) {
-      pendingSessionSyncRef.current.set(
-        threadId,
-        Boolean(pendingSessionSyncRef.current.get(threadId) || options.recovery),
-      );
-      return inFlight;
+      const controller = sessionRequestControllersRef.current.get(threadId);
+      if (controller?.signal.aborted) sessionLoadsRef.current.delete(threadId);
+      else {
+        pendingSessionSyncRef.current.set(
+          threadId,
+          Boolean(pendingSessionSyncRef.current.get(threadId) || options.recovery),
+        );
+        return inFlight;
+      }
     }
-
     const request = loadSessionOnce(threadId, options);
     sessionLoadsRef.current.set(threadId, request);
     void request.finally(() => {
@@ -154,6 +177,7 @@ export function useConversationSession(initial: InitialConversationState) {
     setSelectedId(threadId);
     const cached = sessionCache.current.get(threadId);
     setSession(cached || null);
+    setLoadingOlder(false);
     setSyncing(Boolean(cached));
     setContentSyncState("syncing");
     const params = new URLSearchParams(window.location.search);
@@ -165,14 +189,21 @@ export function useConversationSession(initial: InitialConversationState) {
   const adoptSelection = useCallback(async (threadId: string, quiet: boolean) => {
     selectedIdRef.current = threadId;
     setSelectedId(threadId);
+    setLoadingOlder(false);
     setContentSyncState("syncing");
     return loadSession(threadId, { quiet });
   }, [loadSession]);
 
   const clearSelection = useCallback(() => {
+    requestRef.current?.abort();
+    requestRef.current = null;
     selectedIdRef.current = "";
     setSelectedId("");
     setSession(null);
+    setLoadingSession(false);
+    setLoadingOlder(false);
+    setSyncing(false);
+    setSessionError("");
     setContentSyncState("stable");
     const params = new URLSearchParams(window.location.search);
     params.delete("thread");
@@ -186,6 +217,8 @@ export function useConversationSession(initial: InitialConversationState) {
     selectedIdRef.current = detail.threadId;
     setSelectedId(detail.threadId);
     setSession(detail);
+    setLoadingSession(false);
+    setLoadingOlder(false);
     setSyncing(false);
     setContentSyncState("stable");
     const params = new URLSearchParams(window.location.search);

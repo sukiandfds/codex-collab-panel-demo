@@ -117,6 +117,15 @@ type ConversationItem =
   | { id: string; type: "message"; message: SessionMessage; streaming: boolean }
   | { id: string; type: "execution" };
 
+type OlderAnchor = {
+  id: string;
+  top: number;
+  messageCount: number;
+  scrollTop: number;
+  scrollHeight: number;
+  threadId: string;
+};
+
 export function ConversationView({
   active = true,
   session,
@@ -135,12 +144,13 @@ export function ConversationView({
   editingMessageId,
   onRetryMessage,
   retryingMessageId,
-}: ConversationViewProps) {
+  }: ConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const loadingOlderRef = useRef(false);
-  const olderAnchorRef = useRef<{ id: string; top: number; messageCount: number } | null>(null);
-  const wasActiveRef = useRef(active);
-  const savedScrollTopRef = useRef<number | null>(null);
+  const loadingOlderThreadsRef = useRef(new Set<string>());
+  const olderLoadTimersRef = useRef(new Map<string, number>());
+  const olderAnchorRef = useRef<OlderAnchor | null>(null);
+  const scrollPositionsRef = useRef(new Map<string, number>());
+  const followLatestFrameRef = useRef(0);
   const observedActiveThreadsRef = useRef(new Set<string>());
   const stickToBottomRef = useRef(true);
   const [hasNewActivity, setHasNewActivity] = useState(false);
@@ -186,6 +196,8 @@ export function ConversationView({
       streaming: executionStatus.active && !completedExecution,
     }] : []),
   ];
+  const visibleItemsLengthRef = useRef(visibleItems.length);
+  visibleItemsLengthRef.current = visibleItems.length;
   const virtualizer = useVirtualizer({
     count: visibleItems.length,
     getScrollElement: () => scrollRef.current,
@@ -196,46 +208,91 @@ export function ConversationView({
     getItemKey: (index) => visibleItems[index]?.id || index,
   });
 
+  const rememberScrollPosition = useCallback((root = scrollRef.current, threadId = session?.threadId) => {
+    if (!root || !threadId) return;
+    scrollPositionsRef.current.set(threadId, root.scrollTop);
+  }, [session?.threadId]);
+
+  const captureOlderAnchor = useCallback((root: HTMLDivElement, threadId: string) => {
+    const rootTop = root.getBoundingClientRect().top;
+    const anchor = Array.from(root.querySelectorAll<HTMLElement>("[data-message-id]"))
+      .map((element) => ({ element, rect: element.getBoundingClientRect() }))
+      .find(({ rect }) => rect.bottom > rootTop);
+    if (!anchor) return;
+    olderAnchorRef.current = {
+      id: anchor.element.dataset.messageId || "",
+      top: anchor.rect.top,
+      messageCount: messages.length,
+      scrollTop: root.scrollTop,
+      scrollHeight: root.scrollHeight,
+      threadId,
+    };
+  }, [messages.length]);
+
+  const scheduleFollowLatest = useCallback(() => {
+    window.cancelAnimationFrame(followLatestFrameRef.current);
+    followLatestFrameRef.current = window.requestAnimationFrame(() => {
+      if (!active || !stickToBottomRef.current || !visibleItems.length) return;
+      virtualizer.scrollToIndex(visibleItems.length - 1, { align: "end" });
+      rememberScrollPosition();
+    });
+  }, [active, rememberScrollPosition, virtualizer, visibleItems.length]);
+
+  useLayoutEffect(() => {
+    if (!active) window.cancelAnimationFrame(followLatestFrameRef.current);
+  }, [active]);
+
   useLayoutEffect(() => {
     if (!active) return;
     const anchor = olderAnchorRef.current;
     const root = scrollRef.current;
-    if (!anchor || !root || messages.length <= anchor.messageCount) return;
+    if (!anchor || !root || loadingOlder || session?.threadId !== anchor.threadId || messages.length <= anchor.messageCount) return;
 
     virtualizer.measure();
-    const nextAnchor = Array.from(root.querySelectorAll<HTMLElement>("[data-message-id]"))
-      .find((element) => element.dataset.messageId === anchor.id);
-    if (nextAnchor) {
-      root.scrollTop += nextAnchor.getBoundingClientRect().top - anchor.top;
-    }
-    olderAnchorRef.current = null;
-  }, [active, messages.length, session?.threadId, virtualizer]);
+    const restoreAnchor = () => {
+      const nextAnchor = Array.from(root.querySelectorAll<HTMLElement>("[data-message-id]"))
+        .find((element) => element.dataset.messageId === anchor.id);
+      if (nextAnchor) {
+        root.scrollTop += nextAnchor.getBoundingClientRect().top - anchor.top;
+      } else {
+        root.scrollTop = anchor.scrollTop + Math.max(0, root.scrollHeight - anchor.scrollHeight);
+      }
+      rememberScrollPosition(root, anchor.threadId);
+    };
 
-  useEffect(() => {
+    restoreAnchor();
+    window.requestAnimationFrame(() => {
+      if (olderAnchorRef.current !== anchor || !scrollRef.current) return;
+      virtualizer.measure();
+      restoreAnchor();
+      olderAnchorRef.current = null;
+    });
+  }, [active, loadingOlder, messages.length, rememberScrollPosition, session?.threadId, virtualizer]);
+
+  useLayoutEffect(() => {
     if (!active) return;
     if (!loading && session && scrollRef.current) {
-      stickToBottomRef.current = true;
+      const savedTop = scrollPositionsRef.current.get(session.threadId);
       setHasNewActivity(false);
-      requestAnimationFrame(() => virtualizer.scrollToIndex(visibleItems.length - 1, { align: "end" }));
+      window.cancelAnimationFrame(followLatestFrameRef.current);
+      virtualizer.measure();
+      if (savedTop !== undefined) {
+        virtualizer.scrollToOffset(savedTop, { align: "start" });
+        const root = scrollRef.current;
+        stickToBottomRef.current = root.scrollHeight - root.scrollTop - root.clientHeight < 120;
+        rememberScrollPosition(root, session.threadId);
+        return;
+      }
+      stickToBottomRef.current = true;
+      virtualizer.scrollToIndex(Math.max(0, visibleItemsLengthRef.current - 1), { align: "end" });
+      rememberScrollPosition(scrollRef.current, session.threadId);
     }
-  }, [active, loading, session?.threadId]);
+  }, [active, loading, rememberScrollPosition, session?.threadId, virtualizer]);
 
   useEffect(() => {
-    const root = scrollRef.current;
-    if (!active) {
-      if (wasActiveRef.current && root) savedScrollTopRef.current = root.scrollTop;
-      wasActiveRef.current = false;
-      return;
-    }
-    if (wasActiveRef.current || !root || !session || loading) return;
-    wasActiveRef.current = true;
-    if (savedScrollTopRef.current !== null) {
-      const savedTop = savedScrollTopRef.current;
-      window.requestAnimationFrame(() => { root.scrollTop = savedTop; });
-      return;
-    }
-    window.requestAnimationFrame(() => virtualizer.scrollToIndex(visibleItems.length - 1, { align: "end" }));
-  }, [active, loading, session, virtualizer, visibleItems.length]);
+    if (active || !session?.threadId) return;
+    rememberScrollPosition();
+  }, [active, rememberScrollPosition, session?.threadId]);
 
   useEffect(() => {
     if (!active) return;
@@ -244,8 +301,8 @@ export function ConversationView({
       setHasNewActivity(true);
       return;
     }
-    requestAnimationFrame(() => virtualizer.scrollToIndex(visibleItems.length - 1, { align: "end" }));
-  }, [active, streamingText]);
+    scheduleFollowLatest();
+  }, [active, scheduleFollowLatest, streamingText, visibleItems.length]);
 
   useEffect(() => {
     if (!active) return;
@@ -254,8 +311,8 @@ export function ConversationView({
       setHasNewActivity(true);
       return;
     }
-    requestAnimationFrame(() => virtualizer.scrollToIndex(visibleItems.length - 1, { align: "end" }));
-  }, [active, executionStatus.active, executionStatus.activities.length, executionStatus.label]);
+    scheduleFollowLatest();
+  }, [active, executionStatus.active, executionStatus.activities.length, executionStatus.label, scheduleFollowLatest, visibleItems.length]);
 
   const lastMessageId = messages[messages.length - 1]?.id;
   useEffect(() => {
@@ -265,15 +322,15 @@ export function ConversationView({
       setHasNewActivity(true);
       return;
     }
-    requestAnimationFrame(() => virtualizer.scrollToIndex(visibleItems.length - 1, { align: "end" }));
-  }, [active, lastMessageId, messages.length]);
+    scheduleFollowLatest();
+  }, [active, lastMessageId, scheduleFollowLatest]);
 
   const scrollToLatest = useCallback(() => {
     if (!active) return;
     stickToBottomRef.current = true;
     setHasNewActivity(false);
-    virtualizer.scrollToIndex(Math.max(0, visibleItems.length - 1), { align: "end" });
-  }, [active, virtualizer, visibleItems.length]);
+    scheduleFollowLatest();
+  }, [active, scheduleFollowLatest]);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -287,58 +344,79 @@ export function ConversationView({
       previousHeight = nextHeight;
       if (!stickToBottomRef.current) return;
       window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(() => {
-        root.scrollTop = Math.max(0, root.scrollHeight - root.clientHeight);
-      });
+      frame = window.requestAnimationFrame(scheduleFollowLatest);
     });
     observer.observe(root);
     return () => {
       observer.disconnect();
       window.cancelAnimationFrame(frame);
     };
-  }, [active]);
+  }, [active, scheduleFollowLatest]);
 
   useEffect(() => {
     if (!active) return undefined;
     const root = scrollRef.current;
     if (!root) return;
     let disposed = false;
-    const onScroll = async () => {
+    const onScroll = () => {
+      const threadId = session?.threadId || "";
       const nearBottom = root.scrollHeight - root.scrollTop - root.clientHeight < 120;
       stickToBottomRef.current = nearBottom;
+      rememberScrollPosition(root);
       if (nearBottom) setHasNewActivity(false);
-      if (root.scrollTop > 140 || !session?.hasMore || loadingOlderRef.current || contentSyncState === "recovering") return;
-      loadingOlderRef.current = true;
-      const rootTop = root.getBoundingClientRect().top;
-      const anchor = Array.from(root.querySelectorAll<HTMLElement>("[data-message-id]"))
-        .map((element) => ({ element, rect: element.getBoundingClientRect() }))
-        .find(({ rect }) => rect.bottom > rootTop);
-      if (anchor) {
-        olderAnchorRef.current = {
-          id: anchor.element.dataset.messageId || "",
-          top: anchor.rect.top,
-          messageCount: messages.length,
-        };
+      const pendingTimer = threadId ? olderLoadTimersRef.current.get(threadId) : undefined;
+      if (pendingTimer !== undefined && root.scrollTop > 140) {
+        window.clearTimeout(pendingTimer);
+        olderLoadTimersRef.current.delete(threadId);
+        loadingOlderThreadsRef.current.delete(threadId);
+        if (olderAnchorRef.current?.threadId === threadId) olderAnchorRef.current = null;
+        return;
       }
-      try {
-        await onLoadOlder();
-      } finally {
-        loadingOlderRef.current = false;
-        if (!disposed) {
-          window.requestAnimationFrame(() => {
-            window.requestAnimationFrame(() => {
-              olderAnchorRef.current = null;
-            });
-          });
+      if (threadId && loadingOlderThreadsRef.current.has(threadId)) {
+        captureOlderAnchor(root, threadId);
+        return;
+      }
+      if (
+        !threadId
+        || root.scrollTop > 140
+        || !session?.hasMore
+        || contentSyncState === "recovering"
+      ) return;
+      loadingOlderThreadsRef.current.add(threadId);
+      captureOlderAnchor(root, threadId);
+      const timer = window.setTimeout(() => {
+        olderLoadTimersRef.current.delete(threadId);
+        if (disposed || !active || session?.threadId !== threadId || root.scrollTop > 140 || !session?.hasMore) {
+          loadingOlderThreadsRef.current.delete(threadId);
+          if (olderAnchorRef.current?.threadId === threadId) olderAnchorRef.current = null;
+          return;
         }
-      }
+        void onLoadOlder().finally(() => {
+          loadingOlderThreadsRef.current.delete(threadId);
+          if (!disposed) {
+            window.requestAnimationFrame(() => {
+              window.requestAnimationFrame(() => {
+                if (olderAnchorRef.current?.threadId === threadId) olderAnchorRef.current = null;
+              });
+            });
+          }
+        });
+      }, 140);
+      olderLoadTimersRef.current.set(threadId, timer);
     };
     root.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       disposed = true;
       root.removeEventListener("scroll", onScroll);
+      const threadId = session?.threadId || "";
+      const pending = threadId ? olderLoadTimersRef.current.get(threadId) : undefined;
+      if (pending !== undefined) {
+        window.clearTimeout(pending);
+        olderLoadTimersRef.current.delete(threadId);
+        loadingOlderThreadsRef.current.delete(threadId);
+      }
     };
-  }, [active, contentSyncState, onLoadOlder, session?.hasMore, virtualizer]);
+  }, [active, captureOlderAnchor, contentSyncState, onLoadOlder, rememberScrollPosition, session, session?.hasMore, virtualizer]);
 
   return (
     <div className={styles.viewport}>
@@ -353,9 +431,9 @@ export function ConversationView({
       ) : null}
       <div className={styles.scrollArea} ref={scrollRef}>
         <section className={styles.conversation} aria-label="真实项目对话" aria-live="polite">
-        {loading ? <div className={styles.loading} role="status" aria-label="正在读取对话"><LoaderCircle aria-hidden="true" /></div> : null}
+        {loading && !session ? <div className={styles.loading} role="status" aria-label="正在读取对话"><LoaderCircle aria-hidden="true" /></div> : null}
         {!loading && !error && !session && listAvailable ? <div className={styles.state}>当前项目暂无可显示对话</div> : null}
-        {!loading && session ? (
+        {session ? (
           <div className={styles.virtualList} style={{ height: virtualizer.getTotalSize() }}>
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const item = visibleItems[virtualRow.index];

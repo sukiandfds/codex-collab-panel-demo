@@ -11,6 +11,7 @@ export function useGroupRoom() {
   const [snapshot, setSnapshot] = useState<GroupSnapshot | null>(initialSnapshot);
   const [member, setMember] = useState<StoredMember | null>(readStoredMember);
   const [loading, setLoading] = useState(!initialSnapshot);
+  const [initialSyncReady, setInitialSyncReady] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const sendingRef = useRef(false);
@@ -37,7 +38,9 @@ export function useGroupRoom() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void refresh(controller.signal);
+    void refresh(controller.signal).finally(() => {
+      if (!controller.signal.aborted) setInitialSyncReady(true);
+    });
     return () => controller.abort();
   }, [refresh]);
 
@@ -121,7 +124,7 @@ export function useGroupRoom() {
   }, [member]);
 
   return {
-    snapshot, member, loading, sending, error, join, send, refresh,
+    snapshot, member, loading, initialSyncReady, sending, error, join, send, refresh,
     connected: realtime.connected,
     streaming: realtime.streaming,
     artifactEvent: realtime.artifactEvent,

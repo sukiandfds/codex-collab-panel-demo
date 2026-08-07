@@ -14,7 +14,7 @@ import { useDeviceInfo } from "../device/hooks/useDeviceInfo";
 import { useArtifacts } from "../artifacts/hooks/useArtifacts";
 import styles from "./GroupApp.module.css";
 
-export function GroupApp({ onViewChange }: { onViewChange?: (surface: Exclude<ViewSurface, "progress">) => void }) {
+export function GroupApp({ active = true, onViewChange }: { active?: boolean; onViewChange?: (surface: Exclude<ViewSurface, "progress">) => void }) {
   const group = useGroupRoom();
   const device = useDeviceInfo(group.connected);
   const [mode, setMode] = useState<GroupMode>("discussion");
@@ -30,8 +30,9 @@ export function GroupApp({ onViewChange }: { onViewChange?: (surface: Exclude<Vi
   };
 
   useEffect(() => {
-    if (!group.loading) window.dispatchEvent(new Event("negus:app-ready"));
-  }, [group.loading]);
+    if (!active || !group.initialSyncReady) return;
+    window.dispatchEvent(new Event("negus:app-ready"));
+  }, [active, group.initialSyncReady]);
 
   const agents = snapshot?.agents || [];
   const members = snapshot?.members || [];

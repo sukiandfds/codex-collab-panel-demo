@@ -33,9 +33,21 @@ function ConversationApp({ active, onViewChange }: { active: boolean; onViewChan
   const usage = useUsageMonitor(conversations.executionStatus);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   useEffect(() => {
-    if (conversations.snapshotLoading) return;
+    if (!active) return;
+    if (
+      conversations.snapshotLoading
+      || !conversations.initialSyncReady
+      || conversations.loadingSession
+      || conversations.syncing
+    ) return;
     window.dispatchEvent(new Event("negus:app-ready"));
-  }, [conversations.snapshotLoading]);
+  }, [
+    conversations.initialSyncReady,
+    conversations.loadingSession,
+    conversations.snapshotLoading,
+    conversations.syncing,
+    active,
+  ]);
   const selectSession = useCallback((threadId: string) => {
     conversations.selectSession(threadId);
     setSidebarOpen(false);
@@ -200,7 +212,7 @@ export function App() {
             zIndex: surface === "group" ? 1 : 0,
           }}
         >
-          <GroupApp onViewChange={showSurface} />
+          <GroupApp active={surface === "group"} onViewChange={showSurface} />
         </div>
       ) : null}
     </div>

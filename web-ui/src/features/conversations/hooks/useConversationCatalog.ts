@@ -11,7 +11,6 @@ interface ConversationSelection {
   adoptSelection: (threadId: string, quiet: boolean) => Promise<boolean>;
   clearSelection: () => void;
   setCreatedSession: (detail: SessionDetail) => void;
-  setSyncing: (syncing: boolean) => void;
 }
 
 export function useConversationCatalog(
@@ -23,6 +22,7 @@ export function useConversationCatalog(
   const [project, setProject] = useState<ProjectInfo | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>(initialArchivedView ? [] : initial.sessions);
   const [loadingList, setLoadingList] = useState(initialArchivedView || !initial.sessions.length);
+  const [initialSyncReady, setInitialSyncReady] = useState(false);
   const [archivedView, setArchivedView] = useState(initialArchivedView);
   const [creating, setCreating] = useState(false);
   const [archiveBusyId, setArchiveBusyId] = useState("");
@@ -43,11 +43,12 @@ export function useConversationCatalog(
 
   const refreshSessionsOnce = useCallback(async (initialLoad = false, changedThreadId?: string, reloadSelected = true, retry = true) => {
     const requestId = ++listRequestRef.current;
+    const requestedArchivedView = archivedViewRef.current;
     if (initialLoad) setLoadingList(true);
     setListError("");
     try {
-      const serverSessions = await conversationApi.sessions(archivedViewRef.current);
-      if (requestId !== listRequestRef.current) return;
+      const serverSessions = await conversationApi.sessions(requestedArchivedView);
+      if (requestId !== listRequestRef.current || requestedArchivedView !== archivedViewRef.current) return;
 
       const serverIds = new Set(serverSessions.map((item) => item.threadId));
       for (const threadId of serverIds) transientSessionsRef.current.delete(threadId);
@@ -73,7 +74,7 @@ export function useConversationCatalog(
         await selection.loadSession(nextId, { quiet: !initialLoad });
       }
     } catch (reason) {
-      if (requestId !== listRequestRef.current) return;
+      if (requestId !== listRequestRef.current || requestedArchivedView !== archivedViewRef.current) return;
       setListError(reason instanceof Error ? reason.message : String(reason));
       if (retry) {
         window.clearTimeout(listRetryTimerRef.current);
@@ -82,7 +83,7 @@ export function useConversationCatalog(
         }, 10000);
       }
     } finally {
-      if (initialLoad) setLoadingList(false);
+      if (initialLoad && requestedArchivedView === archivedViewRef.current) setLoadingList(false);
     }
   }, [selection.adoptSelection, selection.clearSelection, selection.loadSession, selection.selectedIdRef]);
 
@@ -147,24 +148,36 @@ export function useConversationCatalog(
     if (!hasAccessToken) {
       setLoadingList(false);
       setListError("访问链接缺少令牌，请运行 pnpm start:demo 并打开输出的完整链接");
+      setInitialSyncReady(true);
       return;
     }
+    let cancelled = false;
     const controller = new AbortController();
     const hasCachedList = Boolean(initial.sessions.length);
     const hasCachedSession = Boolean(initial.session);
-    if (hasCachedSession) selection.setSyncing(true);
     const initialSessionRequest = initial.selectedId
       ? selection.loadSession(initial.selectedId, { quiet: hasCachedSession, recovery: initial.sessionIsPartial })
       : Promise.resolve(false);
-    void Promise.all([
+    void Promise.allSettled([
       conversationApi.project(controller.signal).then(setProject),
       refreshSessions(!hasCachedList, undefined, !initial.selectedId),
       initialSessionRequest,
-    ]).catch((reason) => {
-      if (!controller.signal.aborted) setListError(reason instanceof Error ? reason.message : String(reason));
-    }).finally(() => selection.setSyncing(false));
-    return () => controller.abort();
-  }, [initial, refreshSessions, selection.loadSession, selection.setSyncing]);
+    ]).then((results) => {
+      if (cancelled || controller.signal.aborted) return;
+      const rejected = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+      if (rejected) {
+        const reason = rejected.reason;
+        setListError(reason instanceof Error ? reason.message : String(reason));
+      }
+    }).finally(() => {
+      if (cancelled) return;
+      setInitialSyncReady(true);
+    });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [initial, refreshSessions, selection.loadSession]);
 
   const createSession = useCallback(async () => {
     if (creatingRef.current) return false;
@@ -256,6 +269,7 @@ export function useConversationCatalog(
     sessions,
     archivedView,
     loadingList,
+    initialSyncReady,
     creating,
     archiveBusyId,
     listError,

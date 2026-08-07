@@ -1,0 +1,60 @@
+#negus-launch {
+  position: fixed;
+  z-index: 2147483000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: max(40px, env(safe-area-inset-top)) 28px max(40px, env(safe-area-inset-bottom));
+  background: #000;
+  color: #fff;
+  opacity: 1;
+  transition: opacity 280ms ease, visibility 280ms ease;
+}
+
+#negus-launch.negus-launch-leaving {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.negus-launch-content {
+  display: grid;
+  width: min(100%, 360px);
+  justify-items: center;
+  text-align: center;
+}
+
+.negus-launch-kicker {
+  margin: 0 0 38px;
+  font: 600 30px/1.1 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.negus-launch-logo {
+  display: block;
+  width: 144px;
+  height: 144px;
+}
+
+.negus-launch-copy {
+  max-width: 320px;
+  margin: 38px 0 0;
+  color: #d0d0d0;
+  font: 450 16px/1.75 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.negus-launch-copy strong {
+  color: #fff;
+  font-weight: 650;
+}
+
+html[lang="en"] .negus-launch-zh,
+html:not([lang="en"]) .negus-launch-en {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #negus-launch {
+    transition-duration: 0.001ms;
+  }
+}

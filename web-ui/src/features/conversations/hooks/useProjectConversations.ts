@@ -69,7 +69,6 @@ export function useProjectConversations() {
     adoptSelection: selection.adoptSelection,
     clearSelection: selection.clearSelection,
     setCreatedSession: selection.setCreatedSession,
-    setSyncing: selection.setSyncing,
   }, contextManagement.status.model);
 
   useEffect(() => {
@@ -330,6 +329,7 @@ export function useProjectConversations() {
     selectedId: selection.selectedId,
     session: selection.session,
     loadingList: catalog.loadingList,
+    initialSyncReady: catalog.initialSyncReady,
     loadingSession: selection.loadingSession,
     snapshotLoading,
     loadingOlder: selection.loadingOlder,
