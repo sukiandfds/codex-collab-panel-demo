@@ -5,9 +5,11 @@ import styles from "./MessageActions.module.css";
 interface MessageActionsProps {
   text: string;
   forkable: boolean;
+  forkDisabled?: boolean;
   forking: boolean;
   onFork: () => Promise<boolean>;
   editable: boolean;
+  editDisabled?: boolean;
   editing: boolean;
   onEdit: () => void;
   retryable?: boolean;
@@ -32,7 +34,7 @@ const copyWithFallback = async (text: string) => {
   if (!copied) throw new Error("clipboard unavailable");
 };
 
-export function MessageActions({ text, forkable, forking, onFork, editable, editing, onEdit, retryable = false, retrying = false, onRetry }: MessageActionsProps) {
+export function MessageActions({ text, forkable, forkDisabled = false, forking, onFork, editable, editDisabled = false, editing, onEdit, retryable = false, retrying = false, onRetry }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const resetTimerRef = useRef<number | null>(null);
@@ -76,7 +78,7 @@ export function MessageActions({ text, forkable, forking, onFork, editable, edit
           type="button"
           aria-label="从这里继续"
           title={forking ? "正在创建分支" : "从这里继续"}
-          disabled={forking}
+          disabled={forking || forkDisabled}
           onClick={() => void onFork()}
         >
           <GitBranch aria-hidden="true" className={forking ? styles.spinning : undefined} />
@@ -88,7 +90,7 @@ export function MessageActions({ text, forkable, forking, onFork, editable, edit
           type="button"
           aria-label={editing ? "正在编辑" : "重新编辑"}
           title={editing ? "正在编辑" : "重新编辑"}
-          disabled={editing}
+          disabled={editing || editDisabled}
           onClick={onEdit}
         >
           <Edit3 aria-hidden="true" />

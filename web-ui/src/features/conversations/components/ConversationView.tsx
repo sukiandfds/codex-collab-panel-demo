@@ -41,9 +41,11 @@ function Message({
   message,
   streaming = false,
   forkable = false,
+  forkDisabled = false,
   forking = false,
   onFork,
   editable = false,
+  editDisabled = false,
   editing = false,
   onEdit,
   retryable = false,
@@ -53,9 +55,11 @@ function Message({
   message: SessionMessage;
   streaming?: boolean;
   forkable?: boolean;
+  forkDisabled?: boolean;
   forking?: boolean;
   onFork: () => Promise<boolean>;
   editable?: boolean;
+  editDisabled?: boolean;
   editing?: boolean;
   onEdit: () => void;
   retryable?: boolean;
@@ -79,9 +83,11 @@ function Message({
           <MessageActions
             text={message.text}
             forkable={forkable}
+            forkDisabled={forkDisabled}
             forking={forking}
             onFork={onFork}
             editable={editable}
+            editDisabled={editDisabled}
             editing={editing}
             onEdit={onEdit}
             retryable={retryable}
@@ -400,14 +406,14 @@ export function ConversationView({
                         streaming={item.streaming}
                         forkable={item.message.role === "assistant"
                           && Boolean(item.message.turnId)
-                          && !executionStatus.active
                           && !session?.archived}
+                        forkDisabled={executionStatus.active}
                         forking={forkingMessageId === item.message.id}
                         onFork={() => onForkMessage(item.message)}
                         editable={item.message.role === "user"
                           && Boolean(item.message.turnId)
-                          && !executionStatus.active
                           && !session?.archived}
+                        editDisabled={executionStatus.active}
                         editing={editingMessageId === item.message.id}
                         onEdit={() => onEditMessage(item.message)}
                         retryable={item.message.deliveryState === "pending"}
