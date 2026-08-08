@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { WindowBar } from "../../components/WindowBar/WindowBar";
@@ -24,12 +24,18 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
   const [agentId, setAgentId] = useState("manager");
   const [profile, setProfile] = useState<GroupProfile | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [localSendVersion, setLocalSendVersion] = useState(0);
   const snapshot = group.snapshot;
   const artifactIds = useMemo(() => snapshot?.messages.flatMap((message) => message.artifactIds || []) || [], [snapshot?.messages]);
   const artifactState = useArtifacts(artifactIds, group.artifactEvent);
   const join = async (name: string) => {
     await group.join(name);
   };
+  const sendMessage = useCallback(async (text: string, targetAgentIds: string[], attachmentIds: string[] = []) => {
+    const accepted = await group.send(mode, targetAgentIds, text, attachmentIds);
+    if (accepted) setLocalSendVersion((version) => version + 1);
+    return accepted;
+  }, [group.send, mode]);
 
   useEffect(() => {
     if (!active || !group.initialSyncReady) return;
@@ -75,6 +81,7 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
             onRetryArtifact={artifactState.loadOne}
             onReviewArtifact={artifactState.review}
             onOpenProfile={setProfile}
+            localSendVersion={localSendVersion}
           />
         ) : group.error ? (
           <main className={styles.loading}>
@@ -97,7 +104,7 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
           error={group.error}
           onModeChange={setMode}
           onAgentChange={setAgentId}
-          onSend={(text, targetAgentId) => group.send(mode, targetAgentId, text)}
+          onSend={sendMessage}
         />
         ) : <div className={styles.composerPlaceholder} />}
       />

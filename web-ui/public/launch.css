@@ -12,6 +12,10 @@
   transition: opacity 280ms ease, visibility 280ms ease;
 }
 
+html.negus-skip-launch #negus-launch {
+  display: none;
+}
+
 #negus-launch.negus-launch-leaving {
   visibility: hidden;
   opacity: 0;

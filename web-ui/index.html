@@ -11,6 +11,13 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Negus" />
+    <script>
+      const navigationEntry = performance.getEntriesByType?.("navigation")[0];
+      const navigationType = navigationEntry?.type || (performance.navigation?.type === 1 ? "reload" : "navigate");
+      if (navigationType === "reload" || navigationType === "back_forward") {
+        document.documentElement.classList.add("negus-skip-launch");
+      }
+    </script>
     <meta name="description" content="Negus · 随时随地掌控 AI" />
     <title>Negus · 随时随地掌控 AI</title>
     <script>

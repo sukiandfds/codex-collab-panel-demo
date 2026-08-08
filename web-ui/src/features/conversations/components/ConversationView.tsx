@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Clock3, LoaderCircle } from "lucide-react";
 import { JumpToLatest } from "../../../components/JumpToLatest/JumpToLatest";
+import { isNearBottom, useReturnToBottom } from "../../../components/JumpToLatest/useReturnToBottom";
 import { RefreshNotice } from "../../app-update/components/AppUpdateNotice";
 import type { ContentSyncState, SessionDetail, SessionMessage } from "../model/types";
 import { MessageActions } from "./MessageActions";
@@ -111,6 +112,7 @@ interface ConversationViewProps {
   editingMessageId: string;
   onRetryMessage: (message: SessionMessage) => Promise<boolean>;
   retryingMessageId: string;
+  localSendVersion: number;
 }
 
 type ConversationItem =
@@ -135,6 +137,7 @@ export function ConversationView({
   editingMessageId,
   onRetryMessage,
   retryingMessageId,
+  localSendVersion,
   }: ConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingOlderThreadsRef = useRef(new Set<string>());
@@ -143,8 +146,6 @@ export function ConversationView({
   const followLatestFrameRef = useRef(0);
   const initialPositionFrameRef = useRef(0);
   const observedActiveThreadsRef = useRef(new Set<string>());
-  const stickToBottomRef = useRef(true);
-  const [hasNewActivity, setHasNewActivity] = useState(false);
   const messages = session?.messages || [];
   const executionMatchesSession = executionStatus.threadId === session?.threadId;
   const completedExecution = ["completed", "failed", "interrupted", "systemError"].includes(executionStatus.phase);
@@ -166,6 +167,7 @@ export function ConversationView({
       && latestAssistant?.turnId === executionStatus.turnId)
   );
   const visibleStreamingText = executionMatchesSession && !finalMessageLoaded ? streamingText : "";
+  const isAnswerStreaming = Boolean(visibleStreamingText) && executionStatus.active && !completedExecution;
   const executionIndex = !executionStatus.active && messages.at(-1)?.role === "assistant"
     ? messages.length - 1
     : messages.length;
@@ -209,11 +211,27 @@ export function ConversationView({
   const scheduleFollowLatest = useCallback(() => {
     window.cancelAnimationFrame(followLatestFrameRef.current);
     followLatestFrameRef.current = window.requestAnimationFrame(() => {
-      if (!active || !stickToBottomRef.current || !visibleItems.length) return;
+      if (!active || !visibleItems.length) return;
       virtualizer.scrollToIndex(visibleItems.length - 1, { align: "end" });
       rememberScrollPosition();
     });
   }, [active, rememberScrollPosition, virtualizer, visibleItems.length]);
+
+  const getScrollElement = useCallback(() => scrollRef.current, []);
+  const {
+    visible: showReturnToBottom,
+    stickToBottomRef,
+    onScroll: updateReturnToBottom,
+    contentChanged,
+    returnToBottom,
+    reset: resetReturnToBottom,
+  } = useReturnToBottom({
+    active,
+    isStreaming: isAnswerStreaming,
+    localSendVersion,
+    getScrollElement,
+    scrollToBottom: scheduleFollowLatest,
+  });
 
   useLayoutEffect(() => {
     if (!active) window.cancelAnimationFrame(followLatestFrameRef.current);
@@ -224,7 +242,7 @@ export function ConversationView({
     if (!loading && session && scrollRef.current) {
       const savedTop = scrollPositionsRef.current.get(session.threadId);
       const threadId = session.threadId;
-      setHasNewActivity(false);
+      resetReturnToBottom();
       window.cancelAnimationFrame(followLatestFrameRef.current);
       window.cancelAnimationFrame(initialPositionFrameRef.current);
       initialPositionFrameRef.current = window.requestAnimationFrame(() => {
@@ -232,7 +250,7 @@ export function ConversationView({
         if (!root) return;
         if (savedTop !== undefined) {
           virtualizer.scrollToOffset(savedTop, { align: "start" });
-          stickToBottomRef.current = root.scrollHeight - root.scrollTop - root.clientHeight < 120;
+          resetReturnToBottom(isNearBottom(root));
           rememberScrollPosition(root, threadId);
           return;
         }
@@ -242,7 +260,7 @@ export function ConversationView({
       });
     }
     return () => window.cancelAnimationFrame(initialPositionFrameRef.current);
-  }, [active, loading, rememberScrollPosition, session?.threadId, virtualizer]);
+  }, [active, loading, rememberScrollPosition, resetReturnToBottom, session?.threadId, virtualizer]);
 
   useEffect(() => {
     if (active || !session?.threadId) return;
@@ -252,40 +270,21 @@ export function ConversationView({
   useEffect(() => {
     if (!active) return;
     if (!streamingText || !visibleItems.length) return;
-    if (!stickToBottomRef.current) {
-      setHasNewActivity(true);
-      return;
-    }
-    scheduleFollowLatest();
-  }, [active, scheduleFollowLatest, streamingText, visibleItems.length]);
+    contentChanged();
+  }, [active, contentChanged, streamingText, visibleItems.length]);
 
   useEffect(() => {
     if (!active) return;
     if (!executionStatus.active || !visibleItems.length) return;
-    if (!stickToBottomRef.current) {
-      setHasNewActivity(true);
-      return;
-    }
-    scheduleFollowLatest();
-  }, [active, executionStatus.active, executionStatus.activities.length, executionStatus.label, scheduleFollowLatest, visibleItems.length]);
+    contentChanged();
+  }, [active, contentChanged, executionStatus.active, executionStatus.activities.length, executionStatus.label, visibleItems.length]);
 
   const lastMessageId = messages[messages.length - 1]?.id;
   useEffect(() => {
     if (!active) return;
     if (!lastMessageId) return;
-    if (!stickToBottomRef.current) {
-      setHasNewActivity(true);
-      return;
-    }
-    scheduleFollowLatest();
-  }, [active, lastMessageId, scheduleFollowLatest]);
-
-  const scrollToLatest = useCallback(() => {
-    if (!active) return;
-    stickToBottomRef.current = true;
-    setHasNewActivity(false);
-    scheduleFollowLatest();
-  }, [active, scheduleFollowLatest]);
+    contentChanged();
+  }, [active, contentChanged, lastMessageId]);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -320,10 +319,8 @@ export function ConversationView({
     let disposed = false;
     const onScroll = () => {
       const threadId = session?.threadId || "";
-      const nearBottom = root.scrollHeight - root.scrollTop - root.clientHeight < 120;
-      stickToBottomRef.current = nearBottom;
+      updateReturnToBottom(root);
       rememberScrollPosition(root);
-      if (nearBottom) setHasNewActivity(false);
       const pendingTimer = threadId ? olderLoadTimersRef.current.get(threadId) : undefined;
       if (pendingTimer !== undefined && root.scrollTop > 140) {
         window.clearTimeout(pendingTimer);
@@ -365,7 +362,7 @@ export function ConversationView({
         loadingOlderThreadsRef.current.delete(threadId);
       }
     };
-  }, [active, contentSyncState, onLoadOlder, rememberScrollPosition, session, session?.hasMore]);
+  }, [active, contentSyncState, onLoadOlder, rememberScrollPosition, session, session?.hasMore, updateReturnToBottom]);
 
   return (
     <div className={styles.viewport}>
@@ -426,7 +423,7 @@ export function ConversationView({
         </section>
       </div>
       {loadingOlder ? <div className={styles.older} role="status" aria-label="正在加载更早消息"><LoaderCircle aria-hidden="true" /></div> : null}
-      <JumpToLatest visible={hasNewActivity} className={styles.jumpToLatest} onClick={scrollToLatest} />
+      <JumpToLatest visible={showReturnToBottom} className={styles.jumpToLatest} onClick={returnToBottom} />
     </div>
   );
 }

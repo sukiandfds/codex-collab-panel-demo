@@ -57,6 +57,7 @@ export function useProjectConversations() {
   const [editRequestVersion, setEditRequestVersion] = useState(0);
   const [renaming, setRenaming] = useState(false);
   const [retryingMessageId, setRetryingMessageId] = useState("");
+  const [localSendVersion, setLocalSendVersion] = useState(0);
   const reconcilingSubmissionsRef = useRef(new Set<string>());
   const contextManagement = useContextManagement(selection.selectedId);
   const onModelChanged = useCallback(() => {
@@ -95,6 +96,7 @@ export function useProjectConversations() {
     const submissionId = existingSubmissionId || createSubmissionId();
     const optimisticMessage = createOptimisticMessage(messageText, attachments, submissionId);
     selection.addOptimisticMessage(threadId, optimisticMessage);
+    setLocalSendVersion((version) => version + 1);
 
     const attempt = await execution.sendMessage(messageText, attachments.map((attachment) => attachment.id), submissionId);
     if (!attempt || attempt.outcome === "failed") {
@@ -351,6 +353,7 @@ export function useProjectConversations() {
     editingMessageId: editingMessage?.id || "",
     retryPendingMessage,
     retryingMessageId,
+    localSendVersion,
     beginEditMessage,
     cancelEditMessage,
     renameSession,

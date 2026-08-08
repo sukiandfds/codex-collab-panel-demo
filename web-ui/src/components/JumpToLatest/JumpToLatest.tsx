@@ -10,7 +10,7 @@ export function JumpToLatest({ visible, className = "", onClick }: {
   return (
     <button className={`${styles.button} ${className}`} type="button" onClick={onClick}>
       <ChevronDown aria-hidden="true" />
-      <span>新消息</span>
+      <span>回到底部</span>
     </button>
   );
 }

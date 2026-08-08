@@ -119,6 +119,7 @@ function ConversationApp({ active, onViewChange }: { active: boolean; onViewChan
           editingMessageId={conversations.editingMessageId}
           onRetryMessage={conversations.retryPendingMessage}
           retryingMessageId={conversations.retryingMessageId}
+          localSendVersion={conversations.localSendVersion}
         />
       }
       composer={

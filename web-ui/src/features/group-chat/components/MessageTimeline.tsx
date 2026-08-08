@@ -1,8 +1,9 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Bot } from "lucide-react";
 import { JumpToLatest } from "../../../components/JumpToLatest/JumpToLatest";
+import { useReturnToBottom } from "../../../components/JumpToLatest/useReturnToBottom";
 import { AttachmentDisplay } from "../../attachments/components/AttachmentDisplay";
 import { ArtifactCollection } from "../../artifacts/components/ArtifactCollection";
 import type { Artifact, ArtifactReviewDecision } from "../../artifacts/model/types";
@@ -29,6 +30,7 @@ export function MessageTimeline({
   onRetryArtifact,
   onReviewArtifact,
   onOpenProfile,
+  localSendVersion,
 }: {
   messages: GroupMessage[];
   agents: GroupAgent[];
@@ -41,33 +43,35 @@ export function MessageTimeline({
   onRetryArtifact: (artifactId: string) => Promise<void>;
   onReviewArtifact: (artifactId: string, decision: ArtifactReviewDecision, note: string, reviewedBy: string) => Promise<void>;
   onOpenProfile: (profile: GroupProfile) => void;
+  localSendVersion: number;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const stickToBottomRef = useRef(true);
-  const [hasNewActivity, setHasNewActivity] = useState(false);
   const streams = Object.entries(streaming).filter(([, value]) => value.text);
-  useEffect(() => {
+  const getScrollElement = useCallback(() => scrollRef.current, []);
+  const scrollToBottom = useCallback(() => {
     const root = scrollRef.current;
-    if (!root) return;
-    if (stickToBottomRef.current) root.scrollTop = root.scrollHeight;
-    else setHasNewActivity(true);
-  }, [messages.length, streaming]);
-
-  const scrollToLatest = useCallback(() => {
-    const root = scrollRef.current;
-    if (!root) return;
-    stickToBottomRef.current = true;
-    setHasNewActivity(false);
-    root.scrollTop = root.scrollHeight;
+    if (root) root.scrollTop = root.scrollHeight;
   }, []);
+  const {
+    visible: showReturnToBottom,
+    onScroll: updateReturnToBottom,
+    contentChanged,
+    returnToBottom,
+  } = useReturnToBottom({
+    isStreaming: streams.length > 0,
+    localSendVersion,
+    getScrollElement,
+    scrollToBottom,
+  });
+
+  useEffect(() => {
+    contentChanged();
+  }, [contentChanged, messages.length, streaming]);
 
   return (
     <div className={styles.timelineShell}>
       <div className={styles.timeline} ref={scrollRef} onScroll={(event) => {
-        const root = event.currentTarget;
-        const nearBottom = root.scrollHeight - root.scrollTop - root.clientHeight < 120;
-        stickToBottomRef.current = nearBottom;
-        if (nearBottom) setHasNewActivity(false);
+        updateReturnToBottom(event.currentTarget);
       }}>
         {!messages.length && !streams.length ? (
           <div className={styles.emptyRoom}><Bot /><strong>暂无消息</strong></div>
@@ -132,7 +136,7 @@ export function MessageTimeline({
           );
         })}
       </div>
-      <JumpToLatest visible={hasNewActivity} className={styles.jumpToLatest} onClick={scrollToLatest} />
+      <JumpToLatest visible={showReturnToBottom} className={styles.jumpToLatest} onClick={returnToBottom} />
     </div>
   );
 }
