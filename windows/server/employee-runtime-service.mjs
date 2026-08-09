@@ -290,6 +290,7 @@ export const createEmployeeRuntimeService = ({
     if (method === "item/completed") {
       const item = params.item;
       if (!item || !["userMessage", "agentMessage"].includes(item.type)) return;
+      if (item.type === "agentMessage" && item.phase && item.phase !== "final_answer") return;
       void conversationStore.recordRuntimeEvent(message).catch(() => {});
       const text = textFromItem(item);
       if (!text.trim()) return;
