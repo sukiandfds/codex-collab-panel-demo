@@ -216,8 +216,18 @@ export function ConversationView({
     }] : []),
     ...(agentScoped ? [{ id: "employee-growth", type: "growth" as const }] : []),
   ];
-  const visibleItemsLengthRef = useRef(visibleItems.length);
-  visibleItemsLengthRef.current = visibleItems.length;
+  const latestConversationIndex = visibleItems.reduce(
+    (latestIndex, item, index) => item.type === "growth" ? latestIndex : index,
+    -1,
+  );
+  const latestFollowIndex = latestConversationIndex >= 0 ? latestConversationIndex : Math.max(0, visibleItems.length - 1);
+  const trailingContentHeightRef = useRef(agentScoped ? 260 : 0);
+  const trailingContentScopeRef = useRef(agentScoped);
+  if (trailingContentScopeRef.current !== agentScoped) {
+    trailingContentScopeRef.current = agentScoped;
+    trailingContentHeightRef.current = agentScoped ? 260 : 0;
+  }
+  const getTrailingContentHeight = useCallback(() => trailingContentHeightRef.current, []);
   const virtualizer = useVirtualizer({
     count: visibleItems.length,
     getScrollElement: () => scrollRef.current,
@@ -296,10 +306,10 @@ export function ConversationView({
     window.cancelAnimationFrame(followLatestFrameRef.current);
     followLatestFrameRef.current = window.requestAnimationFrame(() => {
       if (!active || !visibleItems.length) return;
-      virtualizer.scrollToIndex(visibleItems.length - 1, { align: "end" });
+      virtualizer.scrollToIndex(latestFollowIndex, { align: "end" });
       rememberScrollPosition();
     });
-  }, [active, rememberScrollPosition, virtualizer, visibleItems.length]);
+  }, [active, latestFollowIndex, rememberScrollPosition, virtualizer, visibleItems.length]);
 
   const getScrollElement = useCallback(() => scrollRef.current, []);
   const {
@@ -314,6 +324,7 @@ export function ConversationView({
     isStreaming: isAnswerStreaming,
     localSendVersion,
     getScrollElement,
+    getTrailingContentHeight,
     scrollToBottom: scheduleFollowLatest,
   });
 
@@ -334,18 +345,18 @@ export function ConversationView({
         if (!root) return;
         if (savedPosition) {
           restoreScrollPosition(savedPosition, threadId, (currentRoot) => {
-            resetReturnToBottom(isNearBottom(currentRoot));
+            resetReturnToBottom(isNearBottom(currentRoot, trailingContentHeightRef.current));
             rememberScrollPosition(currentRoot, threadId);
           });
           return;
         }
         stickToBottomRef.current = true;
-        virtualizer.scrollToIndex(Math.max(0, visibleItemsLengthRef.current - 1), { align: "end" });
+        virtualizer.scrollToIndex(latestFollowIndex, { align: "end" });
         rememberScrollPosition(root, threadId);
       });
     }
     return () => window.cancelAnimationFrame(initialPositionFrameRef.current);
-  }, [active, loading, rememberScrollPosition, resetReturnToBottom, restoreScrollPosition, session?.threadId, virtualizer]);
+  }, [active, latestFollowIndex, loading, rememberScrollPosition, resetReturnToBottom, restoreScrollPosition, session?.threadId, virtualizer]);
 
   useEffect(() => {
     if (active || !session?.threadId) return;
@@ -476,7 +487,12 @@ export function ConversationView({
                   data-index={virtualRow.index}
                   data-message-id={item.type === "message" ? item.message.id : undefined}
                   key={virtualRow.key}
-                  ref={virtualizer.measureElement}
+                  ref={(element) => {
+                    virtualizer.measureElement(element);
+                    if (item.type === "growth" && element) {
+                      trailingContentHeightRef.current = element.getBoundingClientRect().height;
+                    }
+                  }}
                   style={{ transform: `translateY(${virtualRow.start}px)` }}
                 >
                   {item.type === "execution"

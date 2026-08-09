@@ -469,7 +469,27 @@ export const createConversationRoutes = ({
   }
   if (url.pathname === "/api/sessions") {
     const archived = url.searchParams.get("archived") === "1";
-    const sessions = await conversations.listSessions(url.searchParams.get("source") || "all", archived);
+    const source = url.searchParams.get("source") || "all";
+    const conversationId = String(url.searchParams.get("conversationId") || "").trim();
+    if (conversationId && agentConversationStore) {
+      const binding = await agentConversationStore.resolve({ conversationId });
+      if (binding.conversationKind !== "direct") {
+        sendJson(response, { error: "该 Agent 对话不是独立单聊" }, 409);
+        return true;
+      }
+      const session = await readAgentSession(binding, source, {});
+      const matchesFilter = session
+        && Boolean(session.archived) === archived
+        && (source === "all" || session.source === source);
+      if (!matchesFilter) {
+        sendJson(response, []);
+        return true;
+      }
+      const { messages, file, ...summary } = session;
+      sendJson(response, [summary]);
+      return true;
+    }
+    const sessions = await conversations.listSessions(source, archived);
     sendJson(response, sessions.map(({ messages, file, ...summary }) => summary));
     return true;
   }

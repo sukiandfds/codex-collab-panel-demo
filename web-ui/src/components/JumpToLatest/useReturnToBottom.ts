@@ -2,25 +2,30 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const AUTO_FOLLOW_DISTANCE = 120;
 const DEFAULT_PROMPT_DISTANCE = 800;
+const noTrailingContent = () => 0;
 
 const distanceFromBottom = (root: HTMLElement) => Math.max(
   0,
   root.scrollHeight - root.scrollTop - root.clientHeight,
 );
 
-export const isNearBottom = (root: HTMLElement) => distanceFromBottom(root) < AUTO_FOLLOW_DISTANCE;
+export const isNearBottom = (root: HTMLElement, trailingContentHeight = 0) => (
+  Math.max(0, distanceFromBottom(root) - Math.max(0, trailingContentHeight)) < AUTO_FOLLOW_DISTANCE
+);
 
 export function useReturnToBottom({
   active = true,
   isStreaming,
   localSendVersion = 0,
   getScrollElement,
+  getTrailingContentHeight = noTrailingContent,
   scrollToBottom,
 }: {
   active?: boolean;
   isStreaming: boolean;
   localSendVersion?: number;
   getScrollElement: () => HTMLElement | null;
+  getTrailingContentHeight?: () => number;
   scrollToBottom: () => void;
 }) {
   const [visible, setVisible] = useState(false);
@@ -31,7 +36,7 @@ export function useReturnToBottom({
 
   const updateFromPosition = useCallback((root = getScrollElement()) => {
     if (!active || !root) return;
-    const distance = distanceFromBottom(root);
+    const distance = Math.max(0, distanceFromBottom(root) - Math.max(0, getTrailingContentHeight()));
     if (distance < AUTO_FOLLOW_DISTANCE) {
       stickToBottomRef.current = true;
       streamingPromptLatchedRef.current = false;
@@ -44,7 +49,7 @@ export function useReturnToBottom({
     const beyondPromptDistance = distance > promptDistance;
     if (isStreaming && beyondPromptDistance) streamingPromptLatchedRef.current = true;
     setVisible(streamingPromptLatchedRef.current || beyondPromptDistance);
-  }, [active, getScrollElement, isStreaming]);
+  }, [active, getScrollElement, getTrailingContentHeight, isStreaming]);
 
   const schedulePositionUpdate = useCallback(() => {
     window.cancelAnimationFrame(positionFrameRef.current);

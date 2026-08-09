@@ -9,6 +9,8 @@
     status: null,
     messages: [],
     pendingAssistant: "",
+    turnId: "",
+    completedTurnIds: new Set(),
     sending: false,
     growth: {
       facts: [],
@@ -27,6 +29,50 @@
     if (!token) return path;
     const joiner = path.includes("?") ? "&" : "?";
     return `${path}${joiner}token=${encodeURIComponent(token)}`;
+  };
+
+  const normalizeTurnId = (value) => String(value || "").trim();
+  const terminalPhases = new Set(["idle", "failed", "interrupted", "systemError"]);
+  const statusTimestamp = (value) => {
+    const timestamp = Date.parse(String(value?.updatedAt || ""));
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  };
+  const mergeSessionMessages = (snapshotMessages, liveMessages) => {
+    const liveById = new Map(liveMessages.map((message) => [message.id, message]));
+    const seen = new Set();
+    const merged = [];
+    for (const message of snapshotMessages) {
+      const next = liveById.get(message.id) || message;
+      if (seen.has(next.id)) continue;
+      seen.add(next.id);
+      merged.push(next);
+    }
+    for (const message of liveMessages) {
+      if (seen.has(message.id)) continue;
+      seen.add(message.id);
+      merged.push(message);
+    }
+    return merged;
+  };
+  const rememberCompletedTurn = (turnId) => {
+    const normalized = normalizeTurnId(turnId);
+    if (!normalized) return;
+    state.completedTurnIds.add(normalized);
+    if (state.completedTurnIds.size > 20) {
+      const oldest = state.completedTurnIds.values().next().value;
+      state.completedTurnIds.delete(oldest);
+    }
+  };
+  const acceptsTurnEvent = (turnId, allowCompleted = false) => {
+    const normalized = normalizeTurnId(turnId);
+    if (!normalized) return true;
+    if (state.turnId) return state.turnId === normalized;
+    if (state.completedTurnIds.has(normalized)) {
+      return allowCompleted && !state.status?.active;
+    }
+    if (!state.status?.active) return allowCompleted && state.completedTurnIds.size === 0;
+    state.turnId = normalized;
+    return true;
   };
 
   const jsonRequest = async (path, options = {}) => {
@@ -206,6 +252,14 @@
   const setStatus = (status, confirmed = state.employee?.modificationConfirmed) => {
     state.status = status || state.status;
     const current = state.status || {};
+    const nextTurnId = normalizeTurnId(current.turnId);
+    if (current.active) {
+      if (current.phase === "submitted") state.turnId = "";
+      if (nextTurnId) state.turnId = nextTurnId;
+    } else if (terminalPhases.has(current.phase)) {
+      rememberCompletedTurn(state.turnId);
+      state.turnId = "";
+    }
     byId("work-state").textContent = current.label || (confirmed ? "等待任务" : "等待确认");
     byId("permission-state").textContent = confirmed ? "可执行" : "只读";
     byId("permission-state").dataset.state = confirmed ? "write" : "readonly";
@@ -267,8 +321,12 @@
     state.employee = session.employee;
     state.project = session.project;
     state.conversation = session.conversation;
-    state.status = session.status;
-    state.messages = Array.isArray(session.messages) ? session.messages : [];
+    const snapshotMessages = Array.isArray(session.messages) ? session.messages : [];
+    const currentStatus = state.status;
+    state.status = currentStatus && statusTimestamp(currentStatus) >= statusTimestamp(session.status)
+      ? currentStatus
+      : session.status;
+    state.messages = mergeSessionMessages(snapshotMessages, state.messages);
     renderIdentity();
     setStatus(state.status, Boolean(state.employee?.modificationConfirmed));
     renderMessages();
@@ -295,6 +353,10 @@
       }
       if (value.type === "employee_status") {
         setStatus(value.status, value.modificationConfirmed);
+        if (!value.status?.active && ["idle", "failed", "interrupted", "systemError"].includes(value.status?.phase)) {
+          state.pendingAssistant = "";
+          renderMessages();
+        }
         return;
       }
       if (value.type === "employee_confirmation_changed") {
@@ -303,6 +365,7 @@
         return;
       }
       if (value.type === "employee_assistant_delta") {
+        if (!state.status?.active || !acceptsTurnEvent(value.turnId)) return;
         state.pendingAssistant += String(value.delta || "");
         renderMessages();
         return;
@@ -310,9 +373,11 @@
       if (value.type === "employee_message_completed") {
         const message = value.message;
         if (!message?.text) return;
+        if (!acceptsTurnEvent(message.turnId, true)) return;
         if (message.role === "assistant") {
           state.pendingAssistant = "";
           if (!state.messages.some((entry) => entry.id === message.id)) state.messages.push(message);
+          rememberCompletedTurn(message.turnId);
         } else {
           let optimisticIndex = -1;
           for (let index = state.messages.length - 1; index >= 0; index -= 1) {
@@ -363,7 +428,8 @@
     if (!text) return;
     state.sending = true;
     const requestId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-    state.messages.push({ id: `local-${requestId}`, role: "user", text, optimistic: true, createdAt: new Date().toISOString() });
+    const optimisticMessageId = `local-${requestId}`;
+    state.messages.push({ id: optimisticMessageId, role: "user", text, optimistic: true, createdAt: new Date().toISOString() });
     state.pendingAssistant = "";
     renderMessages();
     input.value = "";
@@ -377,6 +443,8 @@
         body: JSON.stringify({ employeeId, text, requestId }),
       });
     } catch (error) {
+      state.messages = state.messages.filter((message) => message.id !== optimisticMessageId);
+      renderMessages();
       byId("send-hint").textContent = error.message;
     } finally {
       state.sending = false;
