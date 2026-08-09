@@ -1,9 +1,9 @@
 ---
 feature_id: FEAT-002
 title: 项目群聊与多 Agent 协作
-status: in_progress
-current_version: v0.4.2
-last_updated: 2026-08-07 18:36 +08:00
+status: code_ready_pending_user_review
+current_version: v0.4.4
+last_updated: 2026-08-10
 owners: [group_chat, multi_agent]
 key_paths:
   - web-ui/src/features/group-chat
@@ -26,6 +26,22 @@ key_paths:
 - v0.4.2 已将群聊侧栏、顶部、输入区、加载反馈和移动端布局调整为单人页的界面语言，同时保留成员、Agent、`@`、讨论/开发模式和成果审核；本轮没有修改单人页文件。
 - 消息整体样式、富文本、消息操作、历史消息、流式回复、指令等候队列、模型与上下文明确暂缓，继续作为本功能的待开发项目。
 - 对话与群聊已改为同一应用内切换，共用稳定页面外壳、手机视口和基础导航；两边业务状态、数据缓存和执行逻辑继续隔离。
+- Agent 单聊和独立员工项目页都可以看到该员工的成长事实与建议；建议审批中的后台读取不会把新状态覆盖回旧状态，审批写入失败会保留为可重试状态。
+
+### 2026-08-10 | v0.4.4 | code_ready_pending_user_review
+
+- 员工独立项目页接入成长记录读取、SSE/轮询刷新和规则/Skill 建议审批，用户不必离开员工主对话寻找成长信息。
+- 审批写入失败后，建议回到待处理状态并保留错误信息，用户可以再次批准或拒绝；正在审批时旧的轮询/SSE 结果不会覆盖页面状态。
+- 验证待完成：修改结束后只运行一次 `pnpm build:ui`；未启动服务、未做浏览器运行态验收。
+
+### 2026-08-09 | v0.4.3 | code_ready_pending_user_review
+
+- 本轮只补齐一个可演示闭环：从 Agent 详情进入完整单聊，对一条已完成 Agent 文字回复选择“带到群聊”，用户明确选择一个目标 Negus 群后发送原文字/Markdown。
+- Agent 身份以稳定 `agentId + conversationId` 绑定；Project/Agent/Conversation/Runtime 的最小边界已预留，Runtime `threadId` 只是可替换引用，不把 Agent 写死为 Codex Thread 或 Project。
+- Agent direct 单聊使用独立 Runtime Thread，与群聊执行 Thread 隔离；legacy 群聊 Thread 不迁移群上下文；单聊记录优先写入本地 append-only JSONL，Runtime 不可用时仍可恢复已保存记录。
+- 分享入口复用 React 单聊消息操作区的分支按钮 UI；目标群必须由用户点击确认。群内以原 Agent 身份显示一条普通消息，使用 `requestId` 幂等，且不自动触发其他 Agent。
+- 本轮不新增 Task/组织管理、群聊管理、Runtime 接入、摘要编辑、来源链接、项目进度或自动协作；9460 验收服务保持运行，桌面与 `390x844` 手机视口均完成技术验收，产品签收仍待用户确认。
+- 验收证据：Agent 定向测试 13/13 通过，`pnpm build:ui` 和 `git diff --check` 通过；全量 Windows Node 测试 121 项中 120 项通过，唯一失败是既有 `conversation-routes.test.mjs` 广播 mock 参数断言。
 
 ## 用户可见结果
 

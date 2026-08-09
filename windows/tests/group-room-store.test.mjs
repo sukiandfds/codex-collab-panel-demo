@@ -64,3 +64,34 @@ test("restores attachment-only group messages", async (t) => {
   assert.equal(restored.snapshot().messages[0].attachments[0].id, "media-1");
   await restored.close();
 });
+
+test("deduplicates repeated agent completions by work id", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "negus-group-work-"));
+  const stateFile = path.join(directory, "group-room.json");
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+
+  const events = [];
+  const room = await createGroupRoomStore({ stateFile, project: "negus", broadcast: (event) => events.push(event) });
+  const first = await room.addMessage({
+    type: "agent",
+    authorId: "developer",
+    authorName: "Developer Agent",
+    agentId: "developer",
+    workId: "work-1",
+    text: "最终结果",
+  });
+  const repeated = await room.addMessageWithStatus({
+    type: "agent",
+    authorId: "developer",
+    authorName: "Developer Agent",
+    agentId: "developer",
+    workId: "work-1",
+    text: "最终结果",
+  });
+
+  assert.equal(repeated.message.id, first.id);
+  assert.equal(repeated.created, false);
+  assert.equal(room.snapshot().messages.length, 1);
+  assert.equal(events.filter((event) => event.type === "group_message_created").length, 1);
+  await room.close();
+});

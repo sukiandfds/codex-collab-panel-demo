@@ -5,6 +5,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import test from "node:test";
 import { inputFromAttachments } from "../server/app-server-conversation-store.mjs";
+import { createAttachmentContentService } from "../server/attachment-content-service.mjs";
 import { createMediaService } from "../server/media-service.mjs";
 
 const pngHeader = (width, height) => {
@@ -17,8 +18,8 @@ const pngHeader = (width, height) => {
   return buffer;
 };
 
-test("maps uploaded files to Codex native input types", () => {
-  const input = inputFromAttachments("检查附件", [
+test("maps uploaded files to Codex native input types", async () => {
+  const input = await inputFromAttachments("检查附件", [
     { name: "screen.png", mimeType: "image/png", path: "C:\\uploads\\screen.png" },
     { name: "voice.m4a", mimeType: "audio/mp4", path: "C:\\uploads\\voice.m4a" },
     { name: "notes.pdf", mimeType: "application/pdf", path: "C:\\uploads\\notes.pdf" },
@@ -30,6 +31,23 @@ test("maps uploaded files to Codex native input types", () => {
     { type: "localAudio", path: "C:\\uploads\\voice.m4a" },
     { type: "mention", name: "notes.pdf", path: "C:\\uploads\\notes.pdf" },
   ]);
+});
+
+test("injects readable text attachment content while preserving the file mention", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "negus-readable-attachment-"));
+  try {
+    const file = path.join(root, "notes.md");
+    await fs.writeFile(file, "可读取的附件正文", "utf8");
+    const attachmentContent = createAttachmentContentService();
+    const input = await inputFromAttachments("检查附件", [
+      { name: "notes.md", mimeType: "text/markdown", path: file },
+    ], attachmentContent);
+
+    assert.deepEqual(input.map((item) => item.type), ["text", "mention", "text"]);
+    assert.match(input[2].text, /可读取的附件正文/u);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
 });
 
 test("stores uploads inside the configured runtime directory and restores them", async () => {

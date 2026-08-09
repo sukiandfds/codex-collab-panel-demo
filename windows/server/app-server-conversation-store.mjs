@@ -23,7 +23,7 @@ const latestIsoFromEpochMilliseconds = (values, fallback = "") => {
   return Number.isFinite(date.getTime()) ? date.toISOString() : fallback;
 };
 
-export const inputFromAttachments = (text, attachments = []) => {
+export const inputFromAttachments = async (text, attachments = [], attachmentContent) => {
   const input = [];
   if (text) input.push({ type: "text", text, text_elements: [] });
   for (const attachment of attachments) {
@@ -33,13 +33,41 @@ export const inputFromAttachments = (text, attachments = []) => {
       input.push({ type: "localAudio", path: attachment.path });
     } else {
       input.push({ type: "mention", name: attachment.name, path: attachment.path });
+      const analysis = await attachmentContent?.inspect?.(attachment);
+      if (analysis?.status === "ready" && analysis.content) {
+        input.push({
+          type: "text",
+          text: `\n\n[附件正文：${attachment.name}]\n${analysis.content}\n[附件正文结束]`,
+          text_elements: [],
+        });
+      }
     }
   }
   return input;
 };
 
+const promptFromSlashCommand = (text, attachments = []) => {
+  const match = /^\s*\/(image|file|skill|app)(?:\s+([\s\S]*?))?\s*$/iu.exec(String(text || ""));
+  if (!match) return text;
+  const detail = String(match[2] || "").trim();
+  const command = match[1].toLocaleLowerCase();
+  if (command === "image") {
+    return attachments.length
+      ? `请直接调用已配置的图片生成 MCP 工具，使用我上传的图片作为参考并按以下要求修改：${detail || "请先分析参考图片，再给出适当的修改结果。"}`
+      : `请直接调用已配置的图片生成 MCP 工具，按以下要求生成图片：${detail || "请根据当前对话中已经明确的画面要求生成图片。"}`;
+  }
+  if (command === "file") {
+    return `请读取并处理我上传的文件。${detail || "先理解文件内容和结构，再回答我的问题。"}`;
+  }
+  if (command === "skill") {
+    return `请使用与以下任务最匹配的 Codex Skill，并完成任务：${detail || "根据当前对话选择合适的 Skill。"}`;
+  }
+  return `请使用当前可用的 Codex App 或连接器完成以下任务：${detail || "根据当前对话选择合适的 App。"}`;
+};
+
 export const createAppServerConversationStore = ({
   projectRoot, registerMedia, onProtocolMessage, onSubmitted, onFailed, onHealthState,
+  attachmentContent,
   client = createAppServerClient(),
   supervision = {},
 }) => {
@@ -365,7 +393,7 @@ export const createAppServerConversationStore = ({
       await resumeThread(threadId);
       const result = await client.request("turn/start", {
         threadId,
-        input: inputFromAttachments(text, attachments),
+        input: await inputFromAttachments(promptFromSlashCommand(text, attachments), attachments, attachmentContent),
       });
       freshThreadRuntime.delete(threadId);
       return result;
@@ -378,7 +406,7 @@ export const createAppServerConversationStore = ({
   const steerMessage = async (threadId, turnId, text, attachments = []) => client.request("turn/steer", {
     threadId,
     expectedTurnId: turnId,
-    input: inputFromAttachments(text, attachments),
+    input: await inputFromAttachments(promptFromSlashCommand(text, attachments), attachments, attachmentContent),
   });
 
   const interrupt = async (threadId, turnId) => client.request("turn/interrupt", { threadId, turnId });
@@ -405,6 +433,11 @@ export const createAppServerConversationStore = ({
   const compactContext = async (threadId) => {
     await resumeThread(threadId);
     return client.request("thread/compact/start", { threadId });
+  };
+
+  const reviewSession = async (threadId) => {
+    await ensureProjectThread(threadId);
+    return client.request("review/start", { threadId });
   };
 
   const updateModel = async (threadId, model) => {
@@ -436,6 +469,6 @@ export const createAppServerConversationStore = ({
     listSessions, createSession, renameSession, findSession, sendMessage, steerMessage, interrupt,
     forkSession, archiveSession, unarchiveSession,
     listModels, updateModel, updateReasoningEffort, getRuntimeContext, getThreadStatus,
-    compactContext, close,
+    compactContext, reviewSession, close,
   };
 };

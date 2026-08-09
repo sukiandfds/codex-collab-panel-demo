@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#101319" />
+    <title>Negus · 员工</title>
+    <link rel="stylesheet" href="/employee.css" />
+  </head>
+  <body>
+    <div class="employee-app">
+      <header class="employee-topbar">
+        <a id="back-link" class="back-link" href="/group.html" aria-label="返回项目群">返回群聊</a>
+        <div class="topbar-title">
+          <span class="eyebrow">NEGUS / EMPLOYEE</span>
+          <strong id="employee-name">开发总监</strong>
+        </div>
+        <span id="connection-state" class="connection-state" data-state="loading">连接中</span>
+      </header>
+
+      <main class="employee-layout">
+        <aside class="employee-sidebar" aria-label="员工信息">
+          <div class="identity-block">
+            <div class="identity-mark" aria-hidden="true">开</div>
+            <div>
+              <p class="identity-label">长期员工</p>
+              <h1 id="employee-heading">开发总监</h1>
+              <p id="employee-responsibility" class="muted">负责已确认的代码实现、验证和结果汇报</p>
+            </div>
+          </div>
+          <dl class="project-meta">
+            <div>
+              <dt>员工项目</dt>
+              <dd id="project-key">employee-developer</dd>
+            </div>
+            <div>
+              <dt>执行后端</dt>
+              <dd id="runtime-kind">Codex</dd>
+            </div>
+            <div>
+              <dt>主对话</dt>
+              <dd id="thread-state">尚未打开</dd>
+            </div>
+          </dl>
+          <section id="growth-panel" class="growth-panel" aria-label="员工成长">
+            <div class="panel-heading">
+              <span>本次成长</span>
+              <span id="growth-state" class="growth-state" data-state="loading">读取中</span>
+            </div>
+            <div id="growth-content" class="growth-content">
+              <p class="growth-empty">正在读取成长记录...</p>
+            </div>
+          </section>
+          <div class="confirmation-panel">
+            <div class="panel-heading">
+              <span>修改权限</span>
+              <span id="permission-state" class="permission-state" data-state="readonly">只读</span>
+            </div>
+            <p id="permission-copy">当前只讨论、分析和读取信息。确认后，员工才可以进入修改流程。</p>
+            <button id="confirm-button" class="primary-button" type="button">确认执行修改</button>
+          </div>
+        </aside>
+
+        <section class="conversation-panel" aria-label="员工主对话">
+          <div class="conversation-header">
+            <div>
+              <p class="eyebrow">MAIN THREAD</p>
+              <h2>与开发总监沟通</h2>
+            </div>
+            <span id="work-state" class="work-state">等待确认</span>
+          </div>
+          <div id="message-list" class="message-list" aria-live="polite" aria-label="对话记录">
+            <div class="empty-state">正在打开员工主对话...</div>
+          </div>
+          <form id="message-form" class="composer">
+            <label class="sr-only" for="message-input">发送给员工</label>
+            <textarea id="message-input" rows="3" maxlength="32000" placeholder="和开发总监讨论任务、方案或下一步"></textarea>
+            <div class="composer-footer">
+              <span id="send-hint" class="muted">消息会进入该员工的长期主对话</span>
+              <button id="send-button" class="send-button" type="submit">发送</button>
+            </div>
+          </form>
+        </section>
+      </main>
+    </div>
+    <script src="/employee.js" defer></script>
+  </body>
+</html>

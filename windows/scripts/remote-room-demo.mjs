@@ -21,6 +21,18 @@ import { createArtifactService } from "../server/artifact-service.mjs";
 import { createWebOutputService } from "../server/web-output-service.mjs";
 import { createFushengUsageService } from "../server/fusheng-usage-service.mjs";
 import { createImageGenerationRunStore } from "../server/image-generation/image-generation-run-store.mjs";
+import { createAgentConversationStore } from "../server/agent-conversation-store.mjs";
+import { createPublicationStore } from "../server/publication-store.mjs";
+import { createAgentPublicationService } from "../server/agent-publication-service.mjs";
+import { createCodexRuntimeAdapter, createRuntimeAdapterRegistry } from "../server/runtime-adapter-registry.mjs";
+import { createGroupRoomDirectory } from "../server/group-room-directory.mjs";
+import { createEmployeeProjectRegistry } from "../server/employee-project-registry.mjs";
+import { createEmployeeRuntimeService } from "../server/employee-runtime-service.mjs";
+import { createEmployeeProjectDirectory } from "../server/employee-project-directory.mjs";
+import { createEmployeeGrowthStore } from "../server/employee-growth-store.mjs";
+import { createEmployeeGrowthReviewer } from "../server/employee-growth-reviewer.mjs";
+import { createEmployeeGrowthService } from "../server/employee-growth-service.mjs";
+import { createAttachmentContentService } from "../server/attachment-content-service.mjs";
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -37,7 +49,8 @@ const token = getArg("--token", randomBytes(12).toString("hex"));
 const deviceName = String(getArg("--device-name", os.hostname())).trim() || os.hostname();
 const device = { name: deviceName, startedAt: new Date().toISOString() };
 const sessionRoot = process.env.CODEX_SESSION_DIR || path.join(os.homedir(), ".codex", "sessions");
-const media = createMediaService({ uploadRoot: path.join(projectRoot, "runtime", "uploads") });
+const attachmentContent = createAttachmentContentService();
+const media = createMediaService({ uploadRoot: path.join(projectRoot, "runtime", "uploads"), attachmentContent });
 await media.restoreUploads();
 const imageGenerationRuns = createImageGenerationRunStore({
   stateFile: path.join(projectRoot, "runtime", "image-generation-runs.json"),
@@ -60,12 +73,15 @@ const jsonlConversations = createJsonlConversationStore({
   registerMedia: media.register,
   onChange: realtime.broadcast,
 });
+let agentConversationStore;
 const appServerConversations = createAppServerConversationStore({
   projectRoot,
+  attachmentContent,
   registerMedia: media.register,
   onProtocolMessage: (message) => {
     execution.handleProtocolMessage(message);
     contextManagement?.handleProtocolMessage(message);
+    void agentConversationStore?.recordRuntimeEvent?.(message);
   },
   onSubmitted: execution.markSubmitted,
   onFailed: execution.markFailed,
@@ -100,6 +116,50 @@ const groupRoom = await createGroupRoomStore({
   project,
   broadcast: realtime.broadcast,
 });
+const groupRoomDirectory = createGroupRoomDirectory({ rooms: [groupRoom] });
+const employeeRegistry = await createEmployeeProjectRegistry({
+  stateFile: path.join(projectRoot, "runtime", "employee-projects.json"),
+  workspaceRoot: projectRoot,
+});
+const employeeConversationStore = await createAgentConversationStore({
+  stateFile: path.join(projectRoot, "runtime", "employee-conversations.json"),
+  historyRoot: path.join(projectRoot, "runtime", "employee-conversations"),
+  groupRoom,
+  roomDirectory: groupRoomDirectory,
+});
+const employeeGrowthStore = await createEmployeeGrowthStore({
+  stateFile: path.join(projectRoot, "runtime", "employee-growth.json"),
+  registry: employeeRegistry,
+});
+const employeeGrowth = createEmployeeGrowthService({
+  registry: employeeRegistry,
+  store: employeeGrowthStore,
+  reviewer: createEmployeeGrowthReviewer(),
+  conversationStore: employeeConversationStore,
+  broadcast: realtime.broadcast,
+});
+const employeeRuntime = createEmployeeRuntimeService({
+  registry: employeeRegistry,
+  conversationStore: employeeConversationStore,
+  projectRoot,
+  broadcast: realtime.broadcast,
+  growthService: employeeGrowth,
+  contextProvider: employeeGrowth.getContext,
+});
+const employeeProjectDirectory = createEmployeeProjectDirectory({
+  project,
+  projectRoot,
+  registry: employeeRegistry,
+  employeeRuntime,
+});
+agentConversationStore = await createAgentConversationStore({
+  stateFile: path.join(projectRoot, "runtime", "agent-conversations.json"),
+  groupRoom,
+  roomDirectory: groupRoomDirectory,
+});
+const publicationStore = await createPublicationStore({
+  stateFile: path.join(projectRoot, "runtime", "agent-publications.json"),
+});
 const artifacts = await createArtifactService({
   stateFile: path.join(projectRoot, "runtime", "artifacts.json"),
   allowedRoot: path.join(projectRoot, "runtime", "agent-artifacts"),
@@ -118,6 +178,21 @@ const multiAgent = createMultiAgentService({
   room: groupRoom,
   broadcast: realtime.broadcast,
   webOutputs,
+  attachmentContent,
+  resolveAttachments: media.resolveMany,
+});
+const runtimeRegistry = createRuntimeAdapterRegistry({
+  adapters: [createCodexRuntimeAdapter({
+    conversations,
+    ensureSession: (agent) => multiAgent.ensureAgentConversationThread(agent.id),
+  })],
+});
+const agentPublicationService = createAgentPublicationService({
+  conversationStore: agentConversationStore,
+  runtimeRegistry,
+  groupRoom,
+  roomDirectory: groupRoomDirectory,
+  publicationStore,
 });
 const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
 const fushengUsage = createFushengUsageService({
@@ -129,6 +204,8 @@ const readWebVersion = createWebVersionReader(webRoot);
 const requestHandler = createRequestHandler({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime, submissions,
   followUpQueue, contextManagement, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
+  agentConversationStore, agentPublicationService, runtimeRegistry, employeeRuntime,
+  employeeProjectDirectory, employeeGrowth,
 });
 const server = http.createServer(requestHandler);
 
@@ -144,6 +221,12 @@ const close = () => {
   webOutputs.close();
   void artifacts.close();
   void groupRoom.close();
+  employeeRuntime.close();
+  void employeeGrowthStore.close();
+  void employeeConversationStore.close();
+  void employeeRegistry.close();
+  void agentConversationStore.close();
+  void publicationStore.close();
   server.close();
 };
 process.once("SIGINT", close);
@@ -154,4 +237,5 @@ server.listen(port, "0.0.0.0", () => {
   console.log(`[remote-room-demo] device: ${deviceName}`);
   console.log(`[remote-room-demo] http://127.0.0.1:${port}/?token=${token}`);
   console.log(`[remote-room-demo] http://127.0.0.1:${port}/group.html?token=${token}`);
+  console.log(`[remote-room-demo] http://127.0.0.1:${port}/employee.html?token=${token}`);
 });

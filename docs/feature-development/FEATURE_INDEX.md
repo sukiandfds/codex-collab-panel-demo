@@ -13,7 +13,7 @@ AI 助手应先根据任务定位功能编号，再读取对应文件。不要�
 | 功能编号 | 功能 | 当前状态 | 当前版本 | 最近更新 | 当前结论 | 记录 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `FEAT-001` | 单人 Codex Web 对话与控制 | `implemented_pending_review` | `v0.10.11` | 2026-08-06 | 已完成提交身份幂等、恢复与最终回复交接、加载完成前隐藏旧快照、历史消息加载位置保持等代码修复；当前只剩最新构建的真实刷新、重开、跨端和长任务体验确认，不再把已完成的代码修复列为待开发 | [`FEAT-001-single-codex-web.md`](./features/FEAT-001-single-codex-web.md) |
-| `FEAT-002` | 项目群聊与多 Agent 讨论 | `in_progress` | `v0.4.2` | 2026-08-07 | 群聊侧栏、顶部、输入区、加载反馈和移动端布局已向单人页看齐；消息样式、富文本、消息操作、历史加载、流式回复、等候队列、模型与上下文仍列为后续开发 | [`FEAT-002-group-multi-agent.md`](./features/FEAT-002-group-multi-agent.md) |
+| `FEAT-002` | 项目群聊与多 Agent 讨论 | `in_progress` | `v0.4.4` | 2026-08-10 | 群聊基础界面、Agent 独立单聊与“带到群聊”已接入；员工项目页显示成长事实和待审批建议，审批写入失败可重试；消息样式、富文本、历史加载、流式回复、等候队列、模型与上下文仍列为后续开发 | [`FEAT-002-group-multi-agent.md`](./features/FEAT-002-group-multi-agent.md) |
 | `FEAT-003` | 附件与对话内容渲染 | `implemented_pending_review` | `v0.3.0` | 2026-07-25 22:49 +08:00 | 支持上传、图片/音频/视频/文件展示和 Markdown 本地图片登记；仍是 Demo 级上传协议 | [`FEAT-003-attachments-content-rendering.md`](./features/FEAT-003-attachments-content-rendering.md) |
 | `FEAT-004` | PWA、设备身份与移动/平板入口 | `implemented_pending_review` | `v0.2.0` | 2026-07-28 17:43 +08:00 | 新构建会提示用户刷新且不会自动打断任务；连接状态不再误报电脑离线，真实 PWA 更新流程待原开发电脑验证 | [`FEAT-004-pwa-device-identity.md`](./features/FEAT-004-pwa-device-identity.md) |
 | `FEAT-005` | Desktop/Web 连续性与同任务提示 | `discovery` | `v0.4.1` | 2026-07-28 22:20 +08:00 | Desktop 与 Web 共享持久化 Thread 但不共享实时事件；双端同时操作曾导致 Web app-server 失联，需先做同任务提示、最小控制权和受控恢复 | [`FEAT-005-desktop-web-continuity.md`](./features/FEAT-005-desktop-web-continuity.md) |

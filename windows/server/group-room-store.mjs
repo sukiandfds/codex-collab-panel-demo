@@ -68,6 +68,7 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     .map((message, index) => ({
       ...message,
       clientMessageId: cleanText(message.clientMessageId, 80) || null,
+      workId: cleanText(message.workId, 160) || null,
       sequence: Number.isSafeInteger(message.sequence) && message.sequence > 0 ? message.sequence : index + 1,
       artifactIds: [...new Set((Array.isArray(message.artifactIds) ? message.artifactIds : [])
         .map((id) => cleanText(id, 80)).filter(Boolean))],
@@ -127,13 +128,19 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     text,
     attachments = [],
     clientMessageId = null,
+    workId = null,
+    preserveText = false,
   }) => {
-    const content = cleanText(text, 12000);
+    const content = preserveText
+      ? String(text || "").slice(0, 12000)
+      : cleanText(text, 12000);
     const cleanAuthorId = cleanText(authorId, 80);
     const cleanClientMessageId = cleanText(clientMessageId, 80) || null;
-    const existing = cleanClientMessageId
-      ? messages.find((message) => message.authorId === cleanAuthorId && message.clientMessageId === cleanClientMessageId)
-      : null;
+    const cleanWorkId = cleanText(workId, 160) || null;
+    const existing = messages.find((message) => (
+      (cleanClientMessageId && message.authorId === cleanAuthorId && message.clientMessageId === cleanClientMessageId)
+      || (cleanWorkId && message.workId === cleanWorkId)
+    ));
     if (existing) return { message: existing, created: false };
     const files = (Array.isArray(attachments) ? attachments : []).slice(0, 6).map((file) => ({
       id: cleanText(file.id, 80),
@@ -141,13 +148,14 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
       mimeType: cleanText(file.mimeType, 120),
       url: cleanText(file.url, 240),
     })).filter((file) => file.id && file.name && file.url);
-    if (!content && !files.length) throw Object.assign(new Error("消息不能为空"), { statusCode: 400 });
+    if (!content.trim() && !files.length) throw Object.assign(new Error("消息不能为空"), { statusCode: 400 });
     const targets = [...new Set((Array.isArray(targetAgentIds) ? targetAgentIds : [])
       .map((id) => cleanText(id, 80))
       .filter((id) => agents.has(id)))];
     const message = {
       id: randomUUID(),
       clientMessageId: cleanClientMessageId,
+      workId: cleanWorkId,
       sequence: ++nextMessageSequence,
       type,
       authorId: cleanAuthorId,

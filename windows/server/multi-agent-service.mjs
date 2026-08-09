@@ -12,10 +12,20 @@ const isMissingThreadError = (error) => missingThreadPattern.test(String(error?.
 
 export { buildDiscussionPrompt, mentionedAgentIds } from "./multi-agent/discussion-prompt.mjs";
 
-export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutputs }) => {
+export const createMultiAgentService = ({
+  projectRoot,
+  room,
+  broadcast,
+  webOutputs,
+  autoCollaboration = false,
+  attachmentContent,
+  resolveAttachments = () => [],
+}) => {
   const client = createAppServerClient();
   const threadAgents = new Map();
+  const conversationThreads = new Map();
   const activeModes = new Map();
+  const allowAutomaticCollaboration = autoCollaboration === true;
   let currentRun = null;
   let workQueue = Promise.resolve();
   let closed = false;
@@ -83,6 +93,18 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
     if (!agentId) return;
 
     if (method === "turn/started") {
+      const run = currentRun?.threadId === params.threadId ? currentRun : null;
+      if (run && !run.startedBroadcast) {
+        run.startedBroadcast = true;
+        broadcast({
+          type: "group_agent_started",
+          agentId,
+          agentName: room.getAgent(agentId)?.name || "Codex Agent",
+          workId: run.workId,
+          mode: activeModes.get(agentId) || "discussion",
+          startedAt: run.startedAt,
+        });
+      }
       void setStatus(agentId, { phase: "working", label: "正在处理任务", detail: "", active: true });
       return;
     }
@@ -97,10 +119,16 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
       return;
     }
     if (method === "item/agentMessage/delta") {
-      broadcast({ type: "group_agent_delta", agentId, ...params });
+      const workId = currentRun?.threadId === params.threadId
+        ? currentRun.workId
+        : `${agentId}:${params.itemId || "stream"}`;
+      broadcast({ type: "group_agent_delta", ...params, agentId, workId });
       return;
     }
     if (method === "item/completed" && params.item?.type === "agentMessage" && params.item.phase !== "commentary") {
+      const workId = currentRun?.threadId === params.threadId
+        ? currentRun.workId
+        : `${agentId}:${params.item.id || params.turnId || "message"}`;
       const messageWrite = room.addMessage({
         type: "agent",
         authorId: agentId,
@@ -108,6 +136,7 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
         agentId,
         mode: activeModes.get(agentId) || "discussion",
         text: params.item.text,
+        workId,
       });
       if (currentRun?.threadId === params.threadId) {
         currentRun.finalText = params.item.text;
@@ -162,6 +191,33 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
     throw new Error("无法建立 Agent Thread");
   };
 
+  const ensureAgentConversationThread = async (agentId) => {
+    const agent = room.getAgent(agentId);
+    if (!agent) throw Object.assign(new Error("Agent does not exist"), { statusCode: 404 });
+    const existing = conversationThreads.get(agent.id);
+    if (existing) return existing;
+    const creation = (async () => {
+      const result = await client.request("thread/start", {
+        cwd: projectRoot,
+        developerInstructions: agent.instructions,
+        ephemeral: false,
+        serviceName: "negus-agent",
+      });
+      const threadId = result.thread.id;
+      await client.request("thread/name/set", { threadId, name: `${agent.name} direct conversation` });
+      if (agent.model) await client.request("thread/settings/update", { threadId, model: agent.model });
+      if (agent.reasoningEffort) await client.request("thread/settings/update", { threadId, effort: agent.reasoningEffort });
+      return threadId;
+    })();
+    conversationThreads.set(agent.id, creation);
+    try {
+      return await creation;
+    } catch (error) {
+      if (conversationThreads.get(agent.id) === creation) conversationThreads.delete(agent.id);
+      throw error;
+    }
+  };
+
   const updateAgentSettings = async (agentId, settings) => {
     const agent = room.getAgent(agentId);
     if (!agent) throw Object.assign(new Error("Agent 不存在"), { statusCode: 404 });
@@ -178,6 +234,12 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
     return room.updateAgent(agentId, nextSettings);
   };
 
+  const ensureAgentThread = async (agentId) => {
+    const agent = room.getAgent(agentId);
+    if (!agent) throw Object.assign(new Error("Agent 不存在"), { statusCode: 404 });
+    return ensureThread(agent);
+  };
+
   const runAgent = async ({ agentId, mode, attachments, outputJob }) => {
     if (closed) throw new Error("多 Agent 服务已关闭");
     const agent = room.getAgent(agentId);
@@ -190,6 +252,16 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
       : "";
     const roomSnapshot = room.snapshot();
     const context = room.getAgentContext(agentId);
+    const contextAttachmentIds = [...new Set(context.messages.flatMap((message) => (
+      Array.isArray(message.attachments) ? message.attachments.map((file) => file.id) : []
+    )))];
+    const contextAttachments = typeof resolveAttachments === "function"
+      ? resolveAttachments(contextAttachmentIds)
+      : [];
+    const inputAttachments = [...new Map([
+      ...attachments,
+      ...contextAttachments,
+    ].filter((attachment) => attachment?.id).map((attachment) => [attachment.id, attachment])).values()];
     const prompt = buildDiscussionPrompt({
       agent,
       agents: roomSnapshot.agents,
@@ -209,12 +281,22 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
       resolveRun({ status: "failed", text: "" });
     }, 30 * 60 * 1000);
     timer.unref?.();
-    currentRun = { agentId, threadId, resolve: resolveRun, timer, finalText: "", messageWrite: null };
+    currentRun = {
+      agentId,
+      threadId,
+      resolve: resolveRun,
+      timer,
+      finalText: "",
+      messageWrite: null,
+      workId: randomUUID(),
+      startedAt: new Date().toISOString(),
+      startedBroadcast: false,
+    };
 
     try {
       await client.request("turn/start", {
         threadId,
-        input: inputFromAttachments(prompt, attachments),
+        input: await inputFromAttachments(prompt, inputAttachments, attachmentContent),
         cwd: projectRoot,
       });
       const result = await completion;
@@ -232,11 +314,11 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
     const agents = room.snapshot().agents;
     const pending = cleanAgentIds(agentIds, agents);
     const runCounts = new Map();
-    let needsManagerFollowUp = pending.some((id) => id !== "manager");
+    let needsManagerFollowUp = allowAutomaticCollaboration && pending.some((id) => id !== "manager");
     let turns = 0;
 
     while (turns < maxDiscussionTurns) {
-      if (!pending.length && needsManagerFollowUp && (runCounts.get("manager") || 0) < 2) {
+      if (allowAutomaticCollaboration && !pending.length && needsManagerFollowUp && (runCounts.get("manager") || 0) < 2) {
         pending.push("manager");
         needsManagerFollowUp = false;
       }
@@ -254,14 +336,16 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
           await completeOutputJob({ outputJob, result, agentId, mode, room, webOutputs, setStatus, finishStatus });
           return;
         }
-        if (agentId !== "manager") needsManagerFollowUp = true;
+        if (agentId !== "manager") needsManagerFollowUp = allowAutomaticCollaboration;
 
-        for (const mentionedId of mentionedAgentIds(result.text, room.snapshot().agents)) {
-          const mentionedLimit = mentionedId === "manager" ? 2 : 1;
-          if (mentionedId !== agentId
-            && (runCounts.get(mentionedId) || 0) < mentionedLimit
-            && !pending.includes(mentionedId)) {
-            pending.push(mentionedId);
+        if (allowAutomaticCollaboration) {
+          for (const mentionedId of mentionedAgentIds(result.text, room.snapshot().agents)) {
+            const mentionedLimit = mentionedId === "manager" ? 2 : 1;
+            if (mentionedId !== agentId
+              && (runCounts.get(mentionedId) || 0) < mentionedLimit
+              && !pending.includes(mentionedId)) {
+              pending.push(mentionedId);
+            }
           }
         }
       } catch (error) {
@@ -280,14 +364,20 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
     }
   };
 
-  const enqueueDiscussion = async ({ agentIds, mode, requestText, attachments = [], sourceMessageId = "" }) => {
+  const enqueueDiscussion = async ({ agentIds, mode, requestText, attachments = [], sourceMessageId = "", explicitAgentIds = [] }) => {
     const agents = room.snapshot().agents;
     let targets = cleanAgentIds(agentIds, agents);
     if (!targets.length) throw Object.assign(new Error("请选择一个可用 Agent"), { statusCode: 404 });
-    const outputJob = webOutputs?.isRequest(requestText)
+    const explicitTargets = cleanAgentIds(
+      explicitAgentIds.length ? explicitAgentIds : mentionedAgentIds(requestText, agents),
+      agents,
+    );
+    const canCreateOutputJob = !explicitTargets.length
+      || (explicitTargets.length === 1 && targets.length === 1 && targets[0] === "developer");
+    const outputJob = canCreateOutputJob && webOutputs?.isRequest(requestText)
       ? await webOutputs.createJob({ sourceMessageId, agentId: "developer" })
       : null;
-    if (outputJob) targets = ["developer"];
+    if (outputJob && !explicitTargets.length) targets = ["developer"];
     const executionMode = outputJob ? "development" : mode;
     const jobId = outputJob?.jobId || randomUUID();
     void setStatus(targets[0], { phase: "queued", label: "已加入讨论队列", detail: "", active: true });
@@ -309,5 +399,5 @@ export const createMultiAgentService = ({ projectRoot, room, broadcast, webOutpu
     client.close();
   };
 
-  return { enqueueDiscussion, updateAgentSettings, close };
+  return { enqueueDiscussion, updateAgentSettings, ensureAgentThread, ensureAgentConversationThread, close };
 };

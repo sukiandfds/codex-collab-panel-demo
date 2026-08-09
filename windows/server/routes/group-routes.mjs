@@ -1,4 +1,5 @@
 import { readJson, sendJson } from "../http/request-utils.mjs";
+import { mentionedAgentIds } from "../multi-agent/discussion-prompt.mjs";
 
 export const createGroupRoutes = ({ groupRoom, media, multiAgent, webOutputs }) => async (request, response, url) => {
   if (url.pathname === "/api/group/snapshot") {
@@ -33,13 +34,15 @@ export const createGroupRoutes = ({ groupRoom, media, multiAgent, webOutputs }) 
     sendJson(response, { error: "消息不能为空" }, 400);
     return true;
   }
+  const agents = groupRoom.snapshot().agents;
+  const explicitAgentIds = mentionedAgentIds(text, agents);
   const requestedAgentIds = Array.isArray(body.agentIds) ? body.agentIds : [body.agentId];
-  const availableAgentIds = new Set(groupRoom.snapshot().agents.map((agent) => agent.id));
-  const targetAgentIds = [...new Set(requestedAgentIds
+  const availableAgentIds = new Set(agents.map((agent) => agent.id));
+  const targetAgentIds = [...new Set((explicitAgentIds.length ? explicitAgentIds : requestedAgentIds)
     .map((agentId) => String(agentId || "").trim())
     .filter((agentId) => availableAgentIds.has(agentId)))];
   if (!targetAgentIds.length) targetAgentIds.push("manager");
-  if (webOutputs.isRequest(text)) {
+  if (!explicitAgentIds.length && webOutputs.isRequest(text)) {
     targetAgentIds.splice(0, targetAgentIds.length, "developer");
     mode = "development";
   }
@@ -64,6 +67,7 @@ export const createGroupRoutes = ({ groupRoom, media, multiAgent, webOutputs }) 
     requestText: text || "请查看附件并根据内容进行处理。",
     attachments,
     sourceMessageId: message.id,
+    explicitAgentIds,
   });
   sendJson(response, { message, execution }, 202);
   return true;

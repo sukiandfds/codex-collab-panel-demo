@@ -1,17 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { paginationFrom, readJson, sendJson } from "../http/request-utils.mjs";
 
-const publicAttachment = ({ id, name, mimeType, url, width, height }) => ({
+const publicAttachment = ({ id, name, mimeType, url, width, height, readStatus, readError }) => ({
   id,
   name,
   mimeType,
   url,
   ...(Number.isSafeInteger(width) && Number.isSafeInteger(height) ? { width, height } : {}),
+  ...(readStatus ? { readStatus } : {}),
+  ...(readError ? { readError } : {}),
 });
 
 export const createConversationRoutes = ({
   conversations, execution, followUpQueue, contextManagement, media, submissionStore,
-  broadcast = () => {}, publishThreadEvent = broadcast,
+  broadcast = () => {}, publishThreadEvent = (_threadId, event) => broadcast(event), agentConversationStore,
 }) => {
   const inFlightSubmissions = new Map();
   const submissionTtlMs = 60000;
@@ -77,6 +79,60 @@ export const createConversationRoutes = ({
     return promise;
   };
 
+  const authorizeAgentThread = async ({ threadId, conversationId }) => {
+    if (!agentConversationStore) return null;
+    const cleanThreadId = String(threadId || "").trim();
+    const cleanConversationId = String(conversationId || "").trim();
+    const boundByThread = cleanThreadId
+      ? agentConversationStore.findByRuntimeSession?.("codex", cleanThreadId)
+      : null;
+    if (!cleanConversationId) {
+      if (boundByThread) throw Object.assign(new Error("Agent 单聊需要 conversationId"), { statusCode: 400 });
+      return null;
+    }
+    const binding = await agentConversationStore.resolve({ conversationId: cleanConversationId });
+    const allowed = binding.runtimeSessionId === cleanThreadId;
+    if (!allowed) throw Object.assign(new Error("conversationId 与 threadId 不匹配"), { statusCode: 409 });
+    if (binding.conversationKind !== "direct") {
+      throw Object.assign(new Error("Agent 单聊尚未绑定独立 Thread"), { statusCode: 409 });
+    }
+    return binding;
+  };
+
+  const readAgentSession = async (binding, source, pagination) => {
+    const localMessages = await agentConversationStore.readMessages(binding.conversationId);
+    let runtime = null;
+    try {
+      runtime = await conversations.findSession(binding.runtimeSessionId, source, pagination);
+    } catch {
+      // The local Agent record remains readable when its previous Runtime is unavailable.
+    }
+    if (!localMessages.length) return runtime;
+    const messages = new Map((runtime?.messages || []).map((message) => [message.id, message]));
+    for (const message of localMessages) messages.set(message.id, message);
+    const ordered = [...messages.values()].sort((left, right) => (
+      Date.parse(left.createdAt || "") - Date.parse(right.createdAt || "")
+    ));
+    return {
+      ...(runtime || {
+        threadId: binding.runtimeSessionId,
+        source: "codex",
+        title: "Agent 对话",
+        updatedAt: "",
+        messageCount: null,
+        latestUser: "",
+        latestAssistant: "",
+        archived: false,
+      }),
+      threadId: binding.runtimeSessionId,
+      messages: ordered,
+      messageCount: ordered.length,
+      hasMore: false,
+      nextBefore: null,
+      nextCursor: null,
+    };
+  };
+
   return async (request, response, url) => {
   if (url.pathname === "/api/models" && request.method === "GET") {
     sendJson(response, await conversations.listModels());
@@ -95,11 +151,14 @@ export const createConversationRoutes = ({
       sendJson(response, { error: "message is too long" }, 413);
       return true;
     }
+    const conversationId = String(body.conversationId || "").trim();
+    await authorizeAgentThread({ threadId, conversationId });
     const submissionId = String(body.submissionId || "").trim().slice(0, 160) || randomUUID();
     const messageId = `optimistic-${submissionId}`;
     const createdAt = new Date().toISOString();
     const fingerprint = JSON.stringify({
       threadId,
+      conversationId,
       text,
       attachmentIds: Array.isArray(body.attachmentIds) ? body.attachmentIds : [],
     });
@@ -195,10 +254,12 @@ export const createConversationRoutes = ({
   if (url.pathname === "/api/session/submission" && request.method === "GET") {
     const threadId = String(url.searchParams.get("threadId") || "").trim();
     const submissionId = String(url.searchParams.get("submissionId") || "").trim();
+    const conversationId = String(url.searchParams.get("conversationId") || "").trim();
     if (!threadId || !submissionId) {
       sendJson(response, { error: "threadId and submissionId are required" }, 400);
       return true;
     }
+    await authorizeAgentThread({ threadId, conversationId });
     const entry = submissionStore?.get(submissionId);
     const resultThreadId = entry?.result?.body?.threadId || "";
     if (!entry || (entry.threadId !== threadId && resultThreadId !== threadId)) {
@@ -219,11 +280,13 @@ export const createConversationRoutes = ({
   if (url.pathname === "/api/session/name" && request.method === "POST") {
     const body = await readJson(request);
     const threadId = String(body.threadId || "").trim();
+    const conversationId = String(body.conversationId || "").trim();
     const name = String(body.name || "").trim();
     if (!threadId || !name) {
       sendJson(response, { error: "threadId and name are required" }, 400);
       return true;
     }
+    await authorizeAgentThread({ threadId, conversationId });
     if (name.length > 120) {
       sendJson(response, { error: "name is too long" }, 413);
       return true;
@@ -236,11 +299,13 @@ export const createConversationRoutes = ({
   if (url.pathname === "/api/session/model" && request.method === "POST") {
     const body = await readJson(request);
     const threadId = String(body.threadId || "").trim();
+    const conversationId = String(body.conversationId || "").trim();
     const model = String(body.model || "").trim();
     if (!threadId || !model) {
       sendJson(response, { error: "threadId and model are required" }, 400);
       return true;
     }
+    await authorizeAgentThread({ threadId, conversationId });
     if (execution.getStatus(threadId).active) {
       sendJson(response, { error: "当前任务运行中，请在完成后切换模型" }, 409);
       return true;
@@ -251,11 +316,13 @@ export const createConversationRoutes = ({
   if (url.pathname === "/api/session/reasoning-effort" && request.method === "POST") {
     const body = await readJson(request);
     const threadId = String(body.threadId || "").trim();
+    const conversationId = String(body.conversationId || "").trim();
     const reasoningEffort = String(body.reasoningEffort || "").trim();
     if (!threadId || !reasoningEffort) {
       sendJson(response, { error: "threadId and reasoningEffort are required" }, 400);
       return true;
     }
+    await authorizeAgentThread({ threadId, conversationId });
     if (execution.getStatus(threadId).active) {
       sendJson(response, { error: "当前任务运行中，请在完成后调整推理强度" }, 409);
       return true;
@@ -266,6 +333,8 @@ export const createConversationRoutes = ({
   if (url.pathname === "/api/session/interrupt" && request.method === "POST") {
     const body = await readJson(request);
     const threadId = String(body.threadId || "").trim();
+    const conversationId = String(body.conversationId || "").trim();
+    await authorizeAgentThread({ threadId, conversationId });
     const status = execution.getStatus(threadId);
     if (!threadId || !status.active || !status.turnId) {
       sendJson(response, { error: "当前没有可停止的任务" }, 409);
@@ -275,14 +344,34 @@ export const createConversationRoutes = ({
     sendJson(response, { threadId, turnId: status.turnId, status: "interrupting" }, 202);
     return true;
   }
+  if (url.pathname === "/api/session/review" && request.method === "POST") {
+    const body = await readJson(request);
+    const threadId = String(body.threadId || "").trim();
+    const conversationId = String(body.conversationId || "").trim();
+    if (!threadId) {
+      sendJson(response, { error: "threadId is required" }, 400);
+      return true;
+    }
+    await authorizeAgentThread({ threadId, conversationId });
+    if (execution.getStatus(threadId).active) {
+      sendJson(response, { error: "当前任务完成后才能开始审查" }, 409);
+      return true;
+    }
+    await conversations.reviewSession(threadId);
+    publishThreadEvent(threadId, { type: "sessions_changed", threadId });
+    sendJson(response, { threadId, status: "started" }, 202);
+    return true;
+  }
   if (url.pathname === "/api/session/fork" && request.method === "POST") {
     const body = await readJson(request);
     const threadId = String(body.threadId || "").trim();
+    const conversationId = String(body.conversationId || "").trim();
     const lastTurnId = String(body.lastTurnId || "").trim();
     if (!threadId || !lastTurnId) {
       sendJson(response, { error: "threadId and lastTurnId are required" }, 400);
       return true;
     }
+    await authorizeAgentThread({ threadId, conversationId });
     if (execution.getStatus(threadId).active) {
       sendJson(response, { error: "当前任务运行中，请完成后再从这里继续" }, 409);
       return true;
@@ -298,10 +387,12 @@ export const createConversationRoutes = ({
   if (url.pathname === "/api/session/archive" && request.method === "POST") {
     const body = await readJson(request);
     const threadId = String(body.threadId || "").trim();
+    const conversationId = String(body.conversationId || "").trim();
     if (!threadId) {
       sendJson(response, { error: "threadId is required" }, 400);
       return true;
     }
+    await authorizeAgentThread({ threadId, conversationId });
     if (execution.getStatus(threadId).active) {
       sendJson(response, { error: "当前任务运行中，请完成后再归档" }, 409);
       return true;
@@ -312,29 +403,35 @@ export const createConversationRoutes = ({
   if (url.pathname === "/api/session/unarchive" && request.method === "POST") {
     const body = await readJson(request);
     const threadId = String(body.threadId || "").trim();
+    const conversationId = String(body.conversationId || "").trim();
     if (!threadId) {
       sendJson(response, { error: "threadId is required" }, 400);
       return true;
     }
+    await authorizeAgentThread({ threadId, conversationId });
     sendJson(response, await conversations.unarchiveSession(threadId), 202);
     return true;
   }
   if (url.pathname === "/api/session/context" && request.method === "GET") {
     const threadId = url.searchParams.get("threadId") || "";
+    const conversationId = url.searchParams.get("conversationId") || "";
     if (!threadId) {
       sendJson(response, { error: "threadId is required" }, 400);
       return true;
     }
+    await authorizeAgentThread({ threadId, conversationId });
     sendJson(response, await contextManagement.load(threadId));
     return true;
   }
   if (url.pathname === "/api/session/context/settings" && request.method === "POST") {
     const body = await readJson(request);
     const threadId = String(body.threadId || "").trim();
+    const conversationId = String(body.conversationId || "").trim();
     if (!threadId) {
       sendJson(response, { error: "threadId is required" }, 400);
       return true;
     }
+    await authorizeAgentThread({ threadId, conversationId });
     const threshold = body.autoCompactThreshold === null ? null : Number(body.autoCompactThreshold);
     sendJson(response, await contextManagement.setThreshold(threadId, threshold));
     return true;
@@ -342,19 +439,23 @@ export const createConversationRoutes = ({
   if (url.pathname === "/api/session/context/compact" && request.method === "POST") {
     const body = await readJson(request);
     const threadId = String(body.threadId || "").trim();
+    const conversationId = String(body.conversationId || "").trim();
     if (!threadId) {
       sendJson(response, { error: "threadId is required" }, 400);
       return true;
     }
+    await authorizeAgentThread({ threadId, conversationId });
     sendJson(response, await contextManagement.requestCompaction(threadId), 202);
     return true;
   }
   if (url.pathname === "/api/execution-status") {
     const threadId = url.searchParams.get("threadId") || "";
+    const conversationId = url.searchParams.get("conversationId") || "";
     if (!threadId) {
       sendJson(response, { error: "threadId is required" }, 400);
       return true;
     }
+    await authorizeAgentThread({ threadId, conversationId });
     const current = execution.getStatus(threadId);
     if (current.active && url.searchParams.get("reconcile") === "1") {
       try {
@@ -378,11 +479,14 @@ export const createConversationRoutes = ({
     return true;
   }
   if (url.pathname === "/api/session") {
-    const session = await conversations.findSession(
-      url.searchParams.get("threadId") || "",
-      url.searchParams.get("source") || "all",
-      paginationFrom(url),
-    );
+    const threadId = url.searchParams.get("threadId") || "";
+    const conversationId = url.searchParams.get("conversationId") || "";
+    const source = url.searchParams.get("source") || "all";
+    const pagination = paginationFrom(url);
+    const binding = await authorizeAgentThread({ threadId, conversationId });
+    const session = binding
+      ? await readAgentSession(binding, source, pagination)
+      : await conversations.findSession(threadId, source, pagination);
     if (!session) {
       sendJson(response, { error: "session not found" }, 404);
       return true;

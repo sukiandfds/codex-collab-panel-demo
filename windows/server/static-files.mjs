@@ -28,7 +28,9 @@ export const createStaticFileServer = (webRoot) => async (url, response) => {
   try {
     const content = await fs.readFile(file);
     const fileName = path.basename(file).toLowerCase();
-    const needsRevalidation = file.endsWith(".html") || fileName === "sw.js" || fileName === "manifest.webmanifest";
+    const needsRevalidation = file.endsWith(".html")
+      || fileName === "sw.js"
+      || fileName === "manifest.webmanifest";
     response.writeHead(200, {
       "Content-Type": mimeTypes.get(path.extname(file).toLowerCase()) || "application/octet-stream",
       "Cache-Control": needsRevalidation ? "no-cache" : "public, max-age=31536000, immutable",

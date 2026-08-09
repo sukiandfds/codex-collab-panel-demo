@@ -7,20 +7,35 @@ import { createGroupRoutes } from "./routes/group-routes.mjs";
 import { createSystemRoutes } from "./routes/system-routes.mjs";
 import { createUsageRoutes } from "./routes/usage-routes.mjs";
 import { createVersionRoutes } from "./routes/version-routes.mjs";
+import { createAgentPublicationRoutes } from "./routes/agent-publication-routes.mjs";
+import { createEmployeeRoutes } from "./routes/employee-routes.mjs";
+import { createEmployeeProjectDirectoryRoutes } from "./routes/employee-project-directory-routes.mjs";
+import { createEmployeeGrowthRoutes } from "./routes/employee-growth-routes.mjs";
 
 export const createRequestHandler = ({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime, submissions,
   followUpQueue, contextManagement, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
+  agentConversationStore, agentPublicationService, runtimeRegistry,
+  employeeRuntime, employeeProjectDirectory, employeeGrowth,
 }) => {
   const routes = [
     createVersionRoutes({ readWebVersion }),
     createArtifactRoutes({ groupRoom, artifacts, webOutputs }),
+    createAgentPublicationRoutes({
+      conversationStore: agentConversationStore,
+      publicationService: agentPublicationService,
+      runtimeRegistry,
+    }),
+    ...(employeeRuntime ? [createEmployeeRoutes({ employeeRuntime })] : []),
+    ...(employeeProjectDirectory ? [createEmployeeProjectDirectoryRoutes({ directory: employeeProjectDirectory })] : []),
+    ...(employeeGrowth ? [createEmployeeGrowthRoutes({ growth: employeeGrowth })] : []),
     createGroupRoutes({ groupRoom, media, multiAgent, webOutputs }),
     createFollowUpQueueRoutes({ queue: followUpQueue, media }),
     createConversationRoutes({
       conversations, execution, followUpQueue, contextManagement, media, submissionStore: submissions,
       broadcast: realtime.broadcast,
       publishThreadEvent: execution.publishThreadEvent,
+      agentConversationStore,
     }),
     createUsageRoutes({ fushengUsage }),
     createSystemRoutes({ token, project, projectRoot, device, observerPort, media, realtime }),

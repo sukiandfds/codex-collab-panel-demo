@@ -27,12 +27,14 @@ const maxImageProbeBytes = 25 * 1024 * 1024;
 const previewMaxPixels = 320;
 
 const validDimension = (value) => Number.isSafeInteger(value) && value > 0;
-const publicMedia = ({ id, name, mimeType, url, width, height }) => ({
+const publicMedia = ({ id, name, mimeType, url, width, height, readStatus, readError }) => ({
   id,
   name,
   mimeType,
   url,
   ...(validDimension(width) && validDimension(height) ? { width, height } : {}),
+  ...(readStatus ? { readStatus } : {}),
+  ...(readError ? { readError } : {}),
 });
 const normalizeSize = (size) => {
   if (!validDimension(size?.width) || !validDimension(size?.height)) return {};
@@ -90,7 +92,7 @@ const readUpload = async (request) => {
   return Buffer.concat(chunks);
 };
 
-export const createMediaService = ({ uploadRoot } = {}) => {
+export const createMediaService = ({ uploadRoot, attachmentContent } = {}) => {
   const entries = new Map();
   const previewJobs = new Map();
   const previewRoot = uploadRoot ? path.join(path.dirname(uploadRoot), "media-previews") : "";
@@ -201,7 +203,14 @@ export const createMediaService = ({ uploadRoot } = {}) => {
     } catch (error) {
       if (error?.code !== "EEXIST") throw error;
     }
-    return register(file, { name: displayName, mimeType, buffer: body });
+    const registered = register(file, { name: displayName, mimeType, buffer: body });
+    const entry = entries.get(registered.id);
+    if (entry && attachmentContent?.inspect) {
+      const analysis = await attachmentContent.inspect(entry);
+      entry.readStatus = analysis.status;
+      entry.readError = analysis.error || "";
+    }
+    return publicMedia(entry || registered);
   };
 
   const resolveMany = (ids) => [...new Set(Array.isArray(ids) ? ids : [])]
