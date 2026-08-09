@@ -27,6 +27,7 @@ export interface GroupAgent {
 export interface GroupMessage {
   id: string;
   clientMessageId?: string | null;
+  workId?: string | null;
   sequence?: number;
   pending?: boolean;
   type: "human" | "agent" | "system";
@@ -39,6 +40,14 @@ export interface GroupMessage {
   attachments?: MediaFile[];
   artifactIds?: string[];
   createdAt: string;
+}
+
+export interface GroupStreamingMessage {
+  workId: string;
+  agentId: string;
+  itemId: string;
+  text: string;
+  startedAt: string;
 }
 
 export interface GroupSnapshot {
@@ -70,5 +79,6 @@ export type GroupEvent =
   | { type: "group_message_updated"; message: GroupMessage }
   | { type: "group_agent_updated"; agent: GroupAgent }
   | { type: "group_members_changed"; members: GroupMember[] }
-  | { type: "group_agent_delta"; agentId: string; itemId: string; delta: string }
+  | { type: "group_agent_started"; agentId: string; agentName: string; workId: string; mode: GroupMode; startedAt: string }
+  | { type: "group_agent_delta"; agentId: string; workId?: string; itemId: string; delta: string }
   | ArtifactRealtimeEvent;

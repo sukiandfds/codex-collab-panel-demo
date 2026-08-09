@@ -172,6 +172,7 @@
 .file { display: flex; width: min(100%, 520px); align-items: center; gap: 10px; margin: 12px 0; padding: 10px 11px; border: 1px solid #3a3c3e; border-radius: 7px; background: #222425; }
 .file > svg { width: 18px; height: 18px; color: var(--color-text-muted); }
 .file span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fileStatus { flex: 0 0 auto; color: var(--color-text-muted); font-size: 11px; white-space: nowrap; }
 .file a { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 5px; color: var(--color-text-secondary); }
 .file a:hover { background: #303335; text-decoration: none; }
 .file a svg { width: 16px; height: 16px; }

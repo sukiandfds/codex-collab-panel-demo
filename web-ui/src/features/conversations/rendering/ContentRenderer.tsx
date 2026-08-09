@@ -214,10 +214,20 @@ function Block({ block }: { block: ContentBlock }) {
   if (block.type === "video") return <video className={styles.video} controls preload="metadata" src={sourceUrl(block.source)} />;
 
   const name = block.name || block.file?.name || "附件";
+  const readStatus = block.file?.readStatus === "ready"
+    ? "已读取"
+    : block.file?.readStatus === "native"
+      ? "原生附件"
+      : block.file?.readStatus === "unsupported"
+        ? "暂未解析"
+        : block.file?.readStatus === "failed"
+          ? "读取失败"
+          : "";
   return (
     <div className={styles.file}>
       <FileText aria-hidden="true" />
       <span>{name}</span>
+      {readStatus ? <small className={styles.fileStatus} title={block.file?.readError || readStatus}>{readStatus}</small> : null}
       <a href={downloadUrl(block.source)} aria-label={`下载 ${name}`} title={`下载 ${name}`}>
         <Download aria-hidden="true" />
       </a>

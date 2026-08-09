@@ -2,11 +2,11 @@
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--text-caption);
+  font-weight: 450;
   line-height: 1;
   white-space: nowrap;
 }
@@ -17,9 +17,9 @@
 }
 
 .status svg {
-  width: 14px;
-  min-width: 14px;
-  height: 14px;
+  width: var(--control-icon-size-small);
+  min-width: var(--control-icon-size-small);
+  height: var(--control-icon-size-small);
   stroke-width: 1.8;
 }
 

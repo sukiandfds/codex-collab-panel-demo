@@ -59,10 +59,20 @@ export function useConversationCatalog(
       setSessions(nextSessions);
       const requestedId = new URLSearchParams(window.location.search).get("thread") || "";
       const currentId = selection.selectedIdRef.current;
-      const nextId = nextSessions.some((item) => item.threadId === currentId)
-        ? currentId
-        : nextSessions.some((item) => item.threadId === requestedId)
-          ? requestedId
+      const agentScoped = Boolean(new URLSearchParams(window.location.search).get("agent"));
+      if (agentScoped) {
+        const pinnedId = requestedId || currentId;
+        if (!pinnedId) return;
+        if (currentId !== pinnedId) await selection.adoptSelection(pinnedId, !initialLoad);
+        else if (reloadSelected && (!changedThreadId || changedThreadId === pinnedId)) {
+          await selection.loadSession(pinnedId, { quiet: !initialLoad });
+        }
+        return;
+      }
+      const nextId = nextSessions.some((item) => item.threadId === requestedId)
+        ? requestedId
+        : nextSessions.some((item) => item.threadId === currentId)
+          ? currentId
           : nextSessions[0]?.threadId || "";
       if (!nextId) {
         selection.clearSelection();

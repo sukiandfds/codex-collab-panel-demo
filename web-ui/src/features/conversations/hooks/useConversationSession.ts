@@ -182,6 +182,9 @@ export function useConversationSession(initial: InitialConversationState) {
     setContentSyncState("syncing");
     const params = new URLSearchParams(window.location.search);
     params.set("thread", threadId);
+    params.delete("agent");
+    params.delete("employee");
+    params.delete("conversation");
     window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
     void loadSession(threadId, { quiet: Boolean(cached) });
   }, [loadSession]);
@@ -189,8 +192,12 @@ export function useConversationSession(initial: InitialConversationState) {
   const adoptSelection = useCallback(async (threadId: string, quiet: boolean) => {
     selectedIdRef.current = threadId;
     setSelectedId(threadId);
+    const cached = sessionCache.current.get(threadId);
+    setSession(cached || null);
     setLoadingOlder(false);
-    setContentSyncState("syncing");
+    setLoadingSession(!cached);
+    setSyncing(Boolean(cached));
+    setContentSyncState(cached ? "syncing" : "stable");
     return loadSession(threadId, { quiet });
   }, [loadSession]);
 
@@ -207,6 +214,9 @@ export function useConversationSession(initial: InitialConversationState) {
     setContentSyncState("stable");
     const params = new URLSearchParams(window.location.search);
     params.delete("thread");
+    params.delete("agent");
+    params.delete("employee");
+    params.delete("conversation");
     const query = params.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
   }, []);
@@ -223,6 +233,9 @@ export function useConversationSession(initial: InitialConversationState) {
     setContentSyncState("stable");
     const params = new URLSearchParams(window.location.search);
     params.set("thread", detail.threadId);
+    params.delete("agent");
+    params.delete("employee");
+    params.delete("conversation");
     window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
   }, []);
 

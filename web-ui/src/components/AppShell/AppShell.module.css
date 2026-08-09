@@ -43,6 +43,9 @@
   overflow: hidden;
 }
 
+.sidebarHidden { grid-template-columns: minmax(0, 1fr); }
+.sidebarHidden .sidebarSlot { display: none; }
+
 @media (any-pointer: coarse) {
   .main {
     display: grid;

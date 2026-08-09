@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { MediaFile } from "../../../shared/model/media";
 import type { RealtimeRecoveryReason } from "../../../shared/model/realtime";
 import { useContextManagement } from "../../context-management/hooks/useContextManagement";
+import { executionApi } from "../../execution/data/executionApi";
 import { useCodexExecution } from "../../execution/hooks/useCodexExecution";
 import type { ProjectEvent } from "../../execution/model/types";
 import { useModels } from "../../models/hooks/useModels";
@@ -21,6 +22,17 @@ const attachmentsFromMessage = (message: SessionMessage): MediaFile[] => {
     if ("file" in block && block.file) attachments.set(block.file.id, block.file);
   }
   return [...attachments.values()];
+};
+
+const conversationLocationKey = () => {
+  const params = new URLSearchParams(window.location.search);
+  return JSON.stringify([
+    params.get("thread") || "",
+    params.get("agent") || "",
+    params.get("employee") || "",
+    params.get("conversation") || "",
+    params.get("archived") === "1",
+  ]);
 };
 
 export function useProjectConversations() {
@@ -71,6 +83,47 @@ export function useProjectConversations() {
     clearSelection: selection.clearSelection,
     setCreatedSession: selection.setCreatedSession,
   }, contextManagement.status.model);
+
+  const syncLocation = useCallback(async () => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedArchived = params.get("archived") === "1";
+    if (requestedArchived !== catalog.archivedView) {
+      await catalog.setArchiveViewMode(requestedArchived);
+      return;
+    }
+    const requestedId = params.get("thread") || "";
+    const currentId = selection.selectedIdRef.current;
+    if (!requestedId) {
+      if (currentId) selection.clearSelection();
+      await catalog.refreshSessions(false, undefined, false);
+      return;
+    }
+    if (requestedId !== currentId) {
+      await selection.adoptSelection(requestedId, false);
+    } else {
+      await selection.loadSession(requestedId, { quiet: true });
+    }
+    await catalog.refreshSessions(false, requestedId, false);
+  }, [catalog.archivedView, catalog.refreshSessions, catalog.setArchiveViewMode, selection.adoptSelection, selection.clearSelection, selection.loadSession, selection.selectedIdRef]);
+
+  const syncLocationRef = useRef(syncLocation);
+  syncLocationRef.current = syncLocation;
+  const locationKeyRef = useRef(conversationLocationKey());
+
+  useEffect(() => {
+    const handleNavigation = () => {
+      const nextLocationKey = conversationLocationKey();
+      if (nextLocationKey === locationKeyRef.current) return;
+      locationKeyRef.current = nextLocationKey;
+      void syncLocationRef.current();
+    };
+    window.addEventListener("popstate", handleNavigation);
+    window.addEventListener("negus:navigate", handleNavigation);
+    return () => {
+      window.removeEventListener("popstate", handleNavigation);
+      window.removeEventListener("negus:navigate", handleNavigation);
+    };
+  }, []);
 
   useEffect(() => {
     if (!selection.selectedId || !selection.session) return;
@@ -284,6 +337,18 @@ export function useProjectConversations() {
     return followUpQueue.enqueue(messageText, attachments);
   }, [followUpQueue.enqueue]);
 
+  const review = useCallback(async () => {
+    const threadId = selection.selectedIdRef.current;
+    if (!threadId || execution.status.active || selection.session?.archived) return false;
+    try {
+      await executionApi.review(threadId);
+      await execution.refreshStatus(undefined, true);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [execution.refreshStatus, execution.status.active, selection.selectedIdRef, selection.session?.archived]);
+
   const onSessionsChanged = useCallback((threadId?: string) => {
     const selected = selection.selectedIdRef.current;
     if (selected && (!threadId || threadId === selected)) {
@@ -381,6 +446,7 @@ export function useProjectConversations() {
     retryQueueItem: followUpQueue.retry,
     sendQueueItem: followUpQueue.sendNow,
     interrupt: execution.interrupt,
+    review,
     compactContext: contextManagement.compact,
     setAutoCompactThreshold: contextManagement.setThreshold,
     changeModel: modelManager.change,

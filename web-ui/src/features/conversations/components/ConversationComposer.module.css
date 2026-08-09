@@ -24,7 +24,7 @@
   pointer-events: auto;
 }
 
-.composer:focus-within { border-color: #555; }
+.composer:focus-within { border-color: var(--color-border-focus); }
 
 .editingBar {
   display: flex;
@@ -85,16 +85,41 @@
 .settingsControls { gap: 2px; }
 .spacer { flex: 1; }
 
+.commandButton {
+  display: grid;
+  width: var(--control-icon-button-size);
+  height: var(--control-icon-button-size);
+  flex: 0 0 var(--control-icon-button-size);
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-secondary, #bbb);
+  cursor: pointer;
+  transition: var(--control-transition);
+}
+
+.commandButton:hover,
+.commandButton:focus-visible {
+  background: var(--color-control-hover);
+  color: var(--color-text, #eee);
+}
+
+.commandButton:disabled { opacity: .4; cursor: default; }
+.commandButton svg { width: var(--control-icon-size); height: var(--control-icon-size); stroke-width: 1.8; }
+
 .sendButton {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: var(--control-icon-button-size);
+  height: var(--control-icon-button-size);
   border: 0;
   border-radius: 50%;
   background: #777;
   color: #292929;
   opacity: .55;
+  transition: var(--control-transition);
 }
 
 .sendButton:not(:disabled) {
@@ -105,7 +130,7 @@
 }
 
 .sendButton:disabled { cursor: default; }
-.sendButton svg { width: 15px; height: 15px; stroke-width: 1.9; }
+.sendButton svg { width: var(--control-icon-size); height: var(--control-icon-size); stroke-width: 1.9; }
 .sendButton svg.stopIcon { width: 10px; height: 10px; fill: currentColor; }
 
 .srOnly {
@@ -122,7 +147,7 @@
 
   .footer {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 36px;
+    grid-template-columns: minmax(0, 1fr) var(--control-touch-icon-button-size);
     row-gap: 2px;
     padding: 0 9px 8px 10px;
   }
@@ -134,9 +159,15 @@
   }
 
   .leadingControls > label {
-    width: 36px;
-    height: 36px;
-    flex-basis: 36px;
+    width: var(--control-touch-icon-button-size);
+    height: var(--control-touch-icon-button-size);
+    flex-basis: var(--control-touch-icon-button-size);
+  }
+
+  .leadingControls > .commandButton {
+    width: var(--control-touch-icon-button-size);
+    height: var(--control-touch-icon-button-size);
+    flex-basis: var(--control-touch-icon-button-size);
   }
 
   .spacer { display: none; }
@@ -153,8 +184,8 @@
   .sendButton {
     grid-column: 2;
     grid-row: 1;
-    width: 36px;
-    height: 36px;
+    width: var(--control-touch-icon-button-size);
+    height: var(--control-touch-icon-button-size);
   }
 
 }

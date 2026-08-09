@@ -4,6 +4,12 @@ import { fetchJson, postJson } from "../../../shared/api/http";
 const PAGE_SIZE = 60;
 const READ_TIMEOUT_MS = 10000;
 
+const currentConversationId = () => new URLSearchParams(window.location.search).get("conversation") || "";
+const conversationQuery = () => {
+  const conversationId = currentConversationId();
+  return conversationId ? `&conversationId=${encodeURIComponent(conversationId)}` : "";
+};
+
 const fetchConversationJson = async <T,>(pathname: string, signal?: AbortSignal): Promise<T> => {
   const controller = new AbortController();
   let timedOut = false;
@@ -29,14 +35,14 @@ export const conversationApi = {
   project: (signal?: AbortSignal) => fetchConversationJson<ProjectInfo>("/api/project", signal),
   sessions: (archived = false, signal?: AbortSignal) => fetchConversationJson<SessionSummary[]>(`/api/sessions?source=all${archived ? "&archived=1" : ""}`, signal),
   create: (model = "", signal?: AbortSignal) => postJson<SessionSummary>("/api/session", { model }, signal),
-  rename: (threadId: string, name: string, signal?: AbortSignal) => postJson<SessionSummary>("/api/session/name", { threadId, name }, signal),
+  rename: (threadId: string, name: string, signal?: AbortSignal) => postJson<SessionSummary>("/api/session/name", { threadId, name, ...(currentConversationId() ? { conversationId: currentConversationId() } : {}) }, signal),
   fork: (threadId: string, lastTurnId: string, signal?: AbortSignal) => postJson<{
     session: SessionSummary;
     sourceThreadId: string;
     forkedFromTurnId: string;
-  }>("/api/session/fork", { threadId, lastTurnId }, signal),
-  archive: (threadId: string, signal?: AbortSignal) => postJson<{ threadId: string; archived: boolean }>("/api/session/archive", { threadId }, signal),
-  unarchive: (threadId: string, signal?: AbortSignal) => postJson<SessionSummary>("/api/session/unarchive", { threadId }, signal),
+  }>("/api/session/fork", { threadId, lastTurnId, ...(currentConversationId() ? { conversationId: currentConversationId() } : {}) }, signal),
+  archive: (threadId: string, signal?: AbortSignal) => postJson<{ threadId: string; archived: boolean }>("/api/session/archive", { threadId, ...(currentConversationId() ? { conversationId: currentConversationId() } : {}) }, signal),
+  unarchive: (threadId: string, signal?: AbortSignal) => postJson<SessionSummary>("/api/session/unarchive", { threadId, ...(currentConversationId() ? { conversationId: currentConversationId() } : {}) }, signal),
   session: (threadId: string, { before, cursor, contentVersion }: {
     before?: number;
     cursor?: string;
@@ -46,7 +52,7 @@ export const conversationApi = {
     const cursorQuery = cursor === undefined ? "" : `&cursor=${encodeURIComponent(cursor)}`;
     const contentVersionQuery = contentVersion === undefined ? "" : `&contentVersion=${contentVersion}`;
     return fetchConversationJson<SessionResponse>(
-      `/api/session?threadId=${encodeURIComponent(threadId)}&limit=${PAGE_SIZE}${beforeQuery}${cursorQuery}${contentVersionQuery}`,
+      `/api/session?threadId=${encodeURIComponent(threadId)}&limit=${PAGE_SIZE}${conversationQuery()}${beforeQuery}${cursorQuery}${contentVersionQuery}`,
       signal,
     );
   },

@@ -4,6 +4,7 @@ import { modelApi } from "../../models/data/modelApi";
 import { formatModelDisplayName } from "../../models/model/modelDisplayName";
 import { formatReasoningEffort } from "../../models/model/reasoningEffortLabels";
 import type { CodexModel } from "../../models/model/types";
+import { AgentMessageLauncher } from "../../agent-sharing/components/AgentMessageLauncher";
 import { groupApi } from "../data/groupApi";
 import type { GroupAgent, GroupProfile } from "../model/types";
 import styles from "./MemberProfileDrawer.module.css";
@@ -105,6 +106,7 @@ export function MemberProfileDrawer({ profile, onClose, onAgentUpdated }: {
         </div>
         {isAgent ? (
           <>
+            <AgentMessageLauncher agentId={agentId} onOpened={onClose} />
             <dl className={styles.details}>
               <div>
                 <dt>推理模型</dt>

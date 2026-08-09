@@ -7,10 +7,14 @@ import { useReturnToBottom } from "../../../components/JumpToLatest/useReturnToB
 import { AttachmentDisplay } from "../../attachments/components/AttachmentDisplay";
 import { ArtifactCollection } from "../../artifacts/components/ArtifactCollection";
 import type { Artifact, ArtifactReviewDecision } from "../../artifacts/model/types";
-import type { GroupAgent, GroupMember, GroupMessage, GroupProfile } from "../model/types";
+import type { GroupAgent, GroupMember, GroupMessage, GroupProfile, GroupStreamingMessage } from "../model/types";
 import styles from "./MessageTimeline.module.css";
 
-const timeText = (value: string) => new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+const timeText = (value: string, withSeconds = false) => new Intl.DateTimeFormat("zh-CN", {
+  hour: "2-digit",
+  minute: "2-digit",
+  ...(withSeconds ? { second: "2-digit" } : {}),
+}).format(new Date(value));
 const dayKey = (value: string) => new Date(value).toLocaleDateString("zh-CN");
 const dayText = (value: string) => {
   const date = new Date(value);
@@ -35,7 +39,7 @@ export function MessageTimeline({
   messages: GroupMessage[];
   agents: GroupAgent[];
   members: GroupMember[];
-  streaming: Record<string, { itemId: string; text: string }>;
+  streaming: Record<string, GroupStreamingMessage>;
   artifacts: Record<string, Artifact>;
   artifactLoadErrors: Record<string, boolean>;
   reviewingArtifactIds: Set<string>;
@@ -47,6 +51,8 @@ export function MessageTimeline({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const streams = Object.entries(streaming).filter(([, value]) => value.text);
+  const messageWorkIds = new Set(messages.map((message) => message.workId).filter(Boolean));
+  const orphanStreams = streams.filter(([workId]) => !messageWorkIds.has(workId));
   const getScrollElement = useCallback(() => scrollRef.current, []);
   const scrollToBottom = useCallback(() => {
     const root = scrollRef.current;
@@ -87,6 +93,8 @@ export function MessageTimeline({
           const profile: GroupProfile | null = agent
             ? { kind: "agent", profile: agent }
             : member ? { kind: "member", profile: member } : null;
+          const liveStream = message.workId ? streaming[message.workId] : undefined;
+          const pendingAgent = message.type === "agent" && message.pending;
           return (
           <Fragment key={message.id}>
             {index === 0 || dayKey(messages[index - 1].createdAt) !== dayKey(message.createdAt)
@@ -104,8 +112,12 @@ export function MessageTimeline({
                 </button>
               ) : <span className={`${styles.messageAvatar} ${message.type === "agent" ? styles.agentMessageAvatar : ""}`}>{message.type === "agent" ? "AI" : message.type === "system" ? "!" : message.authorName.slice(0, 1)}</span>}
               <div className={styles.messageContent}>
-                <div className={styles.messageMeta}><strong>{message.authorName}</strong><span>{timeText(message.createdAt)}</span>{message.mode === "development" ? <em>开发</em> : null}</div>
-                {message.type === "agent" ? <div className={styles.markdown}><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text}</ReactMarkdown></div> : message.text ? <p>{message.text}</p> : null}
+                <div className={styles.messageMeta}><strong>{message.authorName}</strong><span>{pendingAgent ? "..." : timeText(message.createdAt, message.type === "agent")}</span>{message.mode === "development" ? <em>开发</em> : null}</div>
+                {message.type === "agent"
+                  ? pendingAgent
+                    ? <p className={styles.streamingText}>{liveStream?.text || message.text}<i className={styles.cursor} /></p>
+                    : <div className={styles.markdown}><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text}</ReactMarkdown></div>
+                  : message.text ? <p>{message.text}</p> : null}
                 <AttachmentDisplay files={message.attachments || []} />
                 <ArtifactCollection
                   artifactIds={message.artifactIds || []}
@@ -121,15 +133,15 @@ export function MessageTimeline({
           </Fragment>
           );
         })}
-        {streams.map(([agentId, value]) => {
-          const agent = agents.find((item) => item.id === agentId);
+        {orphanStreams.map(([workId, value]) => {
+          const agent = agents.find((item) => item.id === value.agentId);
           return (
-            <article className={styles.message} key={`${agentId}-${value.itemId}`}>
+            <article className={styles.message} key={workId}>
               {agent ? (
                 <button className={`${styles.messageAvatar} ${styles.agentMessageAvatar}`} type="button" aria-label={`查看${agent.name}的个人信息`} onClick={() => onOpenProfile({ kind: "agent", profile: agent })}>AI</button>
               ) : <span className={`${styles.messageAvatar} ${styles.agentMessageAvatar}`}>AI</span>}
               <div className={styles.messageContent}>
-                <div className={styles.messageMeta}><strong>{agent?.name || "Codex Agent"}</strong><span>正在回复</span></div>
+                <div className={styles.messageMeta}><strong>{agent?.name || "Codex Agent"}</strong><span>...</span></div>
                 <p className={styles.streamingText}>{value.text}<i className={styles.cursor} /></p>
               </div>
             </article>

@@ -1,5 +1,7 @@
 import { Archive, ArchiveRestore } from "lucide-react";
 import type { SessionSummary } from "../model/types";
+import type { ExecutionStatus } from "../../execution/model/types";
+import { ProjectStatusBadge } from "../../project-directory/components/ProjectStatusBadge";
 import styles from "./SessionList.module.css";
 
 interface SessionListProps {
@@ -12,6 +14,7 @@ interface SessionListProps {
   onSelect: (threadId: string) => void;
   onArchive: (threadId: string) => Promise<boolean>;
   onUnarchive: (threadId: string) => Promise<boolean>;
+  currentStatus?: ExecutionStatus;
 }
 
 const timeFormatter = new Intl.DateTimeFormat("zh-CN", {
@@ -28,6 +31,7 @@ export function SessionList({
   onSelect,
   onArchive,
   onUnarchive,
+  currentStatus,
 }: SessionListProps) {
   return (
     <div className={styles.root}>
@@ -43,6 +47,7 @@ export function SessionList({
             onClick={() => onSelect(session.threadId)}
           >
             <span className={styles.content}>
+              {session.threadId === currentStatus?.threadId ? <ProjectStatusBadge status={currentStatus} compact /> : null}
               <span className={styles.title}>{session.title}</span>
               <span className={styles.meta}>
                 {session.source === "happy" ? "Happy · " : ""}{timeFormatter.format(new Date(session.updatedAt))}

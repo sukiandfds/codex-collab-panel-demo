@@ -56,3 +56,13 @@
 - 本次更新：根据提交 `ddf43a6c406d010357dce7ebdc133b97de66b5b9` 更新当前结论。加载完成前不展示旧快照；刷新、重开和快照恢复进入统一加载门；加载较早消息使用可见消息锚点恢复阅读位置，并移除会反复改变布局的补偿循环。
 - 用户影响：相关代码已经开发并提交，当前不再列为待开发；剩余是用户确认最新构建下的刷新、重开、历史滚动、跨端消息和长任务体验。
 - 证据：`web-ui/src/App.tsx`、`web-ui/src/features/conversations/components/ConversationView.tsx`、`web-ui/src/features/conversations/hooks/useConversationSession.ts`、`web-ui/src/features/conversations/hooks/useProjectConversations.ts`。
+
+### 2026-08-10 | 会话切换定位修复
+
+- 状态：pending_review / uncommitted
+- 用户问题：会话来回切换时定位不准，切回来后可能跳到不对应的位置。
+- 根因：`ConversationView` 只按线程保存绝对 `scrollTop`；虚拟列表中的 Markdown、代码、图片和执行过程高度变化后，同一像素位置不再对应同一条消息，切换瞬间旧滚动监听也可能把位置记到错误线程。
+- 实现：保存当前可见虚拟项的消息锚点及相对偏移；恢复时先定位锚点，再按当前测量结果校正，找不到锚点才使用原始像素位置；滚动监听改读当前会话引用。
+- 用户影响：切换会话再切回时，应回到之前看到的消息附近，不改变消息内容和执行状态。
+- 验证：`pnpm build:ui`、`git diff --check` 通过；未启动或重启服务，未做浏览器运行态验收。
+- Git：`uncommitted`，未提交、未推送。

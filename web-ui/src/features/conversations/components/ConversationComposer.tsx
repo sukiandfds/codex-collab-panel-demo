@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, Square, X } from "lucide-react";
+import { Send, Sparkles, Square, X } from "lucide-react";
 import { FollowUpQueue } from "./FollowUpQueue";
 import type { FollowUpQueueItem } from "../model/followUpQueue";
 import { AttachmentButton, AttachmentPreviews } from "../../attachments/components/AttachmentDraft";
@@ -12,7 +12,28 @@ import { ModelSettingsControl } from "../../models/components/ModelSettingsContr
 import type { CodexModel } from "../../models/model/types";
 import type { MediaFile } from "../../../shared/model/media";
 import type { SessionMessage } from "../model/types";
+import { SlashCommandMenu, type SlashCommandOption } from "./SlashCommandMenu";
 import styles from "./ConversationComposer.module.css";
+
+interface SlashState { start: number; end: number; query: string; replaceDraft?: boolean }
+
+const slashCommands: SlashCommandOption[] = [
+  { id: "compact", command: "/compact", group: "会话", label: "压缩上下文", detail: "整理当前对话上下文" },
+  { id: "stop", command: "/stop", group: "会话", label: "停止任务", detail: "停止当前正在运行的任务" },
+  { id: "review", command: "/review", group: "Codex", label: "审查当前项目", detail: "调用原生 Codex reviewer" },
+  { id: "file", command: "/file", group: "文件", label: "读取附件", detail: "按问题读取并处理已上传文件" },
+  { id: "image", command: "/image", group: "MCP 工具", label: "生成或修改图片", detail: "调用已配置的 Negus image MCP" },
+  { id: "skill", command: "/skill", group: "Skills", label: "使用 Skill", detail: "让 Codex 选择并遵循匹配的 Skill" },
+  { id: "app", command: "/app", group: "Apps", label: "使用 App", detail: "让 Codex 选择当前可用连接器" },
+];
+
+const findSlash = (value: string, caret: number): SlashState | null => {
+  const beforeCaret = value.slice(0, caret);
+  const match = beforeCaret.match(/^\s*\/([^\s/]*)$/u);
+  if (!match) return null;
+  const start = beforeCaret.search(/\//u);
+  return start >= 0 ? { start, end: caret, query: match[1] || "" } : null;
+};
 
 interface ConversationComposerProps {
   connected: boolean;
@@ -40,6 +61,7 @@ interface ConversationComposerProps {
   editingMessage: SessionMessage | null;
   onCancelEdit: () => void;
   onInterrupt: () => Promise<boolean>;
+  onReview: () => Promise<boolean>;
   onCompactContext: () => Promise<boolean>;
   onAutoCompactThresholdChange: (threshold: number | null) => Promise<boolean>;
   onModelChange: (model: string) => Promise<boolean>;
@@ -52,10 +74,13 @@ export function ConversationComposer({
   onSend, onQueue, queueing, queueItems, queueError, onEditQueueItem, onRemoveQueueItem, onMoveQueueItem, onRetryQueueItem,
   onSendQueueItem,
   editingMessage, onCancelEdit,
-  onInterrupt, onCompactContext, onAutoCompactThresholdChange, onModelChange,
+  onInterrupt, onReview, onCompactContext, onAutoCompactThresholdChange, onModelChange,
   onReasoningEffortChange,
 }: ConversationComposerProps) {
   const [text, setText] = useState("");
+  const [slash, setSlash] = useState<SlashState | null>(null);
+  const [activeSlash, setActiveSlash] = useState(0);
+  const [collapsedSlashGroups, setCollapsedSlashGroups] = useState<Record<string, boolean>>({});
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submittingRef = useRef(false);
   const draft = useAttachmentDraft();
@@ -66,13 +91,58 @@ export function ConversationComposer({
     "file" in block && block.file ? [block.file] : []
   )) || [];
   const hasContent = Boolean(text.trim() || draft.attachments.length || inheritedAttachments.length);
+  const slashOptions = slash
+    ? slashCommands.filter((option) => option.command.slice(1).startsWith(slash.query.toLocaleLowerCase()))
+    : [];
+  const visibleSlashOptions = slashOptions.filter((option) => !collapsedSlashGroups[option.group]);
+
+  const updateSlash = (value: string, caret: number) => {
+    setSlash(findSlash(value, caret));
+    setActiveSlash(0);
+  };
+
+  const insertSlashCommand = (option: SlashCommandOption) => {
+    if (!slash) return;
+    const next = slash.replaceDraft
+      ? `${option.command} ${text.trim()}`
+      : `${text.slice(0, slash.start)}${option.command} ${text.slice(slash.end)}`;
+    const caret = slash.replaceDraft ? next.length : slash.start + option.command.length + 1;
+    setText(next);
+    setSlash(null);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(caret, caret);
+    });
+  };
+
+  const toggleSlashGroup = (group: string) => {
+    setCollapsedSlashGroups((current) => ({ ...current, [group]: !current[group] }));
+    setActiveSlash(0);
+  };
+
+  const openSlashMenu = () => {
+    const textarea = textareaRef.current;
+    const caret = textarea?.selectionStart ?? text.length;
+    const hasDraft = Boolean(text.trim());
+    setSlash({ start: hasDraft ? 0 : caret, end: hasDraft ? text.length : caret, query: "", replaceDraft: hasDraft });
+    setActiveSlash(0);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(hasDraft ? text.length : caret, hasDraft ? text.length : caret);
+    });
+  };
 
   useEffect(() => {
     if (!editingMessage) return;
     setText(editingMessage.text);
+    setSlash(null);
     draft.clear();
     requestAnimationFrame(() => textareaRef.current?.focus());
   }, [draft.clear, editingMessage?.id]);
+
+  useEffect(() => {
+    if (activeSlash >= visibleSlashOptions.length) setActiveSlash(0);
+  }, [activeSlash, visibleSlashOptions.length]);
 
   const submit = async () => {
     const disabled = inputDisabled || !hasContent;
@@ -80,6 +150,23 @@ export function ConversationComposer({
     submittingRef.current = true;
     const submittedText = text;
     setText("");
+    setSlash(null);
+    if (!editing && !draft.attachments.length && !inheritedAttachments.length) {
+      const command = submittedText.trim().toLocaleLowerCase();
+      if (command === "/compact" || command === "/stop" || command === "/review") {
+        try {
+          const accepted = command === "/compact"
+            ? await onCompactContext()
+            : command === "/stop" ? await onInterrupt() : await onReview();
+          if (!accepted) setText(submittedText);
+        } catch {
+          setText(submittedText);
+        } finally {
+          submittingRef.current = false;
+        }
+        return;
+      }
+    }
     try {
       const uploaded = draft.attachments.length ? await draft.uploadAll() : [];
       const submittedAttachments = editing
@@ -126,6 +213,14 @@ export function ConversationComposer({
           draft.addFiles(event.dataTransfer.files);
         }}
       >
+        <SlashCommandMenu
+          options={slashOptions}
+          collapsedGroups={collapsedSlashGroups}
+          activeIndex={activeSlash}
+          onActiveChange={setActiveSlash}
+          onToggleGroup={toggleSlashGroup}
+          onSelect={insertSlashCommand}
+        />
         {editingMessage ? (
           <div className={styles.editingBar}>
             <span><strong>重新编辑</strong><span className={styles.editingPreview}>{editingMessage.text || "附件指令"}</span></span>
@@ -149,13 +244,44 @@ export function ConversationComposer({
           value={text}
           placeholder={!selected ? "请选择一个对话" : archived ? "已归档，请先恢复对话" : status.active ? "追加指令，引导当前任务" : "给 Codex 发送指令"}
           disabled={inputDisabled}
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => {
+            setText(event.target.value);
+            updateSlash(event.target.value, event.target.selectionStart);
+          }}
           onPaste={(event) => {
             if (!event.clipboardData.files.length) return;
             event.preventDefault();
             draft.addFiles(event.clipboardData.files);
           }}
+          onClick={(event) => updateSlash(event.currentTarget.value, event.currentTarget.selectionStart)}
           onKeyDown={(event) => {
+            if (slash && visibleSlashOptions.length) {
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                const direction = event.key === "ArrowDown" ? 1 : -1;
+                setActiveSlash((index) => (index + direction + visibleSlashOptions.length) % visibleSlashOptions.length);
+                return;
+              }
+              if (event.key === "Enter") {
+                const exactCommand = slashOptions.some((option) => option.command.slice(1).toLocaleLowerCase() === slash.query.toLocaleLowerCase());
+                if (exactCommand) {
+                  setSlash(null);
+                } else {
+                  event.preventDefault();
+                  insertSlashCommand(visibleSlashOptions[activeSlash] || visibleSlashOptions[0]);
+                  return;
+                }
+              } else if (event.key === "Tab") {
+                event.preventDefault();
+                insertSlashCommand(visibleSlashOptions[activeSlash] || visibleSlashOptions[0]);
+                return;
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setSlash(null);
+                return;
+              }
+            }
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
               void submit();
@@ -165,6 +291,16 @@ export function ConversationComposer({
         <div className={styles.footer}>
           <div className={styles.leadingControls}>
             <AttachmentButton disabled={inputDisabled} onFiles={draft.addFiles} />
+            <button
+              className={styles.commandButton}
+              type="button"
+              aria-label="打开能力菜单"
+              title="打开能力菜单"
+              disabled={inputDisabled}
+              onClick={openSlashMenu}
+            >
+              <Sparkles aria-hidden="true" />
+            </button>
             <ExecutionStatus connected={connected} status={status} contextStatus={contextStatus} commentary={commentary} sendingSlow={sendingSlow} />
           </div>
           <span className={styles.spacer} />

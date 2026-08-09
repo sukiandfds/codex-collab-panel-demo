@@ -22,11 +22,11 @@ export function useGroupRoom() {
     try {
       const next = await groupApi.snapshot(signal);
       setSnapshot((current) => ({
-        ...next,
-        messages: keepUnacknowledgedMessages(next.messages, [
-          ...pendingMessagesRef.current.values(),
-          ...(current?.messages.filter((message) => message.pending) || []),
-        ]),
+          ...next,
+          messages: keepUnacknowledgedMessages(next.messages, [
+            ...pendingMessagesRef.current.values(),
+            ...(current?.messages.filter((message) => message.pending && message.type === "human") || []),
+          ]),
       }));
       setError("");
     } catch (reason) {

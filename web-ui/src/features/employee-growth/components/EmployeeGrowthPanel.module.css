@@ -1,0 +1,22 @@
+.panel { width: min(var(--content-width), calc(100% - 60px)); max-height: 220px; margin: 0 auto 18px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface-soft); }
+.panel > header { display: flex; min-height: 34px; align-items: center; justify-content: space-between; padding: 0 12px; border-bottom: 1px solid var(--color-border); }
+.panel h3 { margin: 0; color: var(--color-text); font-size: 12px; font-weight: 600; }
+.empty { margin: 0; padding: 12px; color: var(--color-text-muted); font-size: 12px; }
+.facts { display: grid; gap: 4px; padding: 10px 12px; border-bottom: 1px solid var(--color-border); }
+.facts strong { color: var(--color-text-secondary); font-size: 11px; font-weight: 600; }
+.facts p { margin: 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.proposal { position: relative; display: grid; gap: 5px; padding: 10px 12px; border-bottom: 1px solid var(--color-border); }
+.proposal:last-child { border-bottom: 0; }
+.proposalHeader { display: flex; justify-content: space-between; gap: 8px; color: var(--color-text-muted); font-size: 11px; }
+.proposalHeader strong { color: var(--color-text-secondary); font-weight: 600; }
+.proposal h4 { margin: 0; color: var(--color-text); font-size: 12px; font-weight: 600; }
+.proposal p { margin: 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.proposal small { color: var(--color-danger, #e57373); font-size: 11px; }
+.actions { display: flex; gap: 6px; }
+.actions button { display: inline-flex; min-height: 27px; align-items: center; gap: 4px; padding: 0 8px; border: 1px solid var(--color-border-strong); border-radius: 5px; background: transparent; color: var(--color-text-secondary); cursor: pointer; font: inherit; font-size: 11px; }
+.actions button:hover:not(:disabled) { background: var(--color-surface-hover); color: var(--color-text); }
+.actions button:disabled { cursor: default; opacity: .55; }
+.actions svg, .spinner { width: 13px; height: 13px; }
+.spinner { animation: spin .9s linear infinite; color: var(--color-text-muted); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 760px) { .panel { width: calc(100% - 30px); max-height: 180px; margin-bottom: 10px; } }

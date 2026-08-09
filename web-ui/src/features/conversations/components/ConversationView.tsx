@@ -11,6 +11,7 @@ import { ExecutionTimeline } from "../../execution/components/ExecutionTimeline"
 import type { ExecutionStatus } from "../../execution/model/types";
 import type { ContextStatus } from "../../context-management/model/types";
 import styles from "./ConversationView.module.css";
+import { EmployeeGrowthPanel } from "../../employee-growth/components/EmployeeGrowthPanel";
 
 const padTimePart = (value: number) => String(value).padStart(2, "0");
 
@@ -51,6 +52,8 @@ function Message({
   retryable = false,
   retrying = false,
   onRetry,
+  shareable = false,
+  threadId = "",
 }: {
   message: SessionMessage;
   streaming?: boolean;
@@ -65,6 +68,8 @@ function Message({
   retryable?: boolean;
   retrying?: boolean;
   onRetry?: () => Promise<boolean>;
+  shareable?: boolean;
+  threadId?: string;
 }) {
   const formattedTime = messageTime(message.createdAt);
   return (
@@ -93,6 +98,9 @@ function Message({
             retryable={retryable}
             retrying={retrying}
             onRetry={onRetry}
+            shareable={shareable}
+            threadId={threadId}
+            messageId={message.id}
           />
         </div>
       ) : null}
@@ -123,7 +131,14 @@ interface ConversationViewProps {
 
 type ConversationItem =
   | { id: string; type: "message"; message: SessionMessage; streaming: boolean }
-  | { id: string; type: "execution" };
+  | { id: string; type: "execution" }
+  | { id: string; type: "growth" };
+
+type ScrollPosition = {
+  top: number;
+  anchorId?: string;
+  anchorOffset?: number;
+};
 
 export function ConversationView({
   active = true,
@@ -148,11 +163,16 @@ export function ConversationView({
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingOlderThreadsRef = useRef(new Set<string>());
   const olderLoadTimersRef = useRef(new Map<string, number>());
-  const scrollPositionsRef = useRef(new Map<string, number>());
+  const scrollPositionsRef = useRef(new Map<string, ScrollPosition>());
   const followLatestFrameRef = useRef(0);
   const initialPositionFrameRef = useRef(0);
   const observedActiveThreadsRef = useRef(new Set<string>());
   const messages = session?.messages || [];
+  const currentSessionRef = useRef(session);
+  currentSessionRef.current = session;
+  const locationParams = new URLSearchParams(window.location.search);
+  const agentScoped = Boolean(locationParams.get("agent"));
+  const employeeScoped = Boolean(locationParams.get("employee"));
   const executionMatchesSession = executionStatus.threadId === session?.threadId;
   const completedExecution = ["completed", "failed", "interrupted", "systemError"].includes(executionStatus.phase);
   if (executionMatchesSession && executionStatus.active && executionStatus.threadId) {
@@ -194,6 +214,7 @@ export function ConversationView({
       },
       streaming: executionStatus.active && !completedExecution,
     }] : []),
+    ...(agentScoped ? [{ id: "employee-growth", type: "growth" as const }] : []),
   ];
   const visibleItemsLengthRef = useRef(visibleItems.length);
   visibleItemsLengthRef.current = visibleItems.length;
@@ -202,17 +223,74 @@ export function ConversationView({
     getScrollElement: () => scrollRef.current,
     estimateSize: (index) => visibleItems[index]?.type === "execution"
       ? 120
+      : visibleItems[index]?.type === "growth" ? 260
       : visibleItems[index]?.message.role === "user" ? 84 : 160,
     overscan: 6,
     getItemKey: (index) => visibleItems[index]?.id || index,
     anchorTo: "end",
     followOnAppend: false,
   });
+  const virtualizerRef = useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
+  const visibleItemsRef = useRef(visibleItems);
+  visibleItemsRef.current = visibleItems;
 
-  const rememberScrollPosition = useCallback((root = scrollRef.current, threadId = session?.threadId) => {
+  const captureScrollPosition = useCallback((
+    root: HTMLElement | null,
+    threadId: string,
+    items: ConversationItem[],
+    currentVirtualizer: typeof virtualizer,
+  ) => {
     if (!root || !threadId) return;
-    scrollPositionsRef.current.set(threadId, root.scrollTop);
-  }, [session?.threadId]);
+    const anchor = currentVirtualizer.getVirtualItems().find((item) => item.end > root.scrollTop);
+    const anchorId = anchor ? items[anchor.index]?.id : undefined;
+    scrollPositionsRef.current.set(threadId, {
+      top: root.scrollTop,
+      ...(anchorId ? {
+        anchorId,
+        anchorOffset: anchor!.start - root.scrollTop,
+      } : {}),
+    });
+  }, []);
+
+  const rememberScrollPosition = useCallback((root = scrollRef.current, threadId = currentSessionRef.current?.threadId) => {
+    if (!threadId) return;
+    captureScrollPosition(root, threadId, visibleItemsRef.current, virtualizerRef.current);
+  }, [captureScrollPosition]);
+
+  const restoreScrollPosition = useCallback((
+    position: ScrollPosition,
+    threadId: string,
+    onRestored: (root: HTMLDivElement) => void,
+  ) => {
+    const currentVirtualizer = virtualizerRef.current;
+    const items = visibleItemsRef.current;
+    const root = scrollRef.current;
+    if (!root) return;
+    const anchorOffset = position.anchorOffset;
+    const anchorIndex = position.anchorId
+      ? items.findIndex((item) => item.id === position.anchorId)
+      : -1;
+    if (anchorIndex < 0 || anchorOffset === undefined) {
+      currentVirtualizer.scrollToOffset(position.top, { align: "start" });
+      onRestored(root);
+      return;
+    }
+
+    currentVirtualizer.scrollToIndex(anchorIndex, { align: "start" });
+    window.requestAnimationFrame(() => {
+      const currentRoot = scrollRef.current;
+      if (currentSessionRef.current?.threadId !== threadId || !currentRoot) return;
+      const anchor = virtualizerRef.current.getVirtualItems().find((item) => item.key === position.anchorId);
+      if (!anchor) {
+        virtualizerRef.current.scrollToOffset(position.top, { align: "start" });
+        onRestored(currentRoot);
+        return;
+      }
+      virtualizerRef.current.scrollToOffset(anchor.start - anchorOffset, { align: "start" });
+      onRestored(currentRoot);
+    });
+  }, []);
 
   const scheduleFollowLatest = useCallback(() => {
     window.cancelAnimationFrame(followLatestFrameRef.current);
@@ -246,7 +324,7 @@ export function ConversationView({
   useLayoutEffect(() => {
     if (!active) return;
     if (!loading && session && scrollRef.current) {
-      const savedTop = scrollPositionsRef.current.get(session.threadId);
+      const savedPosition = scrollPositionsRef.current.get(session.threadId);
       const threadId = session.threadId;
       resetReturnToBottom();
       window.cancelAnimationFrame(followLatestFrameRef.current);
@@ -254,10 +332,11 @@ export function ConversationView({
       initialPositionFrameRef.current = window.requestAnimationFrame(() => {
         const root = scrollRef.current;
         if (!root) return;
-        if (savedTop !== undefined) {
-          virtualizer.scrollToOffset(savedTop, { align: "start" });
-          resetReturnToBottom(isNearBottom(root));
-          rememberScrollPosition(root, threadId);
+        if (savedPosition) {
+          restoreScrollPosition(savedPosition, threadId, (currentRoot) => {
+            resetReturnToBottom(isNearBottom(currentRoot));
+            rememberScrollPosition(currentRoot, threadId);
+          });
           return;
         }
         stickToBottomRef.current = true;
@@ -266,7 +345,7 @@ export function ConversationView({
       });
     }
     return () => window.cancelAnimationFrame(initialPositionFrameRef.current);
-  }, [active, loading, rememberScrollPosition, resetReturnToBottom, session?.threadId, virtualizer]);
+  }, [active, loading, rememberScrollPosition, resetReturnToBottom, restoreScrollPosition, session?.threadId, virtualizer]);
 
   useEffect(() => {
     if (active || !session?.threadId) return;
@@ -324,7 +403,8 @@ export function ConversationView({
     if (!root) return;
     let disposed = false;
     const onScroll = () => {
-      const threadId = session?.threadId || "";
+      const currentSession = currentSessionRef.current;
+      const threadId = currentSession?.threadId || "";
       updateReturnToBottom(root);
       rememberScrollPosition(root);
       const pendingTimer = threadId ? olderLoadTimersRef.current.get(threadId) : undefined;
@@ -340,13 +420,14 @@ export function ConversationView({
       if (
         !threadId
         || root.scrollTop > 140
-        || !session?.hasMore
+        || !currentSession?.hasMore
         || contentSyncState === "recovering"
       ) return;
       loadingOlderThreadsRef.current.add(threadId);
       const timer = window.setTimeout(() => {
         olderLoadTimersRef.current.delete(threadId);
-        if (disposed || !active || session?.threadId !== threadId || root.scrollTop > 140 || !session?.hasMore) {
+        const latestSession = currentSessionRef.current;
+        if (disposed || !active || latestSession?.threadId !== threadId || root.scrollTop > 140 || !latestSession?.hasMore) {
           loadingOlderThreadsRef.current.delete(threadId);
           return;
         }
@@ -400,6 +481,8 @@ export function ConversationView({
                 >
                   {item.type === "execution"
                     ? <ExecutionTimeline status={executionStatus} contextStatus={contextStatus} />
+                    : item.type === "growth"
+                      ? <EmployeeGrowthPanel />
                     : (
                       <Message
                         message={item.message}
@@ -419,6 +502,15 @@ export function ConversationView({
                         retryable={item.message.deliveryState === "pending"}
                         retrying={retryingMessageId === item.message.id}
                         onRetry={() => onRetryMessage(item.message)}
+                        shareable={agentScoped
+                          && !employeeScoped
+                          && item.message.role === "assistant"
+                          && Boolean(item.message.text?.trim())
+                          && Boolean(item.message.turnId)
+                          && !item.streaming
+                          && !(executionStatus.active && executionStatus.turnId === item.message.turnId)
+                          && !session?.archived}
+                        threadId={session.threadId}
                       />
                     )}
                 </div>

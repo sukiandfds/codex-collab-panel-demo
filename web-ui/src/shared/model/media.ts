@@ -5,4 +5,6 @@ export interface MediaFile {
   url: string;
   width?: number;
   height?: number;
+  readStatus?: "native" | "ready" | "unsupported" | "failed";
+  readError?: string;
 }

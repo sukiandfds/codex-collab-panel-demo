@@ -75,6 +75,8 @@ function ConversationApp({ active, onViewChange }: { active: boolean; onViewChan
           onArchiveViewChange={conversations.setArchiveViewMode}
           onArchive={conversations.archiveSession}
           onUnarchive={conversations.unarchiveSession}
+          currentStatus={conversations.executionStatus}
+          onCloseSidebar={() => setSidebarOpen(false)}
         />
       }
       header={
@@ -150,6 +152,7 @@ function ConversationApp({ active, onViewChange }: { active: boolean; onViewChan
           editingMessage={conversations.editingMessage}
           onCancelEdit={conversations.cancelEditMessage}
           onInterrupt={conversations.interrupt}
+          onReview={conversations.review}
           onCompactContext={conversations.compactContext}
           onAutoCompactThresholdChange={conversations.setAutoCompactThreshold}
           onModelChange={conversations.changeModel}
@@ -179,10 +182,25 @@ export function App() {
   }, [surface]);
 
   useEffect(() => {
-    const handlePopState = () => showSurface(readSurface(), false);
+    const handlePopState = () => {
+      const next = readSurface();
+      if (next === "group") setGroupMounted(true);
+      setSurface(next);
+      try { window.localStorage.setItem(surfaceStorageKey, next); } catch {}
+    };
+    const handleInternalNavigation = () => {
+      const next = readSurface();
+      if (next === "group") setGroupMounted(true);
+      setSurface(next);
+      try { window.localStorage.setItem(surfaceStorageKey, next); } catch {}
+    };
     window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [showSurface]);
+    window.addEventListener("negus:navigate", handleInternalNavigation);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("negus:navigate", handleInternalNavigation);
+    };
+  }, []);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>

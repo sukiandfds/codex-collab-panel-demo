@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Edit3, GitBranch, RefreshCw } from "lucide-react";
+import { AgentMessageShareControl } from "../../agent-sharing/components/AgentMessageShareControl";
 import styles from "./MessageActions.module.css";
 
 interface MessageActionsProps {
@@ -15,6 +16,9 @@ interface MessageActionsProps {
   retryable?: boolean;
   retrying?: boolean;
   onRetry?: () => Promise<boolean>;
+  shareable?: boolean;
+  threadId?: string;
+  messageId?: string;
 }
 
 const copyWithFallback = async (text: string) => {
@@ -34,7 +38,7 @@ const copyWithFallback = async (text: string) => {
   if (!copied) throw new Error("clipboard unavailable");
 };
 
-export function MessageActions({ text, forkable, forkDisabled = false, forking, onFork, editable, editDisabled = false, editing, onEdit, retryable = false, retrying = false, onRetry }: MessageActionsProps) {
+export function MessageActions({ text, forkable, forkDisabled = false, forking, onFork, editable, editDisabled = false, editing, onEdit, retryable = false, retrying = false, onRetry, shareable = false, threadId = "", messageId = "" }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const resetTimerRef = useRef<number | null>(null);
@@ -83,6 +87,13 @@ export function MessageActions({ text, forkable, forkDisabled = false, forking, 
         >
           <GitBranch aria-hidden="true" className={forking ? styles.spinning : undefined} />
         </button>
+      ) : null}
+      {shareable && threadId && messageId ? (
+        <AgentMessageShareControl
+          className={styles.button}
+          threadId={threadId}
+          messageId={messageId}
+        />
       ) : null}
       {editable ? (
         <button

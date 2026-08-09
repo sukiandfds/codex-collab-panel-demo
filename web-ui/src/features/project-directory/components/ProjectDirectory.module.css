@@ -1,0 +1,14 @@
+.directory { min-width: 0; min-height: max-content; border-bottom: 1px solid var(--color-border); padding: 8px 7px 9px; }
+.groupToggle { display: flex; width: 100%; min-height: 30px; align-items: center; gap: 6px; padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--color-text-secondary); cursor: pointer; font: inherit; font-size: 12px; text-align: left; }
+.groupToggle:hover { background: var(--color-surface-hover); color: var(--color-text); }
+.groupToggle svg { width: 14px; height: 14px; flex: 0 0 14px; }
+.projectList { display: grid; gap: 2px; padding-top: 3px; }
+.project { display: flex; width: 100%; min-width: 0; min-height: 38px; align-items: center; gap: 8px; padding: 5px 9px 5px 22px; border: 0; border-radius: 6px; background: transparent; color: var(--color-text-secondary); cursor: pointer; font: inherit; text-align: left; }
+.project:hover, .active { background: var(--color-surface-active); color: var(--color-text); }
+.project > svg { width: 14px; height: 14px; flex: 0 0 14px; }
+.spinner { animation: project-directory-spin .9s linear infinite; }
+@keyframes project-directory-spin { to { transform: rotate(360deg); } }
+.projectText { display: grid; min-width: 0; gap: 3px; }
+.projectText strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; }
+.muted { padding: 7px 22px; color: var(--color-text-muted); font-size: 11px; }
+.error { padding: 7px 22px; color: var(--color-danger, #e57373); font-size: 11px; line-height: 1.45; }

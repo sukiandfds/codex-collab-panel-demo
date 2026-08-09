@@ -3,7 +3,7 @@ feature_id: FEAT-001
 title: 单人 Codex Web 对话与控制
 status: implemented_pending_review
 current_version: v0.10.11
-last_updated: 2026-08-06
+last_updated: 2026-08-10
 owners: [conversations, execution, web_ui]
 key_paths:
   - web-ui/src/features/conversations
@@ -109,6 +109,7 @@ Codex app-server protocol
 | `FEAT-001-I23` | 功能增强 | implemented_pending_review | 用户和助手消息缺少时间；过程区默认展开且完成用时没有使用 Codex 权威字段 | 消息现按本地时区显示 `MM-DD HH:mm`，跨年显示 `YYYY-MM-DD HH:mm`；过程区默认折叠，完成用时读取 `turn/completed.durationMs`，等待用户体验确认 |
 | `FEAT-001-I24` | 普适 | active | 跨设备实时会话在结束、重新打开和流式回答交接时状态不一致：页面重开不刷新仍显示旧的“处理中”；最终回答快结束时已显示的流式文字短暂消失；新消息开始后短暂串出上一次 Turn 的思考过程 | 根因待通过真实事件序列进一步确认，初步怀疑是恢复快照、流式草稿和最终持久化消息之间缺少同一 `runId/turnId/eventSeq` 的单调交接。正确路径是以权威 Run 生命周期和终止事件为准，流式内容只追加不回退；页面恢复先清理旧运行态并补拉终态快照；新 Turn 建立独立事件缓冲，禁止旧 Turn 事件进入新消息。关联 `FEAT-001-I08`、`I15`、`I17`、`FEAT-005` |
 | `FEAT-001-I25` | P0 回归 | implemented_pending_review | 产品提交 `63e8f948b8058d8236e7a4672b5c1f8bdbf8eb70` 后，用户实机观察到消息顺序被旧内容替换、新发送消息不能立即跨 Web 设备显示、最终光标持续闪烁、同一助手答案重复显示 | 已让 `submissionId` 同时成为本机乐观消息和 SSE 消息的稳定身份；会话请求使用返回时的最新缓存并拒绝旧 `contentVersion`；正式答案按 Turn、Item 或终态内容完成流式交接，未交接草稿在终态转为静态。Windows 测试 `84/84`、生产构建、语法和补丁检查通过；服务未重启，真实跨设备效果待验收 |
+| `FEAT-001-I26` | 特例 | implemented_pending_review | 会话来回切换时定位不准，切回来后可能跳到不对应的位置 | 绝对 `scrollTop` 无法抵抗虚拟消息高度变化，且切换瞬间旧滚动监听可能记录错线程；现按可见消息锚点和相对偏移恢复，找不到锚点时才回退到像素位置；生产构建已通过，运行态仍待验收 |
 
 ## 版本时间线
 
@@ -375,6 +376,15 @@ Codex app-server protocol
 - 验证：提交 `ddf43a6c406d010357dce7ebdc133b97de66b5b9`；此前 UI 构建和定向检查通过；本次未重新运行构建。
 - 用户可见变化：刷新、重开和加载较早消息时，页面应先完成必要读取再稳定展示，阅读位置不应因历史加载反复跳动。
 - Git：`ddf43a6c406d010357dce7ebdc133b97de66b5b9`。
+
+### 2026-08-10 | uncommitted UX follow-up
+
+- 用户问题：会话来回切换定位不准，切回来后可能跳到不对应的位置。
+- 实际：`ConversationView` 保存可见虚拟项的消息锚点和相对偏移；恢复时先定位同一消息，再根据当前测量结果校正；切换瞬间的滚动事件读取当前会话引用，避免旧监听器串线程。
+- 追加修复：历史 `failed`、`interrupted` 或 `systemError` 状态不再仅凭 `startedAt` 插回当前对话过程区，避免旧任务状态被误看成当前任务；当前活动过程和本次已观察到的终态仍保留。
+- 边界：不改变基础 UI、消息内容、执行状态或历史加载协议；找不到原消息时保留绝对位置作为降级。
+- 验证：`pnpm build:ui` 和 `git diff --check` 通过；未启动或重启服务，未做浏览器运行态验收。
+- Git：`uncommitted`，未提交、未推送。
 
 ## 下一步
 

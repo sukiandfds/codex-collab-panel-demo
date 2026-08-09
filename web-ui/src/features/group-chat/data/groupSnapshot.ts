@@ -18,6 +18,7 @@ export const readGroupSnapshot = (): GroupSnapshot | null => {
     if (!validSnapshot(snapshot)) return null;
     return {
       ...snapshot,
+      messages: snapshot.messages.filter((message) => !(message.pending && message.type === "agent")),
       agents: snapshot.agents.map((agent) => ({ ...agent, active: false })),
       members: [],
     };
@@ -30,7 +31,9 @@ export const writeGroupSnapshot = (snapshot: GroupSnapshot) => {
   try {
     const cached: GroupSnapshot = {
       ...snapshot,
-      messages: snapshot.messages.slice(-messageLimit),
+      messages: snapshot.messages
+        .filter((message) => !(message.pending && message.type === "agent"))
+        .slice(-messageLimit),
     };
     const serialized = JSON.stringify(cached);
     if (serialized.length <= maxBytes) window.localStorage.setItem(storageKey, serialized);

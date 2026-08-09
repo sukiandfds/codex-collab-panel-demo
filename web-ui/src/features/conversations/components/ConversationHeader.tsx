@@ -11,6 +11,7 @@ interface ConversationHeaderProps {
   session: SessionDetail | null;
   deviceName?: string;
   connected: boolean;
+  sidebarAvailable?: boolean;
   onOpenSidebar: () => void;
   onRename: (name: string) => Promise<boolean>;
   renaming: boolean;
@@ -18,7 +19,7 @@ interface ConversationHeaderProps {
   onViewChange?: (surface: Exclude<ViewSurface, "progress">) => void;
 }
 
-export function ConversationHeader({ project, session, deviceName, connected, onOpenSidebar, onRename, renaming, usage, onViewChange }: ConversationHeaderProps) {
+export function ConversationHeader({ project, session, deviceName, connected, sidebarAvailable = true, onOpenSidebar, onRename, renaming, usage, onViewChange }: ConversationHeaderProps) {
   const [sharing, setSharing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -51,9 +52,11 @@ export function ConversationHeader({ project, session, deviceName, connected, on
     <>
       <header className={styles.header}>
         <div className={styles.topbar}>
-          <button className={`${styles.iconButton} ${styles.mobileOnly}`} type="button" aria-label="打开侧栏" title="打开侧栏" onClick={onOpenSidebar}>
-            <PanelLeft aria-hidden="true" />
-          </button>
+          {sidebarAvailable ? (
+            <button className={`${styles.iconButton} ${styles.mobileOnly}`} type="button" aria-label="打开侧栏" title="打开侧栏" onClick={onOpenSidebar}>
+              <PanelLeft aria-hidden="true" />
+            </button>
+          ) : null}
           <Folder className={styles.titleIcon} aria-hidden="true" />
           <div className={styles.heading}>
             <div className={styles.titleRow}>

@@ -4,6 +4,7 @@ import styles from "./AppShell.module.css";
 interface AppShellProps {
   chrome: ReactNode;
   sidebar: ReactNode;
+  sidebarVisible?: boolean;
   sidebarOpen: boolean;
   onCloseSidebar: () => void;
   header: ReactNode;
@@ -11,9 +12,9 @@ interface AppShellProps {
   composer: ReactNode;
 }
 
-export function AppShell({ chrome, sidebar, sidebarOpen, onCloseSidebar, header, conversation, composer }: AppShellProps) {
+export function AppShell({ chrome, sidebar, sidebarVisible = true, sidebarOpen, onCloseSidebar, header, conversation, composer }: AppShellProps) {
   return (
-    <div className={styles.shell}>
+    <div className={`${styles.shell} ${sidebarVisible ? "" : styles.sidebarHidden}`}>
       <div className={styles.chrome}>{chrome}</div>
       <button
         className={`${styles.backdrop} ${sidebarOpen ? styles.backdropOpen : ""}`}

@@ -2,11 +2,11 @@
 
 .trigger {
   display: inline-flex;
-  height: 30px;
+  height: var(--control-text-height);
   align-items: center;
   gap: 5px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--control-radius);
   padding: 0 7px;
   background: transparent;
   color: var(--color-text-muted);
@@ -14,11 +14,12 @@
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;
+  transition: var(--control-transition);
 }
 
 .trigger:hover,
-.trigger[aria-expanded="true"] { background: rgba(255, 255, 255, .06); color: var(--color-text); cursor: pointer; }
-.trigger svg { width: 14px; height: 14px; stroke-width: 1.8; }
+.trigger[aria-expanded="true"] { background: var(--color-control-hover); color: var(--color-text); cursor: pointer; }
+.trigger svg { width: var(--control-icon-size); height: var(--control-icon-size); stroke-width: 1.8; }
 
 .menu {
   position: absolute;
@@ -49,7 +50,7 @@
   width: 82px;
   height: 30px;
   border: 1px solid var(--color-border-strong);
-  border-radius: 5px;
+  border-radius: var(--radius-small);
   outline: 0;
   padding: 0 6px;
   background: var(--color-surface-soft);
@@ -69,7 +70,7 @@
   gap: 5px;
   padding: 0 10px;
   border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
+  border-radius: var(--control-radius);
   background: var(--color-surface-soft);
   color: var(--color-text-secondary);
   font-size: 12px;
@@ -77,7 +78,7 @@
   white-space: nowrap;
 }
 
-.compactButton:not(:disabled):hover { background: rgba(255, 255, 255, .06); color: var(--color-text); cursor: pointer; }
+.compactButton:not(:disabled):hover { background: var(--color-control-hover); color: var(--color-text); cursor: pointer; }
 .compactButton:disabled { opacity: .55; }
 .compactButton svg { width: 14px; height: 14px; stroke-width: 1.8; }
 .compacting svg { animation: context-spin .9s linear infinite; }
@@ -85,6 +86,6 @@
 @keyframes context-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 760px) {
-  .trigger { height: 34px; }
+  .trigger { height: var(--control-touch-text-height); }
   .menu { width: min(260px, calc(100vw - 44px)); }
 }

@@ -1,6 +1,9 @@
 import { Archive, ArchiveRestore, RefreshCw, SquarePen } from "lucide-react";
 import { SidebarHeader } from "../../../components/Sidebar/SidebarHeader";
 import type { ProjectInfo, SessionSummary } from "../model/types";
+import type { ExecutionStatus } from "../../execution/model/types";
+import { useProjectDirectory } from "../../project-directory/hooks/useProjectDirectory";
+import { ProjectDirectory } from "../../project-directory/components/ProjectDirectory";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { SessionList } from "./SessionList";
 import styles from "./ConversationSidebar.module.css";
@@ -21,6 +24,8 @@ interface ConversationSidebarProps {
   onArchiveViewChange: (archived: boolean) => Promise<void>;
   onArchive: (threadId: string) => Promise<boolean>;
   onUnarchive: (threadId: string) => Promise<boolean>;
+  currentStatus?: ExecutionStatus;
+  onCloseSidebar?: () => void;
 }
 
 export function ConversationSidebar({
@@ -39,7 +44,10 @@ export function ConversationSidebar({
   onArchiveViewChange,
   onArchive,
   onUnarchive,
+  currentStatus,
+  onCloseSidebar,
 }: ConversationSidebarProps) {
+  const directory = useProjectDirectory();
   const workspaceName = project?.root.split(/[\\/]/u).filter(Boolean).slice(-1)[0]
     || project?.name
     || "正在读取项目";
@@ -70,6 +78,15 @@ export function ConversationSidebar({
           </>
         )}
       />
+      <ProjectDirectory
+        project={project}
+        projects={directory.projects}
+        loading={directory.loading}
+        error={directory.error}
+        selectedId={selectedId}
+        currentStatus={currentStatus}
+        onOpened={onCloseSidebar}
+      />
       <SessionList
         sessions={sessions}
         selectedId={selectedId}
@@ -80,6 +97,7 @@ export function ConversationSidebar({
         onSelect={onSelect}
         onArchive={onArchive}
         onUnarchive={onUnarchive}
+        currentStatus={currentStatus}
       />
       <ConnectionStatus connected={connected} />
     </aside>

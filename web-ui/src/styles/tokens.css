@@ -14,6 +14,8 @@
   --color-text: #e7e7e7;
   --color-text-secondary: #b9b9b9;
   --color-text-muted: #7f8182;
+  --color-control-hover: rgba(255, 255, 255, .06);
+  --color-border-focus: #555;
   --color-accent: #8ab4f8;
   --color-access: #e56f2d;
   --color-success: #69cf8d;
@@ -32,6 +34,14 @@
   --space-6: 32px;
   --radius-small: 5px;
   --radius-medium: 8px;
+  --control-icon-size: 16px;
+  --control-icon-size-small: 14px;
+  --control-icon-button-size: 30px;
+  --control-touch-icon-button-size: 36px;
+  --control-text-height: 30px;
+  --control-touch-text-height: 34px;
+  --control-radius: 6px;
+  --control-transition: background 120ms ease, color 120ms ease;
   --sidebar-width: 292px;
   --windowbar-height: 42px;
   --topbar-height: 50px;

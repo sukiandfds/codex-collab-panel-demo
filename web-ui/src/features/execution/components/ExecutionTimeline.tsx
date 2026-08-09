@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Brain, Check, ChevronRight, FilePenLine, LoaderCircle, Search, Terminal, Wrench } from "lucide-react";
+import { Brain, Check, ChevronRight, CircleAlert, FilePenLine, LoaderCircle, Search, Terminal, Wrench } from "lucide-react";
 import type { ExecutionActivity, ExecutionStatus } from "../model/types";
 import type { ContextStatus } from "../../context-management/model/types";
 import styles from "./ExecutionTimeline.module.css";
@@ -33,7 +33,10 @@ export function ExecutionTimeline({ status, contextStatus }: { status: Execution
     return () => window.clearInterval(timer);
   }, [status.active]);
 
-  if (!status.active && !status.activities.length) return null;
+  const failed = status.phase === "failed" || status.phase === "systemError";
+  const interrupted = status.phase === "interrupted";
+  const terminalIssue = failed || interrupted;
+  if (!status.active && !status.activities.length && !terminalIssue) return null;
   const activities = (status.activities || []).slice(-4);
   const startedAt = Date.parse(status.startedAt || "");
   const liveDurationMs = Number.isFinite(startedAt) ? now - startedAt : 0;
@@ -48,7 +51,9 @@ export function ExecutionTimeline({ status, contextStatus }: { status: Execution
       <button className={styles.header} type="button" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
         {status.active
           ? <LoaderCircle className={styles.spinner} aria-hidden="true" />
-          : <Check className={styles.completed} aria-hidden="true" />}
+          : terminalIssue
+            ? <CircleAlert className={failed ? styles.failed : styles.interrupted} aria-hidden="true" />
+            : <Check className={styles.completed} aria-hidden="true" />}
         <span>{label}</span>
         {elapsed ? <time>{elapsed}</time> : null}
         <ChevronRight className={expanded ? styles.expanded : ""} aria-hidden="true" />
@@ -70,7 +75,9 @@ export function ExecutionTimeline({ status, contextStatus }: { status: Execution
                 </div>
               </div>
             );
-          }) : (
+          }) : terminalIssue && status.detail ? (
+            <div className={styles.failureDetail}>{status.detail}</div>
+          ) : (
             <div className={styles.waiting}><i /><i /><i /></div>
           )}
         </div>
