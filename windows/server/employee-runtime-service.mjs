@@ -357,12 +357,15 @@ export const createEmployeeRuntimeService = ({
             ? { developerInstructions: context }
             : {}),
         });
-        publishStatus(employee.id, {
-          phase: "working",
-          label: "正在处理",
-          active: true,
-          turnId: clean(result?.turn?.id, 160),
-        });
+        const currentStatus = statusFor(employee.id);
+        if (currentStatus.active && ["submitted", "working"].includes(currentStatus.phase)) {
+          publishStatus(employee.id, {
+            phase: "working",
+            label: "正在处理",
+            active: true,
+            turnId: clean(result?.turn?.id, 160),
+          });
+        }
         return {
           requestId: cleanRequestId,
           employeeId: employee.id,
