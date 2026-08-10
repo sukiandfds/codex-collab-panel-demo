@@ -158,9 +158,21 @@ export function ConversationView({
   const loadingOlderThreadsRef = useRef(new Set<string>());
   const olderLoadTimersRef = useRef(new Map<string, number>());
   const scrollPositionsRef = useRef(new Map<string, number>());
+  const positionedThreadIdRef = useRef("");
+  const contentChangeRef = useRef<{
+    threadId: string;
+    lastMessageId: string;
+    streamingText: string;
+    executionActive: boolean;
+    executionPhase: string;
+    executionTurnId: string;
+    executionLabel: string;
+    executionActivityCount: number;
+  } | null>(null);
   const followLatestFrameRef = useRef(0);
   const observedActiveThreadsRef = useRef(new Set<string>());
   const messages = session?.messages || [];
+  const lastMessageId = messages[messages.length - 1]?.id || "";
   const currentSessionRef = useRef(session);
   currentSessionRef.current = session;
   const locationParams = new URLSearchParams(window.location.search);
@@ -213,6 +225,7 @@ export function ConversationView({
     (latestIndex, item, index) => item.type === "growth" ? latestIndex : index,
     -1,
   );
+  const hasVisibleItems = visibleItems.length > 0;
   const latestFollowIndex = latestConversationIndex >= 0 ? latestConversationIndex : Math.max(0, visibleItems.length - 1);
   const trailingContentHeightRef = useRef(agentScoped ? 260 : 0);
   const trailingContentScopeRef = useRef(agentScoped);
@@ -268,7 +281,11 @@ export function ConversationView({
   });
 
   useLayoutEffect(() => {
-    if (!active) window.cancelAnimationFrame(followLatestFrameRef.current);
+    if (!active) {
+      window.cancelAnimationFrame(followLatestFrameRef.current);
+      positionedThreadIdRef.current = "";
+      contentChangeRef.current = null;
+    }
   }, [active]);
 
   useLayoutEffect(() => {
@@ -276,6 +293,8 @@ export function ConversationView({
     if (!loading && session && scrollRef.current) {
       const savedTop = scrollPositionsRef.current.get(session.threadId);
       const threadId = session.threadId;
+      if (positionedThreadIdRef.current === threadId) return;
+      positionedThreadIdRef.current = threadId;
       resetReturnToBottom();
       window.cancelAnimationFrame(followLatestFrameRef.current);
       const root = scrollRef.current;
@@ -297,23 +316,45 @@ export function ConversationView({
   }, [active, rememberScrollPosition, session?.threadId]);
 
   useEffect(() => {
-    if (!active) return;
-    if (!streamingText || !visibleItems.length) return;
+    const threadId = session?.threadId || "";
+    if (!active || !threadId || !hasVisibleItems) return;
+    const next = {
+      threadId,
+      lastMessageId,
+      streamingText: visibleStreamingText,
+      executionActive: executionMatchesSession && executionStatus.active,
+      executionPhase: executionMatchesSession ? executionStatus.phase : "",
+      executionTurnId: executionMatchesSession ? executionStatus.turnId : "",
+      executionLabel: executionMatchesSession ? executionStatus.label : "",
+      executionActivityCount: executionMatchesSession ? executionStatus.activities.length : 0,
+    };
+    const previous = contentChangeRef.current;
+    contentChangeRef.current = next;
+    if (!previous || previous.threadId !== threadId) return;
+    if (
+      previous.lastMessageId === next.lastMessageId
+      && previous.streamingText === next.streamingText
+      && previous.executionActive === next.executionActive
+      && previous.executionPhase === next.executionPhase
+      && previous.executionTurnId === next.executionTurnId
+      && previous.executionLabel === next.executionLabel
+      && previous.executionActivityCount === next.executionActivityCount
+    ) return;
     contentChanged();
-  }, [active, contentChanged, streamingText, visibleItems.length]);
-
-  useEffect(() => {
-    if (!active) return;
-    if (!executionStatus.active || !visibleItems.length) return;
-    contentChanged();
-  }, [active, contentChanged, executionStatus.active, executionStatus.activities.length, executionStatus.label, visibleItems.length]);
-
-  const lastMessageId = messages[messages.length - 1]?.id;
-  useEffect(() => {
-    if (!active) return;
-    if (!lastMessageId) return;
-    contentChanged();
-  }, [active, contentChanged, lastMessageId]);
+  }, [
+    active,
+    contentChanged,
+    executionMatchesSession,
+    executionStatus.active,
+    executionStatus.activities.length,
+    executionStatus.label,
+    executionStatus.phase,
+    executionStatus.turnId,
+    hasVisibleItems,
+    lastMessageId,
+    session?.threadId,
+    visibleStreamingText,
+  ]);
 
   useEffect(() => {
     if (!active) return undefined;
