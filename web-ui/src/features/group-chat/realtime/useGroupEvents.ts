@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { ArtifactRealtimeEvent } from "../../artifacts/model/types";
 import { groupApi } from "../data/groupApi";
 import { upsertGroupMessage } from "../data/groupMessageState";
+import { reconcileGroupSnapshot } from "../data/groupSnapshot";
 import type { GroupEvent, GroupSnapshot, GroupStreamingMessage } from "../model/types";
 
 export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapshot | null>>) {
@@ -16,11 +17,32 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
 
   useEffect(() => {
     let disposed = false;
+    let openedOnce = false;
 
     const clearReconnectTimer = () => {
       if (reconnectTimerRef.current === null) return;
       window.clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
+    };
+
+    const reconcileSnapshot = async () => {
+      try {
+        const next = await groupApi.snapshot();
+        if (disposed) return;
+        const completedWorkIds = new Set(next.messages
+          .filter((message) => !message.pending && message.workId)
+          .map((message) => message.workId));
+        const activeWorkIds = new Set((next.activeWorks || [])
+          .filter((work) => !completedWorkIds.has(work.workId))
+          .map((work) => work.workId));
+        const nextBuffer = Object.fromEntries(Object.entries(streamingBuffer.current)
+          .filter(([workId]) => activeWorkIds.has(workId) && !completedWorkIds.has(workId)));
+        streamingBuffer.current = nextBuffer;
+        setStreaming(nextBuffer);
+        setSnapshot((current) => reconcileGroupSnapshot(next, current));
+      } catch {
+        // The existing event stream remains usable if the reconnect snapshot fails.
+      }
     };
 
     const connect = () => {
@@ -29,8 +51,11 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
       const events = new EventSource(groupApi.eventsUrl(), { withCredentials: true });
       sourceRef.current = events;
       events.onopen = () => {
+        const isReconnect = openedOnce;
+        openedOnce = true;
         clearReconnectTimer();
         setConnected(true);
+        if (isReconnect) void reconcileSnapshot();
       };
       events.onerror = () => {
         setConnected(false);
@@ -47,6 +72,7 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
           setSnapshot((current) => current && {
             ...current,
             messages: upsertGroupMessage(current.messages, event.message),
+            activeWorks: (current.activeWorks || []).filter((work) => work.workId !== event.message.workId),
           });
           const nextBuffer = { ...streamingBuffer.current };
           if (event.message.workId) {
@@ -64,10 +90,22 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
             messages: upsertGroupMessage(current.messages, event.message),
           });
         } else if (event.type === "group_agent_updated") {
-          setSnapshot((current) => current && {
+          setSnapshot((current) => current && ({
             ...current,
             agents: current.agents.map((agent) => agent.id === event.agent.id ? event.agent : agent),
-          });
+            activeWorks: event.agent.active
+              ? current.activeWorks
+              : (current.activeWorks || []).filter((work) => work.agentId !== event.agent.id),
+            messages: event.agent.active
+              ? current.messages
+              : current.messages.filter((item) => !(item.pending && item.type === "agent" && item.agentId === event.agent.id)),
+          }));
+          if (!event.agent.active) {
+            const nextBuffer = Object.fromEntries(Object.entries(streamingBuffer.current)
+              .filter(([, value]) => value.agentId !== event.agent.id));
+            streamingBuffer.current = nextBuffer;
+            setStreaming(nextBuffer);
+          }
         } else if (event.type === "group_members_changed") {
           setSnapshot((current) => current && { ...current, members: event.members });
         } else if (event.type === "group_agent_started") {
@@ -88,6 +126,17 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
           setSnapshot((current) => current && {
             ...current,
             messages: upsertGroupMessage(current.messages, pendingMessage),
+            activeWorks: [
+              ...(current.activeWorks || []).filter((work) => work.workId !== event.workId),
+              {
+                workId: event.workId,
+                agentId: event.agentId,
+                agentName: event.agentName,
+                mode: event.mode,
+                startedAt: event.startedAt,
+                phase: "working" as const,
+              },
+            ],
           });
           const value: GroupStreamingMessage = {
             workId: event.workId,

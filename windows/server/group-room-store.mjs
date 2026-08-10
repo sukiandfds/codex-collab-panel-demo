@@ -75,6 +75,7 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     }))
     .slice(-300);
   const members = new Map();
+  const activeWorks = new Map();
   let nextMessageSequence = messages.reduce((latest, message) => Math.max(latest, message.sequence), 0);
   let writeQueue = Promise.resolve();
 
@@ -106,7 +107,27 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     messages: [...messages],
     agents: [...agents.values()].map(publicAgent),
     members: activeMembers(),
+    activeWorks: [...activeWorks.values()],
   });
+
+  const beginAgentWork = ({ workId, agentId, agentName, mode, startedAt }) => {
+    const id = cleanText(workId, 160);
+    const cleanAgentId = cleanText(agentId, 80);
+    const agent = agents.get(cleanAgentId);
+    if (!id || !agent) return null;
+    const work = {
+      workId: id,
+      agentId: cleanAgentId,
+      agentName: cleanText(agentName, 80) || agent.name,
+      mode: mode === "development" ? "development" : "discussion",
+      startedAt: cleanText(startedAt, 40) || new Date().toISOString(),
+      phase: "working",
+    };
+    activeWorks.set(id, work);
+    return work;
+  };
+
+  const finishAgentWork = (workId) => activeWorks.delete(cleanText(workId, 160));
 
   const touchMember = (memberId, name) => {
     const id = cleanText(memberId, 80);
@@ -233,6 +254,8 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     getMessage,
     getAgentContext,
     advanceAgentContext,
+    beginAgentWork,
+    finishAgentWork,
     attachArtifact,
     updateAgent,
     close: () => writeQueue,

@@ -39,6 +39,7 @@ export interface SessionSummary {
   latestUser: string;
   latestAssistant: string;
   archived?: boolean;
+  archivable?: boolean;
   forkedFromId?: string | null;
 }
 

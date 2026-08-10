@@ -132,3 +132,151 @@ test("returns the new real thread id after migrating a legacy image conversation
     messageId: "optimistic-legacy-migration",
   });
 });
+
+test("routes direct employee text through employee runtime", async () => {
+  const binding = {
+    conversationId: "employee-conversation",
+    agentId: "developer",
+    runtimeKind: "codex",
+    runtimeSessionId: "employee-thread",
+    conversationKind: "direct",
+  };
+  const employeeCalls = [];
+  const events = [];
+  let genericCalls = 0;
+  const route = createConversationRoutes({
+    conversations: {
+      sendMessage: async () => { genericCalls += 1; throw new Error("generic conversation path used"); },
+      steerMessage: async () => { genericCalls += 1; throw new Error("generic conversation path used"); },
+    },
+    execution: { getStatus: () => ({ active: true, turnId: "native-turn" }) },
+    contextManagement: {},
+    media: { resolveMany: () => [] },
+    broadcast: (event) => events.push(event),
+    agentConversationStore: {
+      findByRuntimeSession: () => binding,
+      resolve: async () => binding,
+    },
+    employeeRuntime: {
+      supportsEmployee: (employeeId) => employeeId === "developer",
+      ownsConversation: (value) => value === binding,
+      sendMessage: async (value) => {
+        employeeCalls.push(value);
+        return {
+          employeeId: "developer",
+          conversationId: binding.conversationId,
+          threadId: binding.runtimeSessionId,
+          turnId: "employee-turn",
+          status: "inProgress",
+        };
+      },
+    },
+  });
+
+  const call = invoke(route, {
+    threadId: binding.runtimeSessionId,
+    conversationId: binding.conversationId,
+    text: "run employee task",
+    attachmentIds: [],
+    submissionId: "employee-submission",
+  });
+  await call.promise;
+
+  assert.equal(call.response.status, 202);
+  assert.equal(genericCalls, 0);
+  assert.deepEqual(employeeCalls, [{
+    employeeId: "developer",
+    text: "run employee task",
+    requestId: "employee-submission",
+  }]);
+  assert.deepEqual(JSON.parse(call.response.body), {
+    threadId: binding.runtimeSessionId,
+    turnId: "employee-turn",
+    status: "inProgress",
+    submissionId: "employee-submission",
+    messageId: "optimistic-employee-submission",
+  });
+  assert.equal(events[0].type, "user_message_submitted");
+});
+
+test("rejects employee attachments instead of bypassing employee runtime", async () => {
+  const binding = {
+    conversationId: "employee-conversation",
+    agentId: "developer",
+    runtimeKind: "codex",
+    runtimeSessionId: "employee-thread",
+    conversationKind: "direct",
+  };
+  let employeeCalls = 0;
+  const route = createConversationRoutes({
+    conversations: { sendMessage: async () => { throw new Error("generic path used"); } },
+    execution: { getStatus: () => ({ active: false, turnId: "" }) },
+    contextManagement: {},
+    media: { resolveMany: () => [] },
+    agentConversationStore: {
+      findByRuntimeSession: () => binding,
+      resolve: async () => binding,
+    },
+    employeeRuntime: {
+      supportsEmployee: () => true,
+      ownsConversation: (value) => value === binding,
+      sendMessage: async () => { employeeCalls += 1; },
+    },
+  });
+
+  const call = invoke(route, {
+    threadId: binding.runtimeSessionId,
+    conversationId: binding.conversationId,
+    text: "inspect attachment",
+    attachmentIds: ["file-1"],
+    submissionId: "employee-attachment-submission",
+  });
+  await assert.rejects(call.promise, (error) => error?.statusCode === 400);
+  assert.equal(employeeCalls, 0);
+});
+
+test("keeps an older direct binding on the generic conversation path", async () => {
+  const binding = {
+    conversationId: "legacy-conversation",
+    agentId: "developer",
+    runtimeKind: "codex",
+    runtimeSessionId: "legacy-thread",
+    conversationKind: "direct",
+  };
+  let genericCalls = 0;
+  let employeeCalls = 0;
+  const route = createConversationRoutes({
+    conversations: {
+      sendMessage: async () => {
+        genericCalls += 1;
+        return { turn: { id: "legacy-turn", status: "inProgress" } };
+      },
+      steerMessage: async () => { throw new Error("legacy steer should not be called"); },
+    },
+    execution: { getStatus: () => ({ active: false, turnId: "" }) },
+    contextManagement: {},
+    media: { resolveMany: () => [] },
+    agentConversationStore: {
+      findByRuntimeSession: () => binding,
+      resolve: async () => binding,
+    },
+    employeeRuntime: {
+      supportsEmployee: () => true,
+      ownsConversation: () => false,
+      sendMessage: async () => { employeeCalls += 1; },
+    },
+  });
+
+  const call = invoke(route, {
+    threadId: binding.runtimeSessionId,
+    conversationId: binding.conversationId,
+    text: "legacy task",
+    attachmentIds: [],
+    submissionId: "legacy-submission",
+  });
+  await call.promise;
+
+  assert.equal(genericCalls, 1);
+  assert.equal(employeeCalls, 0);
+  assert.equal(JSON.parse(call.response.body).turnId, "legacy-turn");
+});

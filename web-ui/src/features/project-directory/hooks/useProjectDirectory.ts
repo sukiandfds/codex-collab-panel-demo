@@ -1,18 +1,52 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { hasAccessToken, withAccessToken } from "../../../shared/api/http";
+import type { ExecutionStatus } from "../../execution/model/types";
 import { projectDirectoryApi } from "../data/projectDirectoryApi";
-import type { DirectoryProject } from "../model/types";
+import type { DirectoryProject, ProjectRuntimeStatus } from "../model/types";
 
-const REFRESH_MS = 5000;
+type StatusByThread = Record<string, ProjectRuntimeStatus>;
+type DirectoryEvent = {
+  type?: string;
+  employeeId?: string;
+  threadId?: string;
+  status?: ProjectRuntimeStatus;
+  phase?: string;
+  label?: string;
+  active?: boolean;
+  turnId?: string | null;
+};
 
-export function useProjectDirectory() {
+const sameStatus = (left?: ProjectRuntimeStatus, right?: ProjectRuntimeStatus) => (
+  String(left?.phase || "") === String(right?.phase || "")
+  && Boolean(left?.active) === Boolean(right?.active)
+  && String(left?.turnId || "") === String(right?.turnId || "")
+);
+
+export function useProjectDirectory(currentStatus?: ExecutionStatus) {
   const [projects, setProjects] = useState<DirectoryProject[]>([]);
+  const [statusByThread, setStatusByThread] = useState<StatusByThread>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const projectsRef = useRef(projects);
+  projectsRef.current = projects;
+
+  const cacheStatus = useCallback((threadId: string, status?: ProjectRuntimeStatus | null) => {
+    if (!threadId || !status) return;
+    setStatusByThread((current) => sameStatus(current[threadId], status)
+      ? current
+      : { ...current, [threadId]: status });
+  }, []);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     try {
       const next = await projectDirectoryApi.list(signal);
-      setProjects(next);
+      setProjects((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next);
+      for (const entry of next) {
+        if (entry.mainThreadId) cacheStatus(entry.mainThreadId, entry.status);
+        for (const conversation of entry.conversations || []) {
+          cacheStatus(conversation.threadId || conversation.id, conversation.status);
+        }
+      }
       setError("");
     } catch (reason) {
       if (signal?.aborted) return;
@@ -20,20 +54,51 @@ export function useProjectDirectory() {
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, []);
+  }, [cacheStatus]);
+
+  useEffect(() => {
+    if (!currentStatus?.threadId) return;
+    cacheStatus(currentStatus.threadId, currentStatus);
+  }, [cacheStatus, currentStatus]);
 
   useEffect(() => {
     const controller = new AbortController();
     void refresh(controller.signal);
-    const timer = window.setInterval(() => void refresh(), REFRESH_MS);
-    const onGrowthOrStatus = () => void refresh();
-    window.addEventListener("negus:project-status-changed", onGrowthOrStatus);
+    if (!hasAccessToken || typeof EventSource === "undefined") return () => controller.abort();
+    const source = new EventSource(withAccessToken("/events"));
+    let refreshTimer = 0;
+    const scheduleActivityRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => void refresh(), 180);
+    };
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as DirectoryEvent;
+        if (payload.type === "execution_status" && payload.threadId) {
+          cacheStatus(payload.threadId, payload);
+          return;
+        }
+        if (payload.type === "employee_status") {
+          const employeeProject = projectsRef.current.find((entry) => entry.employeeId === payload.employeeId);
+          if (employeeProject?.mainThreadId) cacheStatus(employeeProject.mainThreadId, payload.status);
+          return;
+        }
+        if (payload.type === "sessions_changed" || payload.type === "employee_message_completed") scheduleActivityRefresh();
+      } catch { /* Existing conversation SSE remains the source of truth. */ }
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    window.addEventListener("pageshow", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
       controller.abort();
-      window.clearInterval(timer);
-      window.removeEventListener("negus:project-status-changed", onGrowthOrStatus);
+      source.close();
+      window.clearTimeout(refreshTimer);
+      window.removeEventListener("pageshow", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [refresh]);
+  }, [cacheStatus, refresh]);
 
-  return { projects, loading, error, refresh };
+  return { projects, statusByThread, loading, error, refresh };
 }

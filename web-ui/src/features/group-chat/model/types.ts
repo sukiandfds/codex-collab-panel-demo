@@ -50,12 +50,22 @@ export interface GroupStreamingMessage {
   startedAt: string;
 }
 
+export interface GroupActiveWork {
+  workId: string;
+  agentId: string;
+  agentName: string;
+  mode: GroupMode;
+  startedAt: string;
+  phase: "working";
+}
+
 export interface GroupSnapshot {
   project: string;
   room: { id: string; name: string };
   messages: GroupMessage[];
   agents: GroupAgent[];
   members: GroupMember[];
+  activeWorks?: GroupActiveWork[];
 }
 
 export type GroupProfile =

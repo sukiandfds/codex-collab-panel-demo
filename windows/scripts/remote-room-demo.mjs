@@ -22,11 +22,13 @@ import { createWebOutputService } from "../server/web-output-service.mjs";
 import { createFushengUsageService } from "../server/fusheng-usage-service.mjs";
 import { createImageGenerationRunStore } from "../server/image-generation/image-generation-run-store.mjs";
 import { createAgentConversationStore } from "../server/agent-conversation-store.mjs";
+import { createAgentConversationStoreRouter } from "../server/agent-conversation-store-router.mjs";
 import { createPublicationStore } from "../server/publication-store.mjs";
 import { createAgentPublicationService } from "../server/agent-publication-service.mjs";
 import { createCodexRuntimeAdapter, createRuntimeAdapterRegistry } from "../server/runtime-adapter-registry.mjs";
 import { createGroupRoomDirectory } from "../server/group-room-directory.mjs";
 import { createEmployeeProjectRegistry } from "../server/employee-project-registry.mjs";
+import { createProjectIdentityStore } from "../server/project-identity-store.mjs";
 import { createEmployeeRuntimeService } from "../server/employee-runtime-service.mjs";
 import { createEmployeeProjectDirectory } from "../server/employee-project-directory.mjs";
 import { createEmployeeGrowthStore } from "../server/employee-growth-store.mjs";
@@ -74,6 +76,7 @@ const jsonlConversations = createJsonlConversationStore({
   onChange: realtime.broadcast,
 });
 let agentConversationStore;
+let legacyAgentConversationStore;
 const appServerConversations = createAppServerConversationStore({
   projectRoot,
   attachmentContent,
@@ -121,6 +124,12 @@ const employeeRegistry = await createEmployeeProjectRegistry({
   stateFile: path.join(projectRoot, "runtime", "employee-projects.json"),
   workspaceRoot: projectRoot,
 });
+const projectIdentity = await createProjectIdentityStore({
+  stateFile: path.join(projectRoot, "runtime", "project-identities.json"),
+  project,
+  projectRoot,
+  registry: employeeRegistry,
+});
 const employeeConversationStore = await createAgentConversationStore({
   stateFile: path.join(projectRoot, "runtime", "employee-conversations.json"),
   historyRoot: path.join(projectRoot, "runtime", "employee-conversations"),
@@ -145,17 +154,26 @@ const employeeRuntime = createEmployeeRuntimeService({
   broadcast: realtime.broadcast,
   growthService: employeeGrowth,
   contextProvider: employeeGrowth.getContext,
+  execution,
 });
 const employeeProjectDirectory = createEmployeeProjectDirectory({
   project,
   projectRoot,
   registry: employeeRegistry,
+  projectIdentity,
   employeeRuntime,
+  conversations,
+  execution,
+  employeeConversations: employeeConversationStore,
 });
-agentConversationStore = await createAgentConversationStore({
+legacyAgentConversationStore = await createAgentConversationStore({
   stateFile: path.join(projectRoot, "runtime", "agent-conversations.json"),
   groupRoom,
   roomDirectory: groupRoomDirectory,
+});
+agentConversationStore = createAgentConversationStoreRouter({
+  primary: employeeConversationStore,
+  fallbacks: [legacyAgentConversationStore],
 });
 const publicationStore = await createPublicationStore({
   stateFile: path.join(projectRoot, "runtime", "agent-publications.json"),
@@ -173,6 +191,16 @@ const webOutputs = createWebOutputService({
   artifacts,
   media,
 });
+const resolveArtifactInputs = (artifactIds) => [...new Set(Array.isArray(artifactIds) ? artifactIds : [])]
+  .slice(0, 6)
+  .flatMap((artifactId) => {
+    try {
+      const artifact = artifacts.get(artifactId);
+      return media.resolveMany([artifact.sourceMediaId]);
+    } catch {
+      return [];
+    }
+  });
 const multiAgent = createMultiAgentService({
   projectRoot,
   room: groupRoom,
@@ -180,6 +208,7 @@ const multiAgent = createMultiAgentService({
   webOutputs,
   attachmentContent,
   resolveAttachments: media.resolveMany,
+  resolveArtifacts: resolveArtifactInputs,
 });
 const runtimeRegistry = createRuntimeAdapterRegistry({
   adapters: [createCodexRuntimeAdapter({
@@ -224,8 +253,9 @@ const close = () => {
   employeeRuntime.close();
   void employeeGrowthStore.close();
   void employeeConversationStore.close();
+  void projectIdentity.close();
   void employeeRegistry.close();
-  void agentConversationStore.close();
+  void legacyAgentConversationStore.close();
   void publicationStore.close();
   server.close();
 };

@@ -20,6 +20,7 @@ export const createMultiAgentService = ({
   autoCollaboration = false,
   attachmentContent,
   resolveAttachments = () => [],
+  resolveArtifacts = () => [],
 }) => {
   const client = createAppServerClient();
   const threadAgents = new Map();
@@ -42,6 +43,20 @@ export const createMultiAgentService = ({
   const finishStatus = (agentId, patch) => {
     activeModes.delete(agentId);
     void setStatus(agentId, { active: false, ...patch });
+  };
+
+  const announceRunStarted = (run) => {
+    if (!run || run.startedBroadcast) return;
+    const work = {
+      agentId: run.agentId,
+      agentName: room.getAgent(run.agentId)?.name || "Codex Agent",
+      workId: run.workId,
+      mode: activeModes.get(run.agentId) || "discussion",
+      startedAt: run.startedAt,
+    };
+    room.beginAgentWork?.(work);
+    run.startedBroadcast = true;
+    broadcast({ type: "group_agent_started", ...work });
   };
 
   const clearAgentThread = async (agent) => {
@@ -77,6 +92,7 @@ export const createMultiAgentService = ({
     if (!run || run.threadId !== threadId) return;
     currentRun = null;
     clearTimeout(run.timer);
+    room.finishAgentWork?.(run.workId);
     finishStatus(run.agentId, {
       phase: status,
       label: status === "failed" ? "执行失败" : status === "interrupted" ? "任务已中断" : "任务已完成",
@@ -94,17 +110,7 @@ export const createMultiAgentService = ({
 
     if (method === "turn/started") {
       const run = currentRun?.threadId === params.threadId ? currentRun : null;
-      if (run && !run.startedBroadcast) {
-        run.startedBroadcast = true;
-        broadcast({
-          type: "group_agent_started",
-          agentId,
-          agentName: room.getAgent(agentId)?.name || "Codex Agent",
-          workId: run.workId,
-          mode: activeModes.get(agentId) || "discussion",
-          startedAt: run.startedAt,
-        });
-      }
+      announceRunStarted(run);
       void setStatus(agentId, { phase: "working", label: "正在处理任务", detail: "", active: true });
       return;
     }
@@ -119,6 +125,7 @@ export const createMultiAgentService = ({
       return;
     }
     if (method === "item/agentMessage/delta") {
+      announceRunStarted(currentRun?.threadId === params.threadId ? currentRun : null);
       const workId = currentRun?.threadId === params.threadId
         ? currentRun.workId
         : `${agentId}:${params.itemId || "stream"}`;
@@ -258,9 +265,16 @@ export const createMultiAgentService = ({
     const contextAttachments = typeof resolveAttachments === "function"
       ? resolveAttachments(contextAttachmentIds)
       : [];
+    const contextArtifactIds = [...new Set(context.messages.flatMap((message) => (
+      Array.isArray(message.artifactIds) ? message.artifactIds : []
+    )))];
+    const contextArtifacts = typeof resolveArtifacts === "function"
+      ? resolveArtifacts(contextArtifactIds)
+      : [];
     const inputAttachments = [...new Map([
       ...attachments,
       ...contextAttachments,
+      ...contextArtifacts,
     ].filter((attachment) => attachment?.id).map((attachment) => [attachment.id, attachment])).values()];
     const prompt = buildDiscussionPrompt({
       agent,
@@ -275,6 +289,7 @@ export const createMultiAgentService = ({
     const completion = new Promise((resolve) => { resolveRun = resolve; });
     const timer = setTimeout(() => {
       if (currentRun?.threadId !== threadId) return;
+      room.finishAgentWork?.(currentRun.workId);
       currentRun = null;
       activeModes.delete(agentId);
       void setStatus(agentId, { phase: "failed", label: "等待回复超时", detail: "", active: false });
@@ -303,7 +318,10 @@ export const createMultiAgentService = ({
       if (result.status === "completed") await room.advanceAgentContext(agentId, context.throughSequence);
       return result;
     } catch (error) {
-      if (currentRun?.threadId === threadId) currentRun = null;
+      if (currentRun?.threadId === threadId) {
+        room.finishAgentWork?.(currentRun.workId);
+        currentRun = null;
+      }
       clearTimeout(timer);
       finishStatus(agentId, { phase: "failed", label: "任务启动失败", detail: error instanceof Error ? error.message : String(error) });
       throw error;
@@ -392,6 +410,7 @@ export const createMultiAgentService = ({
     closed = true;
     if (currentRun) {
       clearTimeout(currentRun.timer);
+      room.finishAgentWork?.(currentRun.workId);
       currentRun.resolve({ status: "interrupted", text: currentRun.finalText });
       currentRun = null;
     }

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createMemberId, readStoredMember, writeStoredMember } from "../data/groupMemberStorage";
 import { groupApi } from "../data/groupApi";
-import { keepUnacknowledgedMessages, removePendingMessage, upsertGroupMessage } from "../data/groupMessageState";
-import { readGroupSnapshot, writeGroupSnapshot } from "../data/groupSnapshot";
+import { removePendingMessage, upsertGroupMessage } from "../data/groupMessageState";
+import { readGroupSnapshot, reconcileGroupSnapshot, writeGroupSnapshot } from "../data/groupSnapshot";
 import type { GroupMessage, GroupMode, GroupSnapshot, StoredMember } from "../model/types";
 import { useGroupEvents } from "../realtime/useGroupEvents";
 
@@ -21,13 +21,11 @@ export function useGroupRoom() {
   const refresh = useCallback(async (signal?: AbortSignal) => {
     try {
       const next = await groupApi.snapshot(signal);
-      setSnapshot((current) => ({
-          ...next,
-          messages: keepUnacknowledgedMessages(next.messages, [
-            ...pendingMessagesRef.current.values(),
-            ...(current?.messages.filter((message) => message.pending && message.type === "human") || []),
-          ]),
-      }));
+      setSnapshot((current) => reconcileGroupSnapshot(
+        next,
+        current,
+        [...pendingMessagesRef.current.values()],
+      ));
       setError("");
     } catch (reason) {
       if (!signal?.aborted) setError(reason instanceof Error ? reason.message : String(reason));

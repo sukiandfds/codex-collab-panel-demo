@@ -95,3 +95,35 @@ test("deduplicates repeated agent completions by work id", async (t) => {
   assert.equal(events.filter((event) => event.type === "group_message_created").length, 1);
   await room.close();
 });
+
+test("exposes active Agent work in snapshots without persisting it across restart", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "negus-group-active-work-"));
+  const stateFile = path.join(directory, "group-room.json");
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+
+  const room = await createGroupRoomStore({ stateFile, project: "negus", broadcast: () => {} });
+  room.beginAgentWork({
+    workId: "work-active-1",
+    agentId: "developer",
+    agentName: "开发 Agent",
+    mode: "development",
+    startedAt: "2026-08-10T01:02:03.000Z",
+  });
+
+  assert.deepEqual(room.snapshot().activeWorks, [{
+    workId: "work-active-1",
+    agentId: "developer",
+    agentName: "开发 Agent",
+    mode: "development",
+    startedAt: "2026-08-10T01:02:03.000Z",
+    phase: "working",
+  }]);
+  assert.equal(room.finishAgentWork("work-active-1"), true);
+  assert.deepEqual(room.snapshot().activeWorks, []);
+
+  room.beginAgentWork({ workId: "work-not-persisted", agentId: "developer" });
+  await room.close();
+  const restored = await createGroupRoomStore({ stateFile, project: "negus", broadcast: () => {} });
+  assert.deepEqual(restored.snapshot().activeWorks, []);
+  await restored.close();
+});

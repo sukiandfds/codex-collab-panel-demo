@@ -39,6 +39,7 @@ export const createEmployeeRuntimeService = ({
   broadcast = () => {},
   growthService = null,
   contextProvider = null,
+  execution = null,
   client = createAppServerClient(),
 }) => {
   const threadEmployees = new Map();
@@ -79,6 +80,16 @@ export const createEmployeeRuntimeService = ({
       status: next,
       modificationConfirmed: Boolean(registry.get(employeeId)?.modificationConfirmed),
     });
+    const threadId = clean(registry.get(employeeId)?.mainThreadId, 120);
+    if (threadId && execution?.publishStatus) {
+      execution.publishStatus(threadId, {
+        phase: next.phase,
+        label: next.label,
+        detail: next.detail,
+        active: next.active,
+        turnId: next.turnId,
+      });
+    }
     return next;
   };
 
@@ -277,13 +288,21 @@ export const createEmployeeRuntimeService = ({
       return;
     }
     if (method === "item/agentMessage/delta") {
-      broadcast({
+      const deltaEvent = {
         type: "employee_assistant_delta",
         employeeId,
         threadId,
         turnId: clean(params.turnId, 160),
         itemId: clean(params.itemId || params.item?.id, 160),
         delta: String(params.delta || params.text || ""),
+      };
+      broadcast(deltaEvent);
+      execution?.publishThreadEvent?.(threadId, {
+        type: "assistant_delta",
+        threadId,
+        turnId: deltaEvent.turnId,
+        itemId: deltaEvent.itemId,
+        delta: deltaEvent.delta,
       });
       return;
     }
@@ -308,6 +327,7 @@ export const createEmployeeRuntimeService = ({
           itemId: item.id,
         }),
       });
+      execution?.publishThreadEvent?.(threadId, { type: "sessions_changed", threadId });
       return;
     }
     if (method.endsWith("/requestApproval")) {
@@ -434,5 +454,20 @@ export const createEmployeeRuntimeService = ({
     client.close();
   };
 
-  return { open: sessionFor, sendMessage, confirmModification, getStatus, close };
+  return {
+    open: sessionFor,
+    sendMessage,
+    confirmModification,
+    getStatus,
+    supportsEmployee: (employeeId) => Boolean(registry.get(employeeId)),
+    ownsConversation: (binding) => {
+      const employee = registry.get(binding?.agentId);
+      return Boolean(
+        employee
+          && clean(employee.conversationId, 120) === clean(binding?.conversationId, 120)
+          && clean(employee.mainThreadId, 120) === clean(binding?.runtimeSessionId, 120),
+      );
+    },
+    close,
+  };
 };

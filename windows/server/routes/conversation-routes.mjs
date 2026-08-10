@@ -14,6 +14,7 @@ const publicAttachment = ({ id, name, mimeType, url, width, height, readStatus, 
 export const createConversationRoutes = ({
   conversations, execution, followUpQueue, contextManagement, media, submissionStore,
   broadcast = () => {}, publishThreadEvent = (_threadId, event) => broadcast(event), agentConversationStore,
+  employeeRuntime,
 }) => {
   const inFlightSubmissions = new Map();
   const submissionTtlMs = 60000;
@@ -99,6 +100,12 @@ export const createConversationRoutes = ({
     return binding;
   };
 
+  const isEmployeeBinding = (binding) => Boolean(
+    employeeRuntime
+      && binding?.conversationKind === "direct"
+      && employeeRuntime.ownsConversation?.(binding),
+  );
+
   const readAgentSession = async (binding, source, pagination) => {
     const localMessages = await agentConversationStore.readMessages(binding.conversationId);
     let runtime = null;
@@ -160,7 +167,11 @@ export const createConversationRoutes = ({
       return true;
     }
     const conversationId = String(body.conversationId || "").trim();
-    await authorizeAgentThread({ threadId, conversationId });
+    const binding = await authorizeAgentThread({ threadId, conversationId });
+    const employeeBinding = isEmployeeBinding(binding);
+    if (employeeBinding && Array.isArray(body.attachmentIds) && body.attachmentIds.length) {
+      throw Object.assign(new Error("员工单聊暂不支持附件"), { statusCode: 400 });
+    }
     const submissionId = String(body.submissionId || "").trim().slice(0, 160) || randomUUID();
     const messageId = `optimistic-${submissionId}`;
     const createdAt = new Date().toISOString();
@@ -194,7 +205,7 @@ export const createConversationRoutes = ({
     }
     const run = async () => {
       const status = execution.getStatus(threadId);
-      if (status.active && !status.turnId) {
+      if (!employeeBinding && status.active && !status.turnId) {
         const error = new Error("Codex 正在启动当前任务，请稍后再试");
         error.statusCode = 409;
         throw error;
@@ -210,10 +221,28 @@ export const createConversationRoutes = ({
       });
       let result;
       try {
+        if (employeeBinding) {
+          const employeeResult = await employeeRuntime.sendMessage({
+            employeeId: binding.agentId,
+            text,
+            requestId: submissionId,
+          });
+          return {
+            body: {
+              threadId: employeeResult?.threadId || threadId,
+              turnId: employeeResult?.turnId || "",
+              status: employeeResult?.status || "inProgress",
+              submissionId,
+              messageId,
+            },
+            statusCode: 202,
+          };
+        }
         result = status.active
           ? await conversations.steerMessage(threadId, status.turnId, text, attachments)
           : await conversations.sendMessage(threadId, text, attachments);
       } catch (error) {
+        if (employeeBinding) throw error;
         const recovered = execution.getStatus(threadId);
         if (status.active || !recovered.turnId || recovered.turnId === status.turnId) throw error;
         return {

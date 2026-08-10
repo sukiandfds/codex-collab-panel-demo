@@ -1,11 +1,12 @@
 import { Archive, ArchiveRestore, RefreshCw, SquarePen } from "lucide-react";
+import { useEffect, useState } from "react";
 import { SidebarHeader } from "../../../components/Sidebar/SidebarHeader";
 import type { ProjectInfo, SessionSummary } from "../model/types";
 import type { ExecutionStatus } from "../../execution/model/types";
 import { useProjectDirectory } from "../../project-directory/hooks/useProjectDirectory";
 import { ProjectDirectory } from "../../project-directory/components/ProjectDirectory";
+import { EmployeeCapabilityPanel } from "../../employee-capabilities/components/EmployeeCapabilityPanel";
 import { ConnectionStatus } from "./ConnectionStatus";
-import { SessionList } from "./SessionList";
 import styles from "./ConversationSidebar.module.css";
 
 interface ConversationSidebarProps {
@@ -47,16 +48,24 @@ export function ConversationSidebar({
   currentStatus,
   onCloseSidebar,
 }: ConversationSidebarProps) {
-  const directory = useProjectDirectory();
+  const directory = useProjectDirectory(currentStatus);
   const workspaceName = project?.root.split(/[\\/]/u).filter(Boolean).slice(-1)[0]
     || project?.name
     || "正在读取项目";
+  const [employeeId, setEmployeeId] = useState(() => new URLSearchParams(window.location.search).get("agent") || "");
+  useEffect(() => {
+    const syncEmployeeRoute = () => setEmployeeId(new URLSearchParams(window.location.search).get("agent") || "");
+    window.addEventListener("popstate", syncEmployeeRoute);
+    window.addEventListener("negus:navigate", syncEmployeeRoute);
+    return () => {
+      window.removeEventListener("popstate", syncEmployeeRoute);
+      window.removeEventListener("negus:navigate", syncEmployeeRoute);
+    };
+  }, []);
 
   return (
     <aside className={styles.sidebar} aria-label="当前项目会话">
       <SidebarHeader
-        project={workspaceName}
-        projectTitle={project?.root}
         actions={(
           <>
           <button className={styles.iconButton} type="button" aria-label="新建对话" title="新建对话" disabled={creating} onClick={() => void onCreate()}>
@@ -80,25 +89,24 @@ export function ConversationSidebar({
       />
       <ProjectDirectory
         project={project}
+        workspaceName={workspaceName}
         projects={directory.projects}
         loading={directory.loading}
         error={directory.error}
         selectedId={selectedId}
         currentStatus={currentStatus}
-        onOpened={onCloseSidebar}
-      />
-      <SessionList
+        statusByThread={directory.statusByThread}
         sessions={sessions}
-        selectedId={selectedId}
-        loading={loading}
-        error={error}
+        sessionsLoading={loading}
+        sessionsError={error}
         archivedView={archivedView}
         archiveBusyId={archiveBusyId}
         onSelect={onSelect}
         onArchive={onArchive}
         onUnarchive={onUnarchive}
-        currentStatus={currentStatus}
+        onOpened={onCloseSidebar}
       />
+      <EmployeeCapabilityPanel employeeId={employeeId} />
       <ConnectionStatus connected={connected} />
     </aside>
   );

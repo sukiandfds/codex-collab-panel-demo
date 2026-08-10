@@ -6,7 +6,7 @@ import test from "node:test";
 import { createEmployeeProjectRegistry } from "../server/employee-project-registry.mjs";
 import { createEmployeeRuntimeService } from "../server/employee-runtime-service.mjs";
 
-const fixture = async (t) => {
+const fixture = async (t, { execution = null } = {}) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "negus-employee-runtime-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const registry = await createEmployeeProjectRegistry({
@@ -41,6 +41,7 @@ const fixture = async (t) => {
     projectRoot: "D:\\project",
     client,
     broadcast: (event) => events.push(event),
+    execution,
   });
   t.after(async () => {
     runtime.close();
@@ -70,4 +71,47 @@ test("employee runtime binds one main thread and gates workspace writes", async 
   assert.equal(calls.at(-1).params.sandbox, "workspace-write");
   assert.equal(registry.get("developer").modificationConfirmed, true);
   assert.equal((await runtime.getStatus("developer")).modificationConfirmed, true);
+});
+
+test("employee runtime mirrors status and message progress to the shared conversation UI", async (t) => {
+  const statuses = [];
+  const threadEvents = [];
+  const execution = {
+    publishStatus: (threadId, status) => statuses.push({ threadId, ...status }),
+    publishThreadEvent: (threadId, event) => threadEvents.push({ threadId, event }),
+  };
+  const { runtime, listener } = await fixture(t, { execution });
+
+  await runtime.open("developer");
+  await runtime.sendMessage({ employeeId: "developer", text: "inspect the project", requestId: "request-bridge" });
+  listener({
+    method: "item/agentMessage/delta",
+    params: { threadId: "employee-thread", turnId: "employee-turn", itemId: "assistant-item", delta: "done" },
+  });
+  listener({
+    method: "item/completed",
+    params: {
+      threadId: "employee-thread",
+      turnId: "employee-turn",
+      item: { id: "assistant-item", type: "agentMessage", phase: "final_answer", text: "done" },
+    },
+  });
+  listener({ method: "turn/completed", params: { threadId: "employee-thread", turn: { id: "employee-turn", status: "completed" } } });
+
+  assert.equal(statuses.some((event) => event.threadId === "employee-thread" && event.phase === "working" && event.active), true);
+  assert.equal(statuses.at(-1).phase, "idle");
+  assert.deepEqual(threadEvents[0], {
+    threadId: "employee-thread",
+    event: {
+      type: "assistant_delta",
+      threadId: "employee-thread",
+      turnId: "employee-turn",
+      itemId: "assistant-item",
+      delta: "done",
+    },
+  });
+  assert.deepEqual(threadEvents.at(-1), {
+    threadId: "employee-thread",
+    event: { type: "sessions_changed", threadId: "employee-thread" },
+  });
 });

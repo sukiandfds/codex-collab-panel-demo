@@ -184,6 +184,7 @@ export function useConversationSession(initial: InitialConversationState) {
     params.set("thread", threadId);
     params.delete("agent");
     params.delete("employee");
+    params.delete("employeeId");
     params.delete("conversation");
     window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
     void loadSession(threadId, { quiet: Boolean(cached) });
@@ -216,6 +217,7 @@ export function useConversationSession(initial: InitialConversationState) {
     params.delete("thread");
     params.delete("agent");
     params.delete("employee");
+    params.delete("employeeId");
     params.delete("conversation");
     const query = params.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
@@ -235,6 +237,7 @@ export function useConversationSession(initial: InitialConversationState) {
     params.set("thread", detail.threadId);
     params.delete("agent");
     params.delete("employee");
+    params.delete("employeeId");
     params.delete("conversation");
     window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
   }, []);
