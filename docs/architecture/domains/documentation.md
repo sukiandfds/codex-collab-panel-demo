@@ -10,8 +10,8 @@
 | `docs/research/` | 日期化技术研究、证据和迁移记录 |
 | `docs/records/` | 新的开发日志、验证记录和事故复盘 |
 | `项目战略与多角色评审/` | 外部调研、竞品、Orca、组织与投资评估等研究资料 |
-| 根目录 `DEVELOPMENT_*.md` | 历史开发日志和事故记录 |
-| 根目录 `PROJECT.md`、`VISION_NOTES.md` | 项目定位、愿景和使用说明 |
+| `docs/records/DEVELOPMENT_*.md` | 历史开发日志和事故记录 |
+| 根目录 `PROJECT.md`、`docs/records/VISION_NOTES.md` | 项目定位、愿景和使用说明 |
 | `docs/images/`、`资料库/` | 截图、参考图片和研究素材 |
 
 ## 文档边界
@@ -26,4 +26,4 @@
 
 ## 当前整理判断
 
-文档数量和来源较多，但问题主要是分类边界重叠，不是缺少一张更大的总表。架构目录应只保留分域说明和例外清单，功能状态继续留在 `FEATURE_INDEX.md` 与 `docs/project-management/`。
+文档数量和来源较多，但问题主要是分类边界重叠，不是缺少一张更大的总表。架构目录应只保留分域说明和例外清单，功能状态继续留在 `FEATURE_STATUS_INDEX.md` 与 `docs/project-management/`。

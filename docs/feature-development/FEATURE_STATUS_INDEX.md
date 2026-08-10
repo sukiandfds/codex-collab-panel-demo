@@ -1,12 +1,12 @@
 ---
-document_type: feature_index
+document_type: feature_status_index
 schema_version: 1
 last_updated: 2026-08-07
 ---
 
-# 功能开发索引
+# 功能状态索引
 
-AI 助手应先根据任务定位功能编号，再读取对应文件。不要默认读取所有功能历史。
+AI 助手根据任务定位功能编号，再读取对应功能文件。不要默认读取所有功能历史。
 
 ## 当前功能
 
@@ -69,7 +69,7 @@ AI 助手应先根据任务定位功能编号，再读取对应文件。不要�
 
 ## 当前优先阅读的普适问题
 
-开发前至少检查 [`PROCESS_ISSUES.md`](./PROCESS_ISSUES.md) 中这些条目：
+开发前至少检查 [`DEVELOPMENT_COMMON_MISTAKES.md`](./DEVELOPMENT_COMMON_MISTAKES.md) 中这些条目：
 
 - `PROC-001`：没有先确认架构和功能所有权就修改。
 - `PROC-002`：Windows 端口与进程检查使用了不适配本机的方法。
@@ -83,13 +83,13 @@ AI 助手应先根据任务定位功能编号，再读取对应文件。不要�
 
 | 原始日志 | 主要关联功能 |
 | --- | --- |
-| `DEVELOPMENT_LOG_2026-07-22.md` | `FEAT-001`、`FEAT-003`、`FEAT-005` |
-| `DEVELOPMENT_LOG_2026-07-24.md` | `FEAT-002`、`FEAT-005` |
-| `DEVELOPMENT_LOG_2026-07-25.md` | `FEAT-001`、`FEAT-002`、`FEAT-003` |
-| `DEVELOPMENT_LOG_2026-07-26.md` | `FEAT-004`、AI 功能开发记录体系 |
-| `DEVELOPMENT_BUG_LOG_2026-07-24_DESKTOP_WEB_SYNC.md` | `FEAT-005` |
-| `DEVELOPMENT_BUG_LOG_2026-07-25.md` | `FEAT-001`、`FEAT-003`、`FEAT-005` |
-| `DEVELOPMENT_PROCESS_BLOCKERS_2026-07-25.md` | `PROCESS_ISSUES.md` |
+| `../records/DEVELOPMENT_LOG_2026-07-22.md` | `FEAT-001`、`FEAT-003`、`FEAT-005` |
+| `../records/DEVELOPMENT_LOG_2026-07-24.md` | `FEAT-002`、`FEAT-005` |
+| `../records/DEVELOPMENT_LOG_2026-07-25.md` | `FEAT-001`、`FEAT-002`、`FEAT-003` |
+| `../records/DEVELOPMENT_LOG_2026-07-26.md` | `FEAT-004`、AI 功能开发记录体系 |
+| `../records/DEVELOPMENT_BUG_LOG_2026-07-24_DESKTOP_WEB_SYNC.md` | `FEAT-005` |
+| `../records/DEVELOPMENT_BUG_LOG_2026-07-25.md` | `FEAT-001`、`FEAT-003`、`FEAT-005` |
+| `../records/DEVELOPMENT_PROCESS_BLOCKERS_2026-07-25.md` | `DEVELOPMENT_COMMON_MISTAKES.md` |
 
 ## 状态含义
 

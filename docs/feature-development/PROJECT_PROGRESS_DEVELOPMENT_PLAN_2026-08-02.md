@@ -11,7 +11,7 @@ source_research: PROJECT_PROGRESS_MANAGEMENT_RESEARCH_2026-08-02.md
 
 ## 1. 本轮目标
 
-把当前直接渲染 `FEATURE_INDEX.md` 的进度页，升级为面向用户快速判断的项目面板：
+把当前直接渲染 `FEATURE_STATUS_INDEX.md` 的进度页，升级为面向用户快速判断的项目面板：
 
 - 用户打开页面后，先看到当前计划、当前进行中的工作和最近更新。
 - 每个条目保留需求来源、助手初步理解、用户体验变化、关联关系、状态和更新时间。
@@ -100,7 +100,7 @@ source_research: PROJECT_PROGRESS_MANAGEMENT_RESEARCH_2026-08-02.md
 
 ### M1：本轮必须完成
 
-- 服务端读取现有 `FEATURE_INDEX.md` 和对应 `FEAT-*.md`。
+- 服务端读取现有 `FEATURE_STATUS_INDEX.md` 和对应 `FEAT-*.md`。
 - 输出结构化项目概览、计划、进行中条目、分类条目和更新日志。
 - 前端实现摘要列表、分类折叠、条目详情和日志列表。
 - 详情展示用户原话、助手初步理解、具体内容、预计效果、关联条目和证据入口。
@@ -118,7 +118,7 @@ source_research: PROJECT_PROGRESS_MANAGEMENT_RESEARCH_2026-08-02.md
 ## 6. 数据边界
 
 ```text
-FEATURE_INDEX.md + FEAT-*.md
+FEATURE_STATUS_INDEX.md + FEAT-*.md
     -> project-progress-store
     -> /api/project-progress
     -> ProjectProgressApp
@@ -153,7 +153,7 @@ FEATURE_INDEX.md + FEAT-*.md
 ### 2026-08-02 15:11 +08:00 | v0.1.0 | implemented_pending_review
 
 - 计划：把现有功能索引升级为结构化项目进度面板，保留用户原话、助手初步理解、用户体验内容和更新历史。
-- 实际：新增 `project-progress-store`，并行读取 `FEATURE_INDEX.md` 与 `FEAT-*.md`；接口返回项目计划、进行中条目、分类条目、条目详情和更新日志。
+- 实际：新增 `project-progress-store`，并行读取 `FEATURE_STATUS_INDEX.md` 与 `FEAT-*.md`；接口返回项目计划、进行中条目、分类条目、条目详情和更新日志。
 - 前端：新增条目摘要列表、分类折叠、最近更新列表、桌面右侧详情面板和移动端全屏详情页；详情支持用户原话、初步理解、具体内容、预计效果、关联条目、证据和版本时间线。
 - 数据边界：功能文档没有记录原始用户原话或助手初步理解时，页面明确显示“未记录/待补录”，没有把技术分析冒充用户原话。
 - 用户可见变化：打开项目进度页后，先看到当前计划、明确进行中的工作和最近变化；点击条目后再阅读完整内容，不再面对整张 Markdown 长表。

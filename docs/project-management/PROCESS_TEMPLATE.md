@@ -14,7 +14,7 @@ audience: ai_assistants_and_maintainers
 - `item.md` 记录当前快照、用户原话、助手初步理解和预计效果。
 - `updates.md` 记录状态、版本和用户可见变化的时间线。
 - `process.md` 记录这个条目独有的弯路、阻塞、决策和效率损失。
-- 能指导其他功能的经验必须升级到 `docs/feature-development/PROCESS_ISSUES.md`，使用 `PROC-*`；条目内只保留本条目影响和链接。
+- 能指导其他功能的经验必须升级到 `docs/feature-development/DEVELOPMENT_COMMON_MISTAKES.md`，使用 `PROC-*`；条目内只保留本条目影响和链接。
 - 未验证的根因必须写“待验证”，不能用推测替代证据。
 
 ## 文件头
@@ -52,4 +52,4 @@ last_updated: 2026-08-02 18:00 +08:00
 - `severity`：`P0` 至 `P3`。资源、时间或用户信任发生严重损失时使用 `P0`。
 - `status`：`active`、`mitigated`、`resolved`、`deferred`。
 
-记录按发现时间正序追加，不覆盖旧记录。一次问题如果从条目专属升级为跨功能问题，保留原 `ITEM-ID-Pxx`，并在 `PROCESS_ISSUES.md` 新增 `PROC-*` 后建立双向链接。
+记录按发现时间正序追加，不覆盖旧记录。一次问题如果从条目专属升级为跨功能问题，保留原 `ITEM-ID-Pxx`，并在 `DEVELOPMENT_COMMON_MISTAKES.md` 新增 `PROC-*` 后建立双向链接。

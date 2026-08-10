@@ -144,7 +144,7 @@ GroupApp / useGroupRoom
 - 实际：完成独立群聊页、成员、群消息、四个 Agent、讨论/开发模式和 `@` 提及。
 - 偏差：首版调度仍不完整，出现“没人回复”。
 - 问题：`FEAT-002-I01`、`FEAT-002-I02`、`FEAT-002-I03`。
-- 验证：构建和接口通过；见 `DEVELOPMENT_LOG_2026-07-24.md`。
+- 验证：构建和接口通过；见 `../../records/DEVELOPMENT_LOG_2026-07-24.md`。
 - Git：`74bfa88`。
 
 ### 2026-07-25 00:55 +08:00 | v0.2.0 | implemented_pending_review

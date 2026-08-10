@@ -55,7 +55,7 @@ scope: read_only_runtime_and_source_diagnosis
 原始记录位置：
 
 - docs/feature-development/features/FEAT-001-single-codex-web.md
-- docs/feature-development/PROCESS_ISSUES.md
+- docs/feature-development/DEVELOPMENT_COMMON_MISTAKES.md
 - docs/project-management/items/FEAT-001/process.md
 - docs/project-management/items/PM-001/process.md
 
@@ -214,7 +214,7 @@ scope: read_only_runtime_and_source_diagnosis
 | 切换长对话卡住 | 当前会话 764 条消息，limit=1 仍约 3.6 s | app-server-conversation-store.mjs:170-200 | 服务端先全量 thread/read，再切片 |
 | 会话读取反复拖慢 | 当前 JSONL 文件约 84 MB；sessions 根目录 96 个文件、约 1.59 GB | conversation-service.mjs:37-52；jsonl-conversation-store.mjs:187-220 | primary 成功时仍并行 fallback，用于媒体补偿 |
 | 发送后消息和状态互相抢顺序 | optimistic message、POST 成功、sessions_changed 都会更新 | useProjectConversations.ts:19-23、51-81 | 多次刷新和本地草稿/持久化消息交接没有单一提交点 |
-| 页面显示运行中但实际已完成 | 历史 P0 记录，当前 tracker 仍可更新 updatedAt | PROCESS_ISSUES.md PROC-019；execution-tracker.mjs:297-386 | tracker 查询时间不能代替真实 protocol 事件和终止事件 |
+| 页面显示运行中但实际已完成 | 历史 P0 记录，当前 tracker 仍可更新 updatedAt | DEVELOPMENT_COMMON_MISTAKES.md PROC-019；execution-tracker.mjs:297-386 | tracker 查询时间不能代替真实 protocol 事件和终止事件 |
 | 重新打开仍显示旧处理中 | 既有 FEAT-001-I08、I15、I24 | useConversationEvents.ts:169-190；useCodexExecution.ts:60-81 | 恢复时 status、snapshot、session 读取没有统一 Turn 顺序 |
 | 上一轮过程串入新消息 | FEAT-001-I17 active | useCodexExecution.ts:88-114；useProjectConversations.ts:72-81 | 缺少 runId/turnId/eventSeq 约束和旧 buffer 丢弃边界 |
 | 最终答案短暂消失 | FEAT-001-I24 active | useCodexExecution.ts:45-57；useProjectConversations.ts:72-81 | 流式缓冲和最终持久化消息交接可能交错 |

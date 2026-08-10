@@ -16,7 +16,7 @@ const createObserverReader = (observerPort) => async (threadId = "") => {
 
 export const createSystemRoutes = ({ token, project, projectRoot, device, observerPort, media, realtime }) => {
   const readObserverStatus = createObserverReader(observerPort);
-  const progressFile = path.join(projectRoot, "docs", "feature-development", "FEATURE_INDEX.md");
+  const progressFile = path.join(projectRoot, "docs", "feature-development", "FEATURE_STATUS_INDEX.md");
   return async (request, response, url) => {
     if (url.pathname === "/api/project") {
       sendJson(response, { name: project, root: projectRoot, mode: "interactive" });

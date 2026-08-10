@@ -13,11 +13,11 @@ audience: ai_assistants_and_maintainers
 
 开始开发前只按以下顺序读取，避免一次加载全部历史：
 
-1. 阅读 [`FEATURE_INDEX.md`](./FEATURE_INDEX.md)，确认功能编号、当前状态和对应文件。
+1. 阅读 [`FEATURE_STATUS_INDEX.md`](./FEATURE_STATUS_INDEX.md)，确认功能编号、当前状态和对应文件。
 2. 如果任务处于需求或调研阶段，先阅读对应的 `*_RESEARCH_*.md`，确认已验证事实、未知事实和范围。
 3. 阅读本次相关的一个或多个 `features/FEAT-*.md`。
-4. 阅读 [`PROCESS_ISSUES.md`](./PROCESS_ISSUES.md) 中状态为 `active` 的普适问题。
-5. 只有需要证据、复盘或定位旧实现时，才沿功能文件中的链接读取原始日期日志和 Git 提交。
+4. 阅读 [`DEVELOPMENT_COMMON_MISTAKES.md`](./DEVELOPMENT_COMMON_MISTAKES.md) 中状态为 `active` 的普适问题。
+5. 只有需要证据、复盘或定位旧实现时，才沿功能文件中的链接读取 `docs/records/` 历史日志和 Git 提交。
 
 当前对话操作功能调研和开发记录入口：[`CODEX_CONVERSATION_ACTIONS_RESEARCH_2026-08-03.md`](./CODEX_CONVERSATION_ACTIONS_RESEARCH_2026-08-03.md)。本轮已完成未提交实现，仍需本机 app-server 能力探测和用户体验确认。
 
@@ -25,11 +25,11 @@ audience: ai_assistants_and_maintainers
 
 | 层级 | 作用 | 更新方式 |
 | --- | --- | --- |
-| `FEATURE_INDEX.md` | 展示所有功能当前状态、最新版本和入口 | 功能新增、状态或版本变化时更新 |
+| `FEATURE_STATUS_INDEX.md` | 展示所有功能当前状态、最新版本和入口 | 功能新增、状态或版本变化时更新 |
 | `features/FEAT-*.md` | 记录一个功能的目标、架构、计划、问题和版本历史 | 每次相关开发结束时更新 |
 | `*_RESEARCH_*.md` | 保存一次调研的来源、事实、风险和实现建议 | 需求进入调研阶段时创建；结论变化时追加 |
-| `PROCESS_ISSUES.md` | 记录能跨功能复用的开发方法、误判和防再犯规则 | 发现普适问题后立即更新 |
-| 根目录日期日志 | 保存当日原始过程与详细证据 | 保留旧文件，不再作为主要入口 |
+| `DEVELOPMENT_COMMON_MISTAKES.md` | 记录能跨功能复用的开发方法、误判和防再犯规则 | 发现普适问题后立即更新 |
+| `docs/records/` 历史日志 | 保存原始过程与详细证据 | 只有需要证据、复盘或定位旧实现时才读取 |
 | Git | 保存可核对的代码变化 | 功能记录引用提交，不复制完整 diff |
 
 项目管理条目的过程复盘不放在本目录重复维护。与项目计划、条目状态直接相关的过程记录放在
@@ -59,7 +59,7 @@ audience: ai_assistants_and_maintainers
 
 会影响多个功能或以后开发方式的问题。例如：没有先理解架构就修改、数据和 UI 混改、验证工具选择错误、服务端改动后没有重启、一次补丁范围过大。
 
-分类判断标准：如果经验可以写成“以后开发其他功能也必须遵守”，归为 `普适`；否则归为 `特例`。普适问题除写入功能文件外，还必须登记到 `PROCESS_ISSUES.md`。
+分类判断标准：如果经验可以写成“以后开发其他功能也必须遵守”，归为 `普适`；否则归为 `特例`。普适问题除写入功能文件外，还必须登记到 `DEVELOPMENT_COMMON_MISTAKES.md`。
 
 ## 问题记录字段
 

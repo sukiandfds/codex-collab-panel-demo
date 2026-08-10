@@ -81,7 +81,7 @@ Local image path in Markdown
 - 实际：建立结构化内容块和独立 `ContentRenderer`。
 - 偏差：当时只覆盖已结构化媒体，本地 Markdown 路径仍未解决。
 - 问题：`FEAT-003-I01` resolved；`FEAT-003-I02` 尚未发现。
-- 验证：见 `DEVELOPMENT_LOG_2026-07-22.md`。
+- 验证：见 `../../records/DEVELOPMENT_LOG_2026-07-22.md`。
 - Git：相关变化进入 `8cf1e3e` 前后的开发线。
 
 ### 2026-07-25 00:04 +08:00 | v0.2.0 | implemented_pending_review
@@ -90,7 +90,7 @@ Local image path in Markdown
 - 实际：完成选择、预览、上传、ID 解析和单人/群聊消息附件。
 - 偏差：上传进度仍为阶段提示。
 - 问题：`FEAT-003-I03` mitigated。
-- 验证：见 `DEVELOPMENT_BUG_LOG_2026-07-25.md`。
+- 验证：见 `../../records/DEVELOPMENT_BUG_LOG_2026-07-25.md`。
 - Git：`5a8ad71`。
 
 ### 2026-07-25 22:49 +08:00 | v0.3.0 | implemented_pending_review

@@ -250,7 +250,7 @@ web-ui/src/features/artifacts/
 6. 新增独立 `features/artifacts` 前端功能域和 `ArtifactCard`。
 7. 支持 Markdown、图片、音视频和 PDF 的现有能力复用，以及所有文件的下载。
 8. 显示版本、状态、创建者和文件大小。
-9. 记录本次实现到本文版本时间线，并更新 `FEATURE_INDEX.md` 状态。
+9. 记录本次实现到本文版本时间线，并更新 `FEATURE_STATUS_INDEX.md` 状态。
 
 ### 本轮不做
 
@@ -318,8 +318,8 @@ Agent 不能只在回复文本中写一个无法验证的本机路径。只有 `
 
 开发前还需要定向阅读：
 
-1. `AI_ASSISTANT_READ_FIRST.md`
-2. `docs/feature-development/PROCESS_ISSUES.md` 的 active 条目
+1. `AI_ASSISTANT_WORK_RULES.md`
+2. `docs/feature-development/DEVELOPMENT_COMMON_MISTAKES.md` 的 active 条目
 3. `docs/feature-development/features/FEAT-002-group-multi-agent.md`
 4. `docs/feature-development/features/FEAT-003-attachments-content-rendering.md`
 5. 本文列出的关键源码

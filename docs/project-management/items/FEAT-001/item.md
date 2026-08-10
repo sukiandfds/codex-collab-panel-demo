@@ -47,7 +47,7 @@ related: [FEAT-005]
 ## 当前证据
 
 - `docs/feature-development/features/FEAT-001-single-codex-web.md`
-- `docs/feature-development/FEATURE_INDEX.md`
+- `docs/feature-development/FEATURE_STATUS_INDEX.md`
 - 远程分支 `codex/remote-work-web-reliability` 提交 `deaa5c5999d96c0e3a01cd53669a315ba663823b`
 - `docs/architecture/audits/REALTIME_CONVERSATION_ARCHITECTURE_AUDIT_2026-08-03.md`
 - `docs/architecture/audits/CODEX_NATIVE_READ_AND_REGRESSION_REVIEW_2026-08-03.md`

@@ -205,7 +205,7 @@ docs/project-management/items/<ITEM-ID>/updates.md
 ### 6.2 项目进度
 
 ~~~text
-docs/feature-development/FEATURE_INDEX.md
+docs/feature-development/FEATURE_STATUS_INDEX.md
   -> project-progress-store
   -> GET /api/project-progress
   -> progressApi
@@ -214,7 +214,7 @@ docs/feature-development/FEATURE_INDEX.md
 
 已确认：
 
-- FEATURE_INDEX.md 定位功能记录，具体内容从 features/FEAT-*.md 读取。
+- FEATURE_STATUS_INDEX.md 定位功能记录，具体内容从 features/FEAT-*.md 读取。
 - 接口一次返回项目进度、计划、进行中、分类、全部条目和日志。
 - 条目详情字段在首次接口返回中一并包含，没有独立详情 API。
 - 当前前端通过 URL 的 item 参数选择条目，并在本地打开详情。

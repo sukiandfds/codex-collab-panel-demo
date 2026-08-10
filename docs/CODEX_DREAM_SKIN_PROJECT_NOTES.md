@@ -58,7 +58,7 @@ Codex-Dream-Skin/
 ├── README.md              # 默认中文
 ├── README.en.md           # English
 ├── docs/
-│   ├── PROJECT.md         # 本文件（项目记录）
+│   ├── CODEX_DREAM_SKIN_PROJECT_NOTES.md  # 本文件（项目记录）
 │   ├── platforms.md       # Win/Mac 路径与能力矩阵
 │   ├── promo-copy.md      # 宣传文案（朋友圈等，注意肖像/IP）
 │   └── images/

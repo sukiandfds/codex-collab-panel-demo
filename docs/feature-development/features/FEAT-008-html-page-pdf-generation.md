@@ -191,7 +191,7 @@ artifactIds
 6. 两个成果挂到同一条 Agent 最终群消息。
 7. Artifact 卡片为 HTML 增加“打开网页”，PDF 继续使用现有打开/下载能力。
 8. 增加服务端定向测试和必要的前端类型检查。
-9. 完成后更新本文版本时间线及 `FEATURE_INDEX.md`。
+9. 完成后更新本文版本时间线及 `FEATURE_STATUS_INDEX.md`。
 
 ## 本轮不做
 
@@ -218,7 +218,7 @@ windows/tests/web-output-service.test.mjs
 web-ui/src/features/artifacts/**
 web-ui/src/features/group-chat/**  # 仅必要接线
 docs/feature-development/features/FEAT-008-html-page-pdf-generation.md
-docs/feature-development/FEATURE_INDEX.md
+docs/feature-development/FEATURE_STATUS_INDEX.md
 ```
 
 未经用户再次许可，不修改：

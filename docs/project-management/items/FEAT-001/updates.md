@@ -12,7 +12,7 @@
 - 状态：pending_review
 - 本次更新：新增 FEAT-001 条目专属过程索引，区分标题/内容渲染特例与已升级到 `PROC-019`、`PROC-020`、`PROC-022` 的跨功能问题。
 - 用户影响：后续复盘单人 Codex 时，可以先看本条目的影响，再跳转到通用运行规则，不需要重复阅读完整事故记录。
-- 证据：`docs/project-management/items/FEAT-001/process.md`、`docs/feature-development/PROCESS_ISSUES.md`
+- 证据：`docs/project-management/items/FEAT-001/process.md`、`docs/feature-development/DEVELOPMENT_COMMON_MISTAKES.md`
 
 ### 2026-08-03 11:32 +08:00
 

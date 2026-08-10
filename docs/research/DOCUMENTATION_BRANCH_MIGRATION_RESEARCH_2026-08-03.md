@@ -35,7 +35,7 @@ status: completed
 ### 功能与项目管理
 
 - `docs/feature-development/features/FEAT-010-orca-group-runtime-adapter.md`
-- `docs/feature-development/FEATURE_INDEX.md` 中的 FEAT-010 索引行
+- `docs/feature-development/FEATURE_STATUS_INDEX.md` 中的 FEAT-010 索引行
 - `docs/project-management/PRODUCT_BASELINE.md`
 
 FEAT-010 保留为已暂停的历史技术试验，不把它描述为路线 2 已完成。产品基线记录改为当前开发分支的基线，并保留来源文档分支与来源 SHA。
@@ -50,7 +50,7 @@ FEAT-010 保留为已暂停的历史技术试验，不把它描述为路线 2 �
 
 ## 3. 未迁移内容及原因
 
-1. 文档分支对 `AI_ASSISTANT_READ_FIRST.md` 的旧版本：当前开发分支版本更新，已包含实际仓库路径、交付清单和当前流程，不能覆盖。
+1. 文档分支对 `AI_ASSISTANT_WORK_RULES.md` 的旧版本：当前开发分支版本更新，已包含实际仓库路径、交付清单和当前流程，不能覆盖。
 2. 文档分支对 `docs/project-management/INDEX.md`、`README.md`、`WORKFLOW_RULES.md` 的旧版本：当前开发分支已经包含 RESEARCH-001、RESEARCH-002 和单分支流程，保留较新版本。
 3. 文档分支上的 `.github`、`package.json`、`pnpm-lock.yaml`、`web-ui/`、`windows/` 代码和删除性改动：属于旧代码线或产品实现，不属于本次文档迁移范围。
 4. `资料库/` 中的图片和资料索引在当前开发分支已经存在，无重复迁移。

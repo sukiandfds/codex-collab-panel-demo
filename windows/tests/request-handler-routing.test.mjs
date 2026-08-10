@@ -77,7 +77,7 @@ test("serves the current feature index as live project progress", async () => {
   try {
     const docs = path.join(root, "docs", "feature-development");
     await fs.mkdir(docs, { recursive: true });
-    await fs.writeFile(path.join(docs, "FEATURE_INDEX.md"), "# Feature index\n\n| ID | Status |\n| --- | --- |\n| FEAT-001 | active |\n", "utf8");
+    await fs.writeFile(path.join(docs, "FEATURE_STATUS_INDEX.md"), "# Feature index\n\n| ID | Status |\n| --- | --- |\n| FEAT-001 | active |\n", "utf8");
     await withServer(async (baseUrl) => {
       const response = await fetch(`${baseUrl}/api/project-progress?token=test-token`);
       const payload = await response.json();
@@ -95,7 +95,7 @@ test("returns structured entries and update history for the progress panel", asy
   try {
     const docs = path.join(root, "docs", "feature-development");
     await fs.mkdir(path.join(docs, "features"), { recursive: true });
-    await fs.writeFile(path.join(docs, "FEATURE_INDEX.md"), [
+    await fs.writeFile(path.join(docs, "FEATURE_STATUS_INDEX.md"), [
       "---",
       "document_type: feature_index",
       "---",

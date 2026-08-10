@@ -26,7 +26,7 @@
 - 状态：implemented_uncommitted
 - 本次更新：补齐项目管理条目过程记录分层；新增 `PROCESS_TEMPLATE.md`，并为 PM-001、FEAT-001 建立条目专属 `process.md`，同时回链 `PROC-*` 通用问题。
 - 用户影响：新 AI 可以先看当前摘要，再按需进入状态历史或过程复盘；同一条通用经验不再在多个功能文件中重复维护。
-- 证据：`docs/project-management/PROCESS_TEMPLATE.md`、`items/PM-001/process.md`、`items/FEAT-001/process.md`、`docs/feature-development/PROCESS_ISSUES.md`
+- 证据：`docs/project-management/PROCESS_TEMPLATE.md`、`items/PM-001/process.md`、`items/FEAT-001/process.md`、`docs/feature-development/DEVELOPMENT_COMMON_MISTAKES.md`
 
 ### 2026-08-06 | 状态同步
 
@@ -34,3 +34,10 @@
 - 本次更新：确认项目管理目录、结构化读取器、摘要接口、分类列表、详情面板和更新日志页面均已进入提交历史；修正当前条目不应继续显示为“已实现未提交”。
 - 用户影响：进度页本身已经是可用实现，后续只需按实际页面体验记录问题，不再重复开发同一套读取和展示能力。
 - 证据：`windows/server/project-management-store.mjs`、`web-ui/src/features/project-management/`、提交 `dfecd6cdac8467a45896867ab3753bd26f1811fa`。
+
+### 2026-08-10 | 规则文档精简
+
+- 状态：pending_review
+- 本次更新：将助手规则、项目事实和错误案例收敛为 `AI_ASSISTANT_WORK_RULES.md`、根目录 `PROJECT.md` 和 `docs/feature-development/DEVELOPMENT_COMMON_MISTAKES.md` 三份；删除重复的工作流文件并补充 `PROC-021`。
+- 用户影响：AI 先读助手规则；需要了解项目时读 `PROJECT.md`；遇到相关问题时再读对应案例。
+- 证据：上述三份文档、`docs/project-management/README.md`、`docs/project-management/PROJECT.md`。

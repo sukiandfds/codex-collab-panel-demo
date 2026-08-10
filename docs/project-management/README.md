@@ -11,21 +11,19 @@ last_updated: 2026-08-03 11:46 +08:00
 
 ## AI 阅读顺序
 
-1. 先读 [`PROJECT.md`](./PROJECT.md)，了解项目目标和资料边界。
-2. 再读 [`WORKFLOW_RULES.md`](./WORKFLOW_RULES.md)，了解代码、文档、审计和合入规则。
-3. 再读 [`ASSISTANT_DELIVERY_CHECKLIST.md`](./ASSISTANT_DELIVERY_CHECKLIST.md)，了解每次工作如何与条目、提交和状态联动。
+1. 先读根目录 [`AI_ASSISTANT_WORK_RULES.md`](../../AI_ASSISTANT_WORK_RULES.md)，了解助手规则。
+2. 再读根目录 [`PROJECT.md`](../../PROJECT.md)，了解产品事实。
+3. 读取本目录 [`PROJECT.md`](./PROJECT.md)，了解项目管理模块。
 4. 再读 [`INDEX.md`](./INDEX.md)，按条目编号定位对应文件夹。
 5. 读取 `items/<条目编号>/item.md`，了解条目的当前快照。
 6. 需要知道状态如何变化时，读取同一目录下的 `updates.md`。
-7. 需要复盘该条目的弯路、阻塞或决策时，读取同一目录下的 `process.md`；跨功能问题再跳转到 `docs/feature-development/PROCESS_ISSUES.md` 的 `PROC-*`。
+7. 需要复盘该条目的弯路、阻塞或决策时，读取同一目录下的 `process.md`；跨功能问题再读取相关 `PROC-*`。
 
 ## 目录约定
 
 ```text
 project-management/
 ├─ PROJECT.md
-├─ WORKFLOW_RULES.md
-├─ ASSISTANT_DELIVERY_CHECKLIST.md
 ├─ INDEX.md
 ├─ SCHEMA.md
 └─ items/
@@ -56,7 +54,7 @@ project-management/
 - 用户原话与助手初步理解必须分开；没有原始对话时明确标记待补录，不能根据文件反推原话。
 - 摘要列表只展示摘要、级别、状态和更新时间；详情和日志单独查看。
 - 旧功能文档只作为证据来源，不与本目录混写。
-- 条目专属记录不能代替功能文档中的问题记录；如果同一经验可以指导其他功能，完整规则应升级到 `PROCESS_ISSUES.md`，条目里只保留链接和本条目的影响。
+- 条目专属记录不能代替功能文档中的问题记录；如果同一经验可以指导其他功能，完整规则应升级到 `DEVELOPMENT_COMMON_MISTAKES.md`，条目里只保留链接和本条目的影响。
 
 ## 运行入口
 

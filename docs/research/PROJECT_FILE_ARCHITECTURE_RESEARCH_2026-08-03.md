@@ -195,7 +195,7 @@ GroupComposer
 ## 11. 当前仓库可直接定位的文档
 
 - 文件边界说明：`docs/architecture/MODULE_BOUNDARIES.md`
-- 需求索引：`docs/feature-development/FEATURE_INDEX.md`
+- 需求索引：`docs/feature-development/FEATURE_STATUS_INDEX.md`
 - 项目管理索引：`docs/project-management/INDEX.md`
 - 流程规则：`docs/project-management/WORKFLOW_RULES.md`
 - 本次调研条目：`docs/project-management/items/RESEARCH-001/`

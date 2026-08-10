@@ -527,6 +527,6 @@ taskId + artifactId
 - `docs/feature-development/features/FEAT-002-group-multi-agent.md`
 - `windows/server/group-room-store.mjs`
 - `windows/server/multi-agent-service.mjs`
-- `docs/feature-development/PROCESS_ISSUES.md`
+- `docs/feature-development/DEVELOPMENT_COMMON_MISTAKES.md`
 - `docs/feature-development/P0_INCIDENT_REVIEW_2026-07-29_ORCA_ROUTE2_SCOPE.md`（Orca 范围事故与停止原则）
-- `docs/project-management/WORKFLOW_RULES.md`
+- `AI_ASSISTANT_WORK_RULES.md`

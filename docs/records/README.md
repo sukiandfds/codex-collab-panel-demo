@@ -1,6 +1,6 @@
-# 运行记录目录
+# 开发记录与历史资料目录
 
-本目录保存新的开发日志、验证记录和事故复盘。历史根目录中的 `DEVELOPMENT_LOG_*`、`DEVELOPMENT_BUG_LOG_*` 等文件保留为原始证据，不强行移动。
+本目录保存开发日志、验证记录、事故复盘和项目历史资料。原来位于根目录的 `DEVELOPMENT_LOG_*`、`DEVELOPMENT_BUG_LOG_*`、`DEVELOPMENT_PROCESS_BLOCKERS_*` 和 `VISION_NOTES.md` 已移入本目录，保留原文件名作为历史证据。
 
 命名：
 

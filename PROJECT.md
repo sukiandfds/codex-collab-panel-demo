@@ -1,223 +1,110 @@
-# negus
+# negus Web 协作工作台项目说明
 
-更新日期：2026-07-22
-当前阶段：单项目真实对话 Web Demo，已完成浏览器双向 Codex 技术闭环
+更新日期：2026-08-10
 
-完整的原始设想、推演过程、商业愿景与顾虑见 [VISION_NOTES.md](VISION_NOTES.md)。
+本文件只说明 negus Web 协作工作台。Codex Dream Skin 换肤工具的使用说明放在 `macos/README.md` 和 `windows/README.md`。
 
-## 2026-07-22 当前状态
+## 项目定位
 
-当前 Demo 已经具备：
+negus 是一个围绕真实 Codex 工作过程的 Web 协作工作台。
 
-- 读取一个项目中的真实 Codex Thread、真实标题和结构化内容；
-- 分页、缓存、虚拟列表及 Markdown、代码、表格和媒体渲染；
-- 从电脑或手机浏览器向当前真实 Thread 发送指令；
-- 通过 app-server Notification 和 SSE 展示执行状态与流式回复；
-- 自动选择可运行的 Codex Desktop 运行时，并在单次读取失败时回退 JSONL。
+当前核心是：
 
-浏览器发送已由用户实测成功，但当前仍有一个重要边界：网页使用独立 app-server 进程。消息和回复会保存到同一个 Thread，已经打开的 Codex Desktop 页面却不会实时显示外部进程追加的内容。因此目前是“同一任务持久化 + Web 实时执行”，尚不是 Desktop 与 Web 的完整双端实时同步。
+- 查看真实 Codex Thread；
+- 在浏览器中继续发送和控制任务；
+- 显示执行过程、流式回复和项目状态；
+- 为后续群聊、多 Agent 和交付物协作提供基础。
 
-当前最近目标：
+仓库同时保留早期的 macOS 和 Windows Codex 换肤工具。换肤工具是历史产品线，当前 Web 工作台的主要代码在 web-ui 和 windows/server。
 
-1. 明确 Desktop 重新打开任务后的刷新行为；
-2. 评估 Desktop daemon/proxy/IPC 或统一 Connector；
-3. 在同步机制完成前避免同一 Thread 双端并发发送；
-4. 正式远程使用前解决固定 token、监听范围、审批和权限；
-5. 之后再进入多人项目群、项目经理 Agent 和多 Agent 组织层。
+本项目不是 OpenAI 官方产品。
 
-当天开发记录与调研入口：
+## 当前产品能力
 
-- [DEVELOPMENT_LOG_2026-07-22.md](DEVELOPMENT_LOG_2026-07-22.md)
-- [DEVELOPMENT_BUG_LOG_2026-07-22.md](DEVELOPMENT_BUG_LOG_2026-07-22.md)
-- [AI_ASSISTANT_READ_FIRST.md](AI_ASSISTANT_READ_FIRST.md)
-- [多人协作与多 Agent 技术路径调研报告](项目战略与多角色评审/05-多人协作与多Agent技术路径调研报告-2026-07-22.md)
-- [群聊方向历史交互原型](docs/codex-group-chat-prototype.html)
+当前 Web Demo 的主要能力：
 
-以下 `v0.1` 内容保留为项目早期阶段记录，不代表当前功能上限。
+- 真实会话列表、标题、历史消息和分页加载；
+- 发送、追加、停止、恢复、排队和执行状态展示；
+- Markdown、代码、表格、链接、图片、音频、视频和普通文件；
+- 会话重命名、归档、恢复、复制和分叉；
+- 项目群聊、Agent 单聊、@ 路由和成果带回群聊；
+- Agent Artifact、HTML/PDF 生成、预览、审核和下载；
+- PWA、设备身份、移动端入口和用量摘要。
 
-## 项目愿景
+功能是否已经达到可交付状态，以 `docs/feature-development/FEATURE_STATUS_INDEX.md` 和对应功能文档为准。
 
-让 Codex 从单人使用的代码助手，逐步变成围绕真实项目工作的共享研发空间。
+## 代码结构与模块入口
 
-项目成员打开 Codex 后，可以看到自己和其他成员正在做什么、Agent 正在执行什么、项目最近形成了哪些结论，以及哪些问题仍在等待确认。长期形态接近一个真实研发团队：用户与 Leader Agent 沟通，Leader 负责澄清、汇总、拆解和进度管理，执行 Agent 负责具体工作。
+| 路径 | 内容 |
+| --- | --- |
+| `web-ui/src/features/` | React 前端功能模块 |
+| `web-ui/src/components/`、`web-ui/src/shared/` | 跨页面 UI、API 和模型共用代码 |
+| `windows/server/` | Web API、SSE、会话、群聊、Artifact 和生图服务 |
+| `windows/server/routes/` | HTTP 路由入口 |
+| `windows/scripts/remote-room-demo.mjs` | Web 服务组装和启动入口 |
+| `windows/scripts/start-web-demo.ps1`、`restart-web-demo.ps1` | Web 服务启动和重启 |
+| `runtime/` | 会话、执行、群聊、Artifact、员工和媒体数据 |
+| `macos/` | Codex Dream Skin macOS 换肤代码和资源 |
+| `windows/assets/`、`windows/scripts/*dream-skin*` | Codex Dream Skin Windows 换肤代码和资源 |
+| `docs/` | 项目、功能、架构、研究、管理和历史记录 |
 
-第一步不追求完整团队系统。先把已经具有独立价值的右侧面板做好，并以此持续迭代。
+## 模块查找表
 
-## v0.1 已实现效果
+| 要修改的模块 | 先读的文档 | 主要代码位置 |
+| --- | --- | --- |
+| 单人 Web 对话、执行、历史 | `docs/feature-development/features/FEAT-001-single-codex-web.md` | `web-ui/src/features/conversations/`、`execution/`、`context-management/`；`windows/server/conversation-service.mjs`、`app-server-conversation-store.mjs`、`execution-tracker.mjs` |
+| 项目群聊和多 Agent | `docs/feature-development/features/FEAT-002-group-multi-agent.md` | `web-ui/src/features/group-chat/`；`windows/server/group-room-store.mjs`、`multi-agent-service.mjs` |
+| 附件和内容渲染 | `docs/feature-development/features/FEAT-003-attachments-content-rendering.md` | `web-ui/src/features/attachments/`、`conversations/rendering/`；`windows/server/content-blocks.mjs`、`media-service.mjs` |
+| PWA、设备和移动端入口 | `docs/feature-development/features/FEAT-004-pwa-device-identity.md` | `web-ui/src/pwa/`、`features/device/`、`features/app-update/`；`web-ui/public/`、`windows/server/request-handler.mjs` |
+| Desktop/Web 连续性和实时事件 | `docs/feature-development/features/FEAT-005-desktop-web-continuity.md` | `windows/server/app-server-client.mjs`、`app-server-conversation-store.mjs`、`execution-tracker.mjs`、`realtime-hub.mjs` |
+| Artifact、HTML 和 PDF | `docs/feature-development/features/FEAT-007-agent-artifacts.md`、`FEAT-008-html-page-pdf-generation.md` | `web-ui/src/features/artifacts/`；`windows/server/artifact-service.mjs`、`web-output-service.mjs`、`request-handler.mjs` |
+| 自然语言生图 | `docs/feature-development/features/FEAT-015-image-generation-and-automation-workbench.md` | `web-ui/src/features/` 相关生图入口；`windows/server/image-generation/`、`conversation-routes.mjs` |
+| macOS 换肤 | `macos/README.md`、`macos/SKILL.md` | `macos/` |
+| Windows 换肤 | `windows/README.md`、`windows/SKILL.md` | `windows/assets/`、`windows/scripts/*dream-skin*`、`windows/scripts/injector.mjs` |
 
-Codex 窗口右侧增加“项目实时总结”面板，包含：
+## 数据和运行链路
 
-- 实时总结与设置两个页面。
-- 本地对话记录连接状态。
-- 最近一次用户要求和 Codex 回复预览。
-- Luna 生成的四段式项目摘要：当前目标、已确认、进行中、待确认。
-- 总结模型、耗时、更新时间和错误状态。
-- 面板关闭后可通过侧边入口重新打开。
+主要数据链路：
 
-当前面板通过 Codex Dream Skin 的本机 CDP 注入机制进入 Codex 渲染页面，不修改官方安装包或 `app.asar`。所有验证均在单独启动的隔离版 Codex 中完成，没有重启或修改用户日常使用的主 Codex。
+Codex app-server
+-> app-server conversation store
+-> conversation service
+-> HTTP API 和 SSE
+-> React Web UI
 
-## 当前工作逻辑
+app-server 是主要数据源。本地 Codex JSONL 是降级数据源。
 
-```text
-Codex 本地会话 JSONL
-        ↓
-summary-observer
-        ↓ 只提取用户消息和 Codex 最终回复
-12 秒静默窗口
-        ↓
-gpt-5.6-luna 四段式总结
-        ↓
-summary-bridge
-        ↓ 本机 CDP
-Codex 右侧面板
-```
+主要页面：
 
-当前观察器需要显式传入任务 ID。它读取本机 Codex 的模型提供商、Base URL 和认证配置，调用当前配置中可用的 `gpt-5.6-luna`；API Key 不发送到面板，也不写入项目文件。
+- /：单人对话
+- /group.html：项目群聊
+- /progress.html：项目进度
+- /project-management.html：项目管理兼容入口
 
-## 已验证事实
+构建和运行：
 
-- 面板可在隔离版 Codex 中稳定显示，原生界面仍可使用。
-- 能读取指定任务的真实新增对话。
-- 不把推理过程和工具内部事件作为总结内容。
-- Luna 已完成真实调用并将中文摘要显示在面板中。
-- 对话结束后可显示“上一轮已完成，等待下一轮对话”。
-- 新增脚本通过 Node 语法检查，原注入器通过 loopback CDP 安全自测。
+- 构建：pnpm build:ui
+- 启动：pnpm start:demo
+- 重启：pnpm restart:demo
+- canonical 服务端口：9360
+- 4173 是旧的 Vite Preview 入口，不作为交付地址
 
 ## 当前限制
 
-- 任务 ID 仍需手动指定，尚未自动跟随当前打开的 Codex 任务。
-- 观察器和桥接服务尚未随 Codex 稳定自动启动。
-- 设置页部分控件仍属于界面 Demo，尚未真正控制后台配置。
-- 当前只支持单机个人总结，尚未同步给其他项目成员。
-- CDP 注入依赖 Codex 当前页面结构，适合验证体验，但不是长期唯一集成方式。
+- Desktop 和 Web 可以写入同一个持久化 Thread，但 Desktop 已打开页面不会实时显示 Web 外部追加内容。
+- Desktop 和 Web 暂不应同时向同一个 Thread 发送任务。
+- 群聊、多 Agent 和员工项目能力仍在持续开发。
+- 固定公网入口、正式认证和长时间远程运行仍需进一步验收。
+- 移动端、断线恢复、长任务和跨端体验仍以真实验收结果为准。
+- 项目当前目标不是完整的企业协作或权限系统。
 
-## 关键方向：复用 Happy
+## 资料入口
 
-[slopus/happy](https://github.com/slopus/happy) 是 MIT 开源项目，已经提供：
-
-- Codex/Agent 事件捕获。
-- CLI 与 Codex `app-server` 连接。
-- 手机、Web 和跨设备客户端。
-- WebSocket 实时同步。
-- 端到端加密、设备配对和推送通知。
-- 可自托管的 Happy Server。
-
-Happy 当前主要解决“同一用户在多个设备控制自己的 Codex”。本项目希望在它的能力之上增加“多个用户围绕同一个项目共享工作状态”。下一步需要重点核对 Happy 的用户、设备、会话、加密密钥和服务端授权模型，再决定直接扩展 Happy，还是在其旁边增加独立的项目状态层。
-
-## 第一个跨电脑 Demo
-
-目标只有一个：
-
-> 用户 A 在自己的电脑使用 Codex 开发；用户 B 在另一台电脑打开自己的 Codex，能够看到 A 是否正在工作、当前大概在做什么，以及最近一次活动时间。
-
-第一版只共享经过筛选的项目状态，不共享完整对话、文件内容、API Key或内部推理。
-
-状态更新采用事件驱动，不使用固定 15 秒上传：
-
-- 会话开始。
-- 用户提出或改变需求。
-- Agent 开始执行。
-- 完成一次可描述的阶段成果。
-- 等待用户确认。
-- 工作完成或正常离线。
-
-每个真实事件更新一次状态和过期时间。异常关机或断网无法发送离线事件时，由状态租约过期后自动显示“可能已离开”。没有工作时不上传数据。
-
-朋友端最终看到的是简洁状态，而不是原始日志：
-
-```text
-Hans 正在修改首页 Banner
-Agent 已完成组件结构，正在调整移动端尺寸
-最近更新：8 秒前
-```
-
-## 已确认的产品原则
-
-1. 右侧总结面板本身就是第一个可独立成立的产品版本。
-2. 本地原始对话默认不离开电脑。
-3. 共享内容必须经过筛选和总结，并明确区分私密信息与项目状态。
-4. 在线状态由真实事件触发，不制造无意义的高频心跳。
-5. GitHub负责代码、分支、提交和长期项目记录，不承担实时在线状态数据库的职责。
-6. 优先复用 Happy 已完成的通信、加密和跨设备能力，避免重复开发基础设施。
-
-## 下一步最小动作
-
-把 Happy 拉到独立研究目录，针对以下路径做源码级核查：
-
-1. Codex 事件如何捕获和归一化。
-2. CLI 如何把事件发送给 Happy Server。
-3. 用户、设备和会话如何识别。
-4. 端到端加密密钥如何配对，能否扩展到项目成员。
-5. 客户端如何订阅、存储和显示实时状态。
-
-核查结束后，只实现一条跨电脑链路：A 产生工作事件，服务端同步，B 的 Codex 右侧面板显示状态。
-
-## 原始目标设想
-
-这个项目最初不是为了单纯增加一个 Codex 聊天窗口，而是从一个很具体的工作场景开始：
-
-- Codex 在电脑上持续执行任务时，使用者可能暂时空闲。
-- 使用者可以用手机与朋友聊天，知道朋友正在让 Codex 做什么。
-- 如果发现朋友布置的需求有问题，例如最新产品需要紧急返工，可以及时提醒朋友，甚至在明确确认后让 Codex 调整方向。
-- 多个同事可以围绕同一个项目交流，而不是只能分别查看各自的 Codex 窗口。
-
-因此，长期设想是让 Codex 的工作过程成为团队可以共同理解、讨论和协作的项目状态，而不是孤立在个人电脑里的黑盒执行过程。
-
-## 衍生内容与长期方向
-
-### 1. 网页版项目群聊
-
-多个成员进入同一个项目空间，看到：
-
-- 哪位成员正在指挥哪个 Codex。
-- 当前项目正在进行什么工作。
-- 最近产生了哪些结论、变更和风险。
-- 哪些问题需要人工确认。
-
-群聊不是普通聊天工具，而是围绕 Codex 工作状态组织的协作入口。
-
-### 2. 项目经理 Agent
-
-项目经理 Agent 作为每个项目或群组中的共同成员，负责：
-
-- 实时总结不同对话的内容。
-- 将讨论整理成目标、决策、任务、风险和待确认事项。
-- 发现需求冲突、范围失控或高风险操作时提醒团队。
-- 在获得明确授权后，协助把讨论转成 Codex 可执行任务。
-
-它首先应该是“项目状态整理和风险提醒者”，而不是未经确认就替人做决定的自动管理者。
-
-### 3. 面向 AI 内容公司的工作流
-
-这个方向也可以延伸到 AI 视频、AI 短剧和内容生产团队：
-
-- 管理选题、脚本、分镜、素材、提示词、生成结果和版本。
-- 记录哪些提示词、模型和参数效果较好。
-- 自动归纳每轮试验的结果和失败原因。
-- 让编剧、导演、剪辑、运营和 AI Agent 共享同一条生产上下文。
-
-这不是当前 Demo 的立即开发范围，而是项目状态协作能力成熟后的行业场景。
-
-### 4. 商业化判断
-
-潜在价值不在于“再做一个聊天软件”，而在于把 AI Agent 的隐性工作过程变成团队可观察、可讨论、可追责、可复用的生产信息。
-
-早期宣传和融资场景应优先选择一个非常具体的案例，例如：
-
-> 一名员工用 Codex 长时间开发，其他成员通过手机看到项目进度，及时提出修改意见，项目经理 Agent 自动整理决策并提醒风险。
-
-之后再验证它是否适合 AI 内容公司、短剧公司、研发团队或其他多 Agent 工作流。
-
-## 当前收束原则
-
-远期目标可以很大，但当前产品不立即跳到“飞书加 Codex”或完整企业协作平台。当前优先级是：
-
-1. 先把本地 Codex 右侧记录小助手做成真正有用的项目控制台。
-2. 让它稳定展示当前项目的目标、对话摘要、任务状态、风险和下一步。
-3. 再做只读网页版，让其他人能查看项目状态和经过筛选的对话。
-4. 最后再增加网页版项目群聊、人工确认的指令转发和多 Codex 协作。
-
-安全边界始终保持：默认只读、不过度暴露原始日志、不展示推理过程、不上传 API Key，远程控制必须经过明确授权和人工确认。
-## 来源与声明
-
-本项目当前基于 [Fei-Away/Codex-Dream-Skin](https://github.com/Fei-Away/Codex-Dream-Skin) 开发，保留其原始 README、MIT 软件许可证和相关 NOTICE。Codex、OpenAI 及相关商标属于其各自权利人；本项目不是 OpenAI 官方产品。
+- 助手工作规则：`AI_ASSISTANT_WORK_RULES.md`
+- 功能状态：`docs/feature-development/FEATURE_STATUS_INDEX.md`
+- 功能详情：`docs/feature-development/features/`
+- 开发常见错误：`docs/feature-development/DEVELOPMENT_COMMON_MISTAKES.md`
+- 架构职责：docs/architecture/
+- 项目管理：docs/project-management/
+- 研究和证据：docs/research/、docs/records/
+- 产品愿景和历史讨论：docs/records/VISION_NOTES.md、项目战略与多角色评审/

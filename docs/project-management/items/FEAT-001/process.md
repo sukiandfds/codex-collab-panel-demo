@@ -20,7 +20,7 @@ last_updated: 2026-08-04 09:55 +08:00
 - 正确路径/决策：优先使用 app-server 的 `thread.name`，JSONL 只作兼容降级；问题详情仍由 `FEAT-001-I01` 维护。
 - 防再犯触发器：任何“标题不对”反馈先检查真实元数据字段和降级链路，不改文案猜测规则。
 - 归属判断：功能特例；不能升级为通用 `PROC-*`。
-- 证据：`FEAT-001-single-codex-web.md` 的 `FEAT-001-I01`、`AI_ASSISTANT_READ_FIRST.md` 当前数据链路说明。
+- 证据：`FEAT-001-single-codex-web.md` 的 `FEAT-001-I01`、`AI_ASSISTANT_WORK_RULES.md` 当前数据链路说明。
 - 关联：`FEAT-001-I01`。
 
 ### 2026-07-22 | FEAT-001-P02 | detour | P1 | resolved
@@ -34,7 +34,7 @@ last_updated: 2026-08-04 09:55 +08:00
 - 正确路径/决策：统一输出内容块，保留 Markdown、代码、媒体和文件元数据；具体问题仍在功能档案中维护。
 - 防再犯触发器：新增内容类型时先检查数据模型是否保留结构，再决定渲染器；禁止用字符串拼接代替内容块。
 - 归属判断：功能特例；内容块和 UI 边界同时受 `PROC-001` 约束。
-- 证据：`AI_ASSISTANT_READ_FIRST.md` 的 12.2、`docs/feature-development/features/FEAT-001-single-codex-web.md`。
+- 证据：`AI_ASSISTANT_WORK_RULES.md` 的 12.2、`docs/feature-development/features/FEAT-001-single-codex-web.md`。
 - 关联：`FEAT-001-I05`、`FEAT-003`、`PROC-001`。
 
 ### 2026-08-01 | FEAT-001-P03 | validation | P0 | active
@@ -48,7 +48,7 @@ last_updated: 2026-08-04 09:55 +08:00
 - 正确路径/决策：该问题已经升级为跨功能 `PROC-022`；后续以 `runId/turnId/eventSeq` 建立单调顺序，终态和持久化快照优先，流式内容只追加。
 - 防再犯触发器：出现文字消失、重开仍处理中或旧过程串入任一现象时，先保存同一 Turn 的事件序号、快照和终止事件，再修改。
 - 归属判断：已从功能特例升级为普适问题；本文件只保留 FEAT-001 的用户影响。
-- 证据：`docs/feature-development/PROCESS_ISSUES.md#PROC-022`、`FEAT-001-I24`。
+- 证据：`docs/feature-development/DEVELOPMENT_COMMON_MISTAKES.md#PROC-022`、`FEAT-001-I24`。
 - 关联：`FEAT-001-I08`、`FEAT-001-I15`、`FEAT-001-I17`、`FEAT-001-I24`、`PROC-022`。
 
 ### 2026-07-29 | FEAT-001-P04 | blocker | P0 | active
@@ -62,7 +62,7 @@ last_updated: 2026-08-04 09:55 +08:00
 - 正确路径/决策：完整根因和恢复边界集中维护在 `PROC-019`、`PROC-020`；FEAT-001 只引用，不复制运行手册。
 - 防再犯触发器：出现“端口在线但核心接口超时”或需要重启当前服务时，先执行真实业务健康检查并使用脱离服务进程的恢复入口。
 - 归属判断：跨功能 P0；完整正文以 `PROC-*` 为准。
-- 证据：`docs/feature-development/PROCESS_ISSUES.md#PROC-019`、`#PROC-020`、`FEAT-001-I12`。
+- 证据：`docs/feature-development/DEVELOPMENT_COMMON_MISTAKES.md#PROC-019`、`#PROC-020`、`FEAT-001-I12`。
 - 关联：`FEAT-001-I12`、`PROC-019`、`PROC-020`。
 
 ### 2026-08-04 | FEAT-001-P05 | regression | P0 | active

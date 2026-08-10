@@ -10,7 +10,7 @@ key_paths:
   - windows/server/app-server-conversation-store.mjs
   - windows/server/execution-tracker.mjs
   - windows/server/realtime-hub.mjs
-  - DEVELOPMENT_BUG_LOG_2026-07-24_DESKTOP_WEB_SYNC.md
+  - ../../records/DEVELOPMENT_BUG_LOG_2026-07-24_DESKTOP_WEB_SYNC.md
 ---
 
 # FEAT-005：Desktop/Web 连续性与同任务提示
@@ -109,7 +109,7 @@ Web SSE 只分发 Web 所连接 app-server 的 Notification；已经打开的 De
 - 问题：`FEAT-005-I01` active；`FEAT-005-I02` active；关联 `PROC-011`。
 - 验证：手机/Web 可以继续真实 Thread，Desktop 已打开页面不热刷新；Desktop 冷启动恢复仍待验证。
 - 用户可见变化：无代码变化；形成明确临时使用约束，避免把当前 Demo 误认为无缝多端同步。
-- Git：文档源记录见 `DEVELOPMENT_BUG_LOG_2026-07-24_DESKTOP_WEB_SYNC.md`，本功能档案为 `uncommitted`。
+- Git：文档源记录见 `../../records/DEVELOPMENT_BUG_LOG_2026-07-24_DESKTOP_WEB_SYNC.md`，本功能档案为 `uncommitted`。
 
 ### 2026-07-27 00:43 +08:00 | v0.2.0 | discovery
 

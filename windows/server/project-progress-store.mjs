@@ -211,7 +211,7 @@ const readFeature = async (projectRoot, row, indexMarkdown, priorityMap) => {
     relatedItems: relatedIds,
     sourcePath: relativeRecordPath,
     updates,
-    evidence: [relativeRecordPath, "FEATURE_INDEX.md"],
+    evidence: [relativeRecordPath, "FEATURE_STATUS_INDEX.md"],
     sourceStatus: frontMatter.status || row["当前状态"] || "未记录",
     indexExcerpt: indexMarkdown.includes(id) ? row["当前结论"] || "" : "",
   };
@@ -247,7 +247,7 @@ export const readProjectProgress = async ({ project, projectRoot, progressFile }
     project,
     markdown,
     updatedAt: stat.mtime.toISOString(),
-    source: "docs/feature-development/FEATURE_INDEX.md",
+    source: "docs/feature-development/FEATURE_STATUS_INDEX.md",
     plan,
     inProgress,
     categories,

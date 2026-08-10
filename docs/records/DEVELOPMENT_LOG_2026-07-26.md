@@ -41,9 +41,9 @@
 
 新增目录：`docs/feature-development/`。
 
-- `FEATURE_INDEX.md`：功能编号、当前状态、版本和入口；
+- `FEATURE_INDEX.md`（现名 `FEATURE_STATUS_INDEX.md`）：功能编号、当前状态、版本和入口；
 - `features/FEAT-*.md`：一个功能从计划、实现、问题到多个版本的连续记录；
-- `PROCESS_ISSUES.md`：跨功能复用的根因、错误路径、正确路径和防再犯触发器；
+- `PROCESS_ISSUES.md`（现名 `DEVELOPMENT_COMMON_MISTAKES.md`）：跨功能复用的根因、错误路径、正确路径和防再犯触发器；
 - `README.md`：字段、编号、特例/普适分类和强制更新时间。
 
 当前已登记：
@@ -55,9 +55,9 @@
 - `FEAT-005`：Desktop/Web 连续性与统一控制权；
 - `PROC-001` 至 `PROC-012`：已知普适开发问题和防再犯规则。
 
-`AI_ASSISTANT_READ_FIRST.md` 已加入强制阅读和回写顺序。旧日期日志继续保留为原始证据，不再作为 AI 首要入口。
+当时的 `AI_ASSISTANT_READ_FIRST.md`（现名 `AI_ASSISTANT_WORK_RULES.md`）已加入强制阅读和回写顺序。旧日期日志继续保留为原始证据，不再作为 AI 首要入口。
 
-用户在本轮决定暂不新增名为 `AI助手请看这个.md` 的中文别名文件，当前根入口仍为 `AI_ASSISTANT_READ_FIRST.md`。
+用户在本轮决定暂不新增名为 `AI助手请看这个.md` 的中文别名文件；当时根入口为 `AI_ASSISTANT_READ_FIRST.md`，现为 `AI_ASSISTANT_WORK_RULES.md`。
 
 ## 4. 基础检查
 
@@ -74,4 +74,4 @@
 2. 单人 Turn 和群聊多 Agent 队列仍属于不同状态模型，不能因为共用 SSE 或展示组件就强行合并。
 3. 正式公网访问前必须补充 HTTPS 和正式鉴权，不能直接把固定 Demo Token 当作产品登录系统。
 4. 视觉效果、PWA 安装和 iPad 体验由用户实际验收，基础构建通过不代表体验已经确认。
-5. 后续每次功能开发结束前，必须更新对应 `FEAT-*.md`；发现普适问题时同步更新 `PROCESS_ISSUES.md`。
+5. 后续每次功能开发结束前，必须更新对应 `FEAT-*.md`；发现普适问题时同步更新 `PROCESS_ISSUES.md`（现名 `DEVELOPMENT_COMMON_MISTAKES.md`）。

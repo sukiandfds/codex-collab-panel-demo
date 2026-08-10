@@ -119,7 +119,7 @@ Codex app-server protocol
 - 实际：形成基础会话列表和内容展示 Demo。
 - 偏差：标题和内容结构仍有误判，加载方式偏全量。
 - 问题：`FEAT-001-I01`、`FEAT-001-I02`。
-- 验证：原始记录见 `DEVELOPMENT_BUG_LOG_2026-07-21.md`。
+- 验证：原始记录见 `../../records/DEVELOPMENT_BUG_LOG_2026-07-21.md`。
 - Git：历史提交见仓库日志。
 
 ### 2026-07-22 | v0.2.0 | implemented
@@ -128,7 +128,7 @@ Codex app-server protocol
 - 实际：完成真实会话、结构化内容、分页和功能目录拆分。
 - 偏差：发现数据接入过程中曾误动 UI，重新明确 UI/内容/功能边界。
 - 问题：`FEAT-001-I01`、`FEAT-001-I02`、`PROC-001`。
-- 验证：见 `DEVELOPMENT_LOG_2026-07-22.md`。
+- 验证：见 `../../records/DEVELOPMENT_LOG_2026-07-22.md`。
 - Git：`8cf1e3e` 包含后续交互控制与同步边界记录。
 
 ### 2026-07-22 | v0.3.0 | implemented_pending_review
@@ -137,7 +137,7 @@ Codex app-server protocol
 - 实际：接入 app-server 发送、执行 tracker 和 SSE 状态。
 - 偏差：Web 与 Desktop 当前窗口不是同一个运行实例，产生连续性问题。
 - 问题：`FEAT-001-I03`、`FEAT-001-I04`。
-- 验证：构建和基础接口通过；详细记录见 `DEVELOPMENT_LOG_2026-07-22.md`。
+- 验证：构建和基础接口通过；详细记录见 `../../records/DEVELOPMENT_LOG_2026-07-22.md`。
 - Git：`8cf1e3e`。
 
 ### 2026-07-25 22:49 +08:00 | v0.4.0 | implemented_pending_review
