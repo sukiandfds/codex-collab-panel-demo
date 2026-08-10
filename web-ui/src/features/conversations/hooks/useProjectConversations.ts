@@ -150,6 +150,7 @@ export function useProjectConversations() {
     const optimisticMessage = createOptimisticMessage(messageText, attachments, submissionId);
     selection.addOptimisticMessage(threadId, optimisticMessage);
     setLocalSendVersion((version) => version + 1);
+    const startsNewTurn = !execution.status.active;
 
     const attempt = await execution.sendMessage(messageText, attachments.map((attachment) => attachment.id), submissionId);
     if (!attempt || attempt.outcome === "failed") {
@@ -175,6 +176,15 @@ export function useProjectConversations() {
       }),
     }));
     const accepted = attempt.result;
+    if (startsNewTurn && accepted.threadId === threadId && accepted.turnId) {
+      selection.updateCurrentSession(threadId, (current) => ({
+        ...current,
+        messages: current.messages.map((message) => message.id === optimisticMessage.id
+          ? { ...message, turnId: accepted.turnId }
+          : message),
+      }));
+      void selection.loadSession(threadId, { quiet: true, retry: false });
+    }
     if (accepted.threadId !== threadId) {
       selection.removeOptimisticMessage(threadId, optimisticMessage.id);
       selection.addOptimisticMessage(accepted.threadId, optimisticMessage);
@@ -186,6 +196,7 @@ export function useProjectConversations() {
     catalog.refreshSessions,
     execution.sendMessage,
     selection.addOptimisticMessage,
+    selection.loadSession,
     selection.removeOptimisticMessage,
     selection.selectSession,
     selection.selectedIdRef,

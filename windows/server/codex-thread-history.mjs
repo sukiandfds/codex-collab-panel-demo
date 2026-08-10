@@ -15,6 +15,30 @@ const stableMessageId = (turnId, itemId, index, message) => {
   return `codex:${encodeURIComponent(String(turnId || "unknown"))}:${encodeURIComponent(String(identity))}`;
 };
 
+const timestampFromValue = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.abs(value) >= 10_000_000_000 ? value : value * 1000;
+  if (typeof value !== "string" || !value.trim()) return null;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) return Math.abs(numeric) >= 10_000_000_000 ? numeric : numeric * 1000;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const timestampFromSubmissionId = (value) => {
+  const match = /^msg-([0-9a-z]+)-/iu.exec(String(value || ""));
+  if (!match) return null;
+  const timestamp = Number.parseInt(match[1], 36);
+  return Number.isSafeInteger(timestamp) && timestamp > 0 ? timestamp : null;
+};
+
+const userMessageTimestamp = (item, fallback) => {
+  for (const value of [item?.createdAt, item?.timestamp, item?.created_at]) {
+    const timestamp = timestampFromValue(value);
+    if (timestamp !== null) return timestamp;
+  }
+  return timestampFromSubmissionId(item?.clientId) ?? timestampFromValue(fallback);
+};
+
 const turnPageLimit = (messageLimit) => {
   const safeLimit = Number.isSafeInteger(messageLimit) && messageLimit > 0 ? messageLimit : 60;
   return Math.min(100, Math.max(20, Math.ceil(safeLimit / 2) + 4));
@@ -24,7 +48,9 @@ const messagesFromTurn = (turn, registerMedia) => dedupeAssistantMediaMessages((
   .map((item, index) => {
     const message = messageFromThreadItem(item, registerMedia);
     if (!message) return null;
-    const timestamp = message.role === "user" ? turn.startedAt : turn.completedAt;
+    const timestamp = message.role === "user"
+      ? userMessageTimestamp(item, turn.startedAt)
+      : timestampFromValue(turn.completedAt);
     const itemId = item.id || message.itemId || "";
     const withTurn = turn.id
       ? {
@@ -34,8 +60,8 @@ const messagesFromTurn = (turn, registerMedia) => dedupeAssistantMediaMessages((
         itemId,
       }
       : { ...message, id: stableMessageId("unknown", itemId, index, message), itemId };
-    return Number.isFinite(timestamp)
-      ? { ...withTurn, createdAt: new Date(timestamp * 1000).toISOString() }
+    return timestamp !== null
+      ? { ...withTurn, createdAt: new Date(timestamp).toISOString() }
       : withTurn;
   })
   .filter(Boolean));
@@ -48,9 +74,11 @@ const messagesFromItems = (entries, registerMedia) => {
     if (!message) return null;
     const turnId = item?.turnId || entry?.turnId || entry?.turn?.id || "";
     const itemId = item?.id || message.itemId || "";
+    const timestamp = message.role === "user" ? userMessageTimestamp(item, entry?.createdAt || entry?.timestamp) : null;
+    const withTimestamp = timestamp !== null ? { ...message, createdAt: new Date(timestamp).toISOString() } : message;
     return turnId
-      ? { ...message, id: stableMessageId(turnId, itemId, index, message), turnId, itemId }
-      : { ...message, id: stableMessageId("unknown", itemId, index, message), itemId };
+      ? { ...withTimestamp, id: stableMessageId(turnId, itemId, index, message), turnId, itemId }
+      : { ...withTimestamp, id: stableMessageId("unknown", itemId, index, message), itemId };
   })
     .filter(Boolean);
   const seenByTurn = new Map();

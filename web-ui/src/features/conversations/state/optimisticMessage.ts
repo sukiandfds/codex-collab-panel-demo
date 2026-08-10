@@ -1,8 +1,11 @@
 import type { MediaFile } from "../../../shared/model/media";
 import type { ContentBlock, SessionMessage } from "../model/types";
 
-export const createSubmissionId = (): string => globalThis.crypto?.randomUUID?.()
-  || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+export const createSubmissionId = (): string => {
+  const timestamp = Date.now().toString(36);
+  const unique = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2);
+  return `msg-${timestamp}-${unique}`;
+};
 
 export const optimisticMessageId = (submissionId: string) => `optimistic-${submissionId}`;
 

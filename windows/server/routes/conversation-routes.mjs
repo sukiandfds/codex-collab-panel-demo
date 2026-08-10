@@ -239,8 +239,8 @@ export const createConversationRoutes = ({
           };
         }
         result = status.active
-          ? await conversations.steerMessage(threadId, status.turnId, text, attachments)
-          : await conversations.sendMessage(threadId, text, attachments);
+          ? await conversations.steerMessage(threadId, status.turnId, text, attachments, submissionId)
+          : await conversations.sendMessage(threadId, text, attachments, submissionId);
       } catch (error) {
         if (employeeBinding) throw error;
         const recovered = execution.getStatus(threadId);

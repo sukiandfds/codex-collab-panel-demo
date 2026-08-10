@@ -387,13 +387,14 @@ export const createAppServerConversationStore = ({
     return summaryFromThread(result.thread, false);
   };
 
-  const sendMessage = async (threadId, text, attachments = []) => {
+  const sendMessage = async (threadId, text, attachments = [], submissionId = "") => {
     onSubmitted?.(threadId);
     try {
       await resumeThread(threadId);
       const result = await client.request("turn/start", {
         threadId,
         input: await inputFromAttachments(promptFromSlashCommand(text, attachments), attachments, attachmentContent),
+        ...(submissionId ? { clientUserMessageId: submissionId } : {}),
       });
       freshThreadRuntime.delete(threadId);
       return result;
@@ -403,10 +404,11 @@ export const createAppServerConversationStore = ({
     }
   };
 
-  const steerMessage = async (threadId, turnId, text, attachments = []) => client.request("turn/steer", {
+  const steerMessage = async (threadId, turnId, text, attachments = [], submissionId = "") => client.request("turn/steer", {
     threadId,
     expectedTurnId: turnId,
     input: await inputFromAttachments(promptFromSlashCommand(text, attachments), attachments, attachmentContent),
+    ...(submissionId ? { clientUserMessageId: submissionId } : {}),
   });
 
   const interrupt = async (threadId, turnId) => client.request("turn/interrupt", { threadId, turnId });

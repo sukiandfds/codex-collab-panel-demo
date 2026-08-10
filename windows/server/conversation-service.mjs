@@ -135,9 +135,9 @@ export const createConversationService = ({ primary, fallback, contentVersionSto
     return mergeSupplementalSessions(sessions, await supplementalMessages.listSessions());
   };
 
-  const sendMessage = async (threadId, text, attachments = []) => {
+  const sendMessage = async (threadId, text, attachments = [], submissionId = "") => {
     try {
-      return { ...(await primary.sendMessage(threadId, text, attachments)), threadId };
+      return { ...(await primary.sendMessage(threadId, text, attachments, submissionId)), threadId };
     } catch (error) {
       if (!missingThreadPattern.test(String(error?.message || error))
         || !supplementalMessages?.migrationContext
@@ -152,7 +152,7 @@ export const createConversationService = ({ primary, fallback, contentVersionSto
       for (const attachment of legacy.attachments) {
         if (!knownPaths.has(attachment.path)) mergedAttachments.push(attachment);
       }
-      const result = await primary.sendMessage(nextThreadId, text, mergedAttachments);
+      const result = await primary.sendMessage(nextThreadId, text, mergedAttachments, submissionId);
       await supplementalMessages.markMigrated(threadId, nextThreadId);
       return { ...result, threadId: nextThreadId, migratedFromThreadId: threadId };
     }

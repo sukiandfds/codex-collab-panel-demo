@@ -252,7 +252,14 @@ export const messageFromThreadItem = (item, registerMedia) => {
     const blocks = cleanUserAttachmentEnvelope(blocksFromContent(item.content, registerMedia));
     const text = visibleText(blocks);
     if (!isUsefulUserMessage(text, blocks)) return null;
-    return { id: item.id || blockId("message", JSON.stringify(blocks)), role: "user", text, blocks };
+    const submissionId = typeof item.clientId === "string" ? item.clientId.trim() : "";
+    return {
+      id: item.id || blockId("message", JSON.stringify(blocks)),
+      role: "user",
+      text,
+      blocks,
+      ...(submissionId ? { submissionId } : {}),
+    };
   }
   if (item?.type === "agentMessage") {
     if (item.phase && item.phase !== "final_answer") return null;

@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 
 const maxItemsPerThread = 50;
 const queueStates = new Set(["pending", "dispatching", "failed"]);
+const dispatchSubmissionId = () => `msg-${Date.now().toString(36)}-${randomUUID()}`;
 
 const normalizeItem = (threadId, item, index = 0) => {
   const state = queueStates.has(item?.state) ? item.state : "pending";
@@ -19,6 +20,8 @@ const normalizeItem = (threadId, item, index = 0) => {
     state: dispatching ? "failed" : state,
     error: dispatching ? "服务重启后未自动重发，请点击重试" : String(item?.error || ""),
     createdAt: String(item?.createdAt || new Date().toISOString()),
+    sentAt: String(item?.sentAt || ""),
+    dispatchSubmissionId: String(item?.dispatchSubmissionId || ""),
     updatedAt: String(item?.updatedAt || item?.createdAt || new Date().toISOString()),
     position: index,
   };
@@ -148,7 +151,14 @@ export const createFollowUpQueueStore = ({ stateFile = "" } = {}) => {
     const index = items.findIndex((item) => item.state === "pending");
     if (index < 0) return null;
     const now = new Date().toISOString();
-    const item = { ...items[index], state: "dispatching", error: "", updatedAt: now };
+    const item = {
+      ...items[index],
+      state: "dispatching",
+      error: "",
+      sentAt: now,
+      dispatchSubmissionId: dispatchSubmissionId(),
+      updatedAt: now,
+    };
     const nextItems = [...items];
     nextItems[index] = item;
     writeItems(threadId, nextItems);
@@ -159,7 +169,15 @@ export const createFollowUpQueueStore = ({ stateFile = "" } = {}) => {
     const items = itemsFor(threadId);
     const index = items.findIndex((item) => item.id === itemId);
     if (index < 0 || items[index].state === "dispatching") return null;
-    const item = { ...items[index], state: "dispatching", error: "", updatedAt: new Date().toISOString() };
+    const now = new Date().toISOString();
+    const item = {
+      ...items[index],
+      state: "dispatching",
+      error: "",
+      sentAt: now,
+      dispatchSubmissionId: dispatchSubmissionId(),
+      updatedAt: now,
+    };
     const nextItems = [...items];
     nextItems[index] = item;
     writeItems(threadId, nextItems);
@@ -171,7 +189,12 @@ export const createFollowUpQueueStore = ({ stateFile = "" } = {}) => {
     error: String(error?.message || error || "指令发送失败"),
   }, { allowDispatching: true });
 
-  const markPending = (threadId, itemId) => update(threadId, itemId, { state: "pending", error: "" });
+  const markPending = (threadId, itemId) => update(threadId, itemId, {
+    state: "pending",
+    error: "",
+    sentAt: "",
+    dispatchSubmissionId: "",
+  });
 
   const complete = (threadId, itemId) => remove(threadId, itemId, { allowDispatching: true });
 

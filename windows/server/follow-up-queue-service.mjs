@@ -41,18 +41,20 @@ export const createFollowUpQueueService = ({
       broadcastQueue(threadId, "failed");
       return failed;
     }
+    const submissionId = item.dispatchSubmissionId || item.submissionId;
+    const sentAt = item.sentAt || new Date().toISOString();
     publishThreadEvent(threadId, {
       type: "user_message_submitted",
       threadId,
-      submissionId: item.submissionId,
-      messageId: `optimistic-${item.submissionId}`,
+      submissionId,
+      messageId: `optimistic-${submissionId}`,
       text: item.text,
       attachments: item.attachments,
-      createdAt: item.createdAt,
+      createdAt: sentAt,
     });
     try {
-      if (status.active) await conversations.steerMessage(threadId, status.turnId, item.text, attachments);
-      else await conversations.sendMessage(threadId, item.text, attachments);
+      if (status.active) await conversations.steerMessage(threadId, status.turnId, item.text, attachments, submissionId);
+      else await conversations.sendMessage(threadId, item.text, attachments, submissionId);
       store.complete(threadId, item.id);
       broadcastQueue(threadId, "completed");
       return item;
