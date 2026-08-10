@@ -109,7 +109,15 @@ export const createConversationRoutes = ({
     }
     if (!localMessages.length) return runtime;
     const messages = new Map((runtime?.messages || []).map((message) => [message.id, message]));
-    for (const message of localMessages) messages.set(message.id, message);
+    for (const message of localMessages) {
+      const runtimeMessage = messages.get(message.id);
+      const runtimeCreatedAt = runtimeMessage?.createdAt;
+      messages.set(message.id, runtimeMessage ? {
+        ...runtimeMessage,
+        ...message,
+        createdAt: Number.isFinite(Date.parse(runtimeCreatedAt || "")) ? runtimeCreatedAt : message.createdAt,
+      } : message);
+    }
     const ordered = [...messages.values()].sort((left, right) => (
       Date.parse(left.createdAt || "") - Date.parse(right.createdAt || "")
     ));

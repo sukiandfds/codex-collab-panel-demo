@@ -15,9 +15,8 @@ export const createEmployeeGrowthReviewer = ({ review } = {}) => ({
   async reviewTask(input) {
     if (typeof review === "function") return review(input);
     const task = text(input?.taskText, 600);
-    const reply = text(input?.replyText, 1000);
     return {
-      facts: reply ? [{ text: reply, source: "assistant", confidence: "low" }] : [],
+      facts: [],
       rules: [],
       skills: [],
       source: "deterministic-fallback",
