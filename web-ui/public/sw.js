@@ -53,15 +53,7 @@ self.addEventListener("fetch", (event) => {
         return response;
       });
     });
-    event.respondWith(
-      caches.match(canonicalPath).then((cached) => {
-        if (cached) {
-          event.waitUntil(refresh.catch(() => undefined));
-          return cached;
-        }
-        return refresh.catch(() => caches.match(canonicalPath));
-      }),
-    );
+    event.respondWith(refresh.catch(() => caches.match(canonicalPath)));
     return;
   }
 
