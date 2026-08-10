@@ -134,12 +134,6 @@ type ConversationItem =
   | { id: string; type: "execution" }
   | { id: string; type: "growth" };
 
-type ScrollPosition = {
-  top: number;
-  anchorId?: string;
-  anchorOffset?: number;
-};
-
 export function ConversationView({
   active = true,
   session,
@@ -163,9 +157,8 @@ export function ConversationView({
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingOlderThreadsRef = useRef(new Set<string>());
   const olderLoadTimersRef = useRef(new Map<string, number>());
-  const scrollPositionsRef = useRef(new Map<string, ScrollPosition>());
+  const scrollPositionsRef = useRef(new Map<string, number>());
   const followLatestFrameRef = useRef(0);
-  const initialPositionFrameRef = useRef(0);
   const observedActiveThreadsRef = useRef(new Set<string>());
   const messages = session?.messages || [];
   const currentSessionRef = useRef(session);
@@ -240,66 +233,12 @@ export function ConversationView({
     anchorTo: "end",
     followOnAppend: false,
   });
-  const virtualizerRef = useRef(virtualizer);
-  virtualizerRef.current = virtualizer;
-  const visibleItemsRef = useRef(visibleItems);
-  visibleItemsRef.current = visibleItems;
-
-  const captureScrollPosition = useCallback((
-    root: HTMLElement | null,
-    threadId: string,
-    items: ConversationItem[],
-    currentVirtualizer: typeof virtualizer,
-  ) => {
-    if (!root || !threadId) return;
-    const anchor = currentVirtualizer.getVirtualItems().find((item) => item.end > root.scrollTop);
-    const anchorId = anchor ? items[anchor.index]?.id : undefined;
-    scrollPositionsRef.current.set(threadId, {
-      top: root.scrollTop,
-      ...(anchorId ? {
-        anchorId,
-        anchorOffset: anchor!.start - root.scrollTop,
-      } : {}),
-    });
-  }, []);
+  const latestFollowIndexRef = useRef(latestFollowIndex);
+  latestFollowIndexRef.current = latestFollowIndex;
 
   const rememberScrollPosition = useCallback((root = scrollRef.current, threadId = currentSessionRef.current?.threadId) => {
-    if (!threadId) return;
-    captureScrollPosition(root, threadId, visibleItemsRef.current, virtualizerRef.current);
-  }, [captureScrollPosition]);
-
-  const restoreScrollPosition = useCallback((
-    position: ScrollPosition,
-    threadId: string,
-    onRestored: (root: HTMLDivElement) => void,
-  ) => {
-    const currentVirtualizer = virtualizerRef.current;
-    const items = visibleItemsRef.current;
-    const root = scrollRef.current;
-    if (!root) return;
-    const anchorOffset = position.anchorOffset;
-    const anchorIndex = position.anchorId
-      ? items.findIndex((item) => item.id === position.anchorId)
-      : -1;
-    if (anchorIndex < 0 || anchorOffset === undefined) {
-      currentVirtualizer.scrollToOffset(position.top, { align: "start" });
-      onRestored(root);
-      return;
-    }
-
-    currentVirtualizer.scrollToIndex(anchorIndex, { align: "start" });
-    window.requestAnimationFrame(() => {
-      const currentRoot = scrollRef.current;
-      if (currentSessionRef.current?.threadId !== threadId || !currentRoot) return;
-      const anchor = virtualizerRef.current.getVirtualItems().find((item) => item.key === position.anchorId);
-      if (!anchor) {
-        virtualizerRef.current.scrollToOffset(position.top, { align: "start" });
-        onRestored(currentRoot);
-        return;
-      }
-      virtualizerRef.current.scrollToOffset(anchor.start - anchorOffset, { align: "start" });
-      onRestored(currentRoot);
-    });
+    if (!root || !threadId) return;
+    scrollPositionsRef.current.set(threadId, root.scrollTop);
   }, []);
 
   const scheduleFollowLatest = useCallback(() => {
@@ -335,28 +274,22 @@ export function ConversationView({
   useLayoutEffect(() => {
     if (!active) return;
     if (!loading && session && scrollRef.current) {
-      const savedPosition = scrollPositionsRef.current.get(session.threadId);
+      const savedTop = scrollPositionsRef.current.get(session.threadId);
       const threadId = session.threadId;
       resetReturnToBottom();
       window.cancelAnimationFrame(followLatestFrameRef.current);
-      window.cancelAnimationFrame(initialPositionFrameRef.current);
-      initialPositionFrameRef.current = window.requestAnimationFrame(() => {
-        const root = scrollRef.current;
-        if (!root) return;
-        if (savedPosition) {
-          restoreScrollPosition(savedPosition, threadId, (currentRoot) => {
-            resetReturnToBottom(isNearBottom(currentRoot, trailingContentHeightRef.current));
-            rememberScrollPosition(currentRoot, threadId);
-          });
-          return;
-        }
+      const root = scrollRef.current;
+      if (savedTop === undefined) {
         stickToBottomRef.current = true;
-        virtualizer.scrollToIndex(latestFollowIndex, { align: "end" });
+        virtualizer.scrollToIndex(latestFollowIndexRef.current, { align: "end" });
         rememberScrollPosition(root, threadId);
-      });
+      } else {
+        virtualizer.scrollToOffset(savedTop, { align: "start" });
+        resetReturnToBottom(isNearBottom(root, trailingContentHeightRef.current));
+        rememberScrollPosition(root, threadId);
+      }
     }
-    return () => window.cancelAnimationFrame(initialPositionFrameRef.current);
-  }, [active, latestFollowIndex, loading, rememberScrollPosition, resetReturnToBottom, restoreScrollPosition, session?.threadId, virtualizer]);
+  }, [active, loading, rememberScrollPosition, resetReturnToBottom, session?.threadId, virtualizer]);
 
   useEffect(() => {
     if (active || !session?.threadId) return;
