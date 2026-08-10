@@ -3,7 +3,6 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Clock3, LoaderCircle } from "lucide-react";
 import { JumpToLatest } from "../../../components/JumpToLatest/JumpToLatest";
 import { isNearBottom, useReturnToBottom } from "../../../components/JumpToLatest/useReturnToBottom";
-import { RefreshNotice } from "../../app-update/components/AppUpdateNotice";
 import type { ContentSyncState, SessionDetail, SessionMessage } from "../model/types";
 import { MessageActions } from "./MessageActions";
 import { ContentRenderer } from "../rendering/ContentRenderer";
@@ -244,6 +243,8 @@ export function ConversationView({
   virtualizerRef.current = virtualizer;
   const visibleItemsRef = useRef(visibleItems);
   visibleItemsRef.current = visibleItems;
+  const latestFollowIndexRef = useRef(latestFollowIndex);
+  latestFollowIndexRef.current = latestFollowIndex;
 
   const captureScrollPosition = useCallback((
     root: HTMLElement | null,
@@ -351,12 +352,12 @@ export function ConversationView({
           return;
         }
         stickToBottomRef.current = true;
-        virtualizer.scrollToIndex(latestFollowIndex, { align: "end" });
+        virtualizer.scrollToIndex(latestFollowIndexRef.current, { align: "end" });
         rememberScrollPosition(root, threadId);
       });
     }
     return () => window.cancelAnimationFrame(initialPositionFrameRef.current);
-  }, [active, latestFollowIndex, loading, rememberScrollPosition, resetReturnToBottom, restoreScrollPosition, session?.threadId, virtualizer]);
+  }, [active, loading, rememberScrollPosition, resetReturnToBottom, restoreScrollPosition, session?.threadId, virtualizer]);
 
   useEffect(() => {
     if (active || !session?.threadId) return;
@@ -464,18 +465,18 @@ export function ConversationView({
 
   return (
     <div className={styles.viewport}>
-      {error ? (
-        <RefreshNotice
-          surface="conversation"
-          title="内容暂时未更新"
-          detail="连接长时间没有响应，请刷新网页后重试。"
-          actionLabel="刷新网页"
-          onAction={() => window.location.reload()}
-        />
-      ) : null}
       <div className={styles.scrollArea} ref={scrollRef}>
         <section className={styles.conversation} aria-label="真实项目对话" aria-live="polite">
         {loading && !session ? <div className={styles.loading} role="status" aria-label="正在读取对话"><LoaderCircle aria-hidden="true" /></div> : null}
+        {!loading && session && (error || contentSyncState === "syncing" || contentSyncState === "recovering" || contentSyncState === "degraded") ? (
+          <div className={styles.syncState} role={error ? "alert" : "status"} aria-live="polite">
+            {error || (contentSyncState === "recovering"
+              ? "正在恢复最新内容…"
+              : contentSyncState === "degraded"
+                ? "当前显示上次稳定内容，最新内容暂未确认"
+                : "正在同步最新内容…")}
+          </div>
+        ) : null}
         {!loading && !error && !session && listAvailable ? <div className={styles.state}>当前项目暂无可显示对话</div> : null}
         {session ? (
           <div className={styles.virtualList} style={{ height: virtualizer.getTotalSize() }}>
