@@ -264,7 +264,9 @@ export const createExecutionTracker = ({ broadcast, stateFile = "", onTurnTermin
         durationMs: Number.isFinite(params.turn?.durationMs) ? params.turn.durationMs : null,
       });
       rememberCompletedTurn(threadId, turnId || statuses.get(threadId)?.turnId || "");
-      broadcastThreadEvent(threadId, { type: "sessions_changed", threadId });
+      if (phase !== "completed") {
+        broadcastThreadEvent(threadId, { type: "sessions_changed", threadId });
+      }
       Promise.resolve(onTurnTerminal({ threadId, turnId, status: phase })).catch((error) => {
         console.warn(`[execution-tracker] terminal callback failed: ${error.message}`);
       });
@@ -331,13 +333,6 @@ export const createExecutionTracker = ({ broadcast, stateFile = "", onTurnTermin
           });
         }
       } else if (isConversationItem(params.item)) {
-        if (params.item?.type === "agentMessage" && params.item?.phase !== "commentary") {
-          publish(threadId, {
-            phase: "finalizing",
-            label: "回复已完成，正在收尾",
-            active: true,
-          });
-        }
         broadcastThreadEvent(threadId, { type: "sessions_changed", threadId });
       } else {
         completeActivity(threadId, params.item);

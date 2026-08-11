@@ -35,8 +35,7 @@ function ConversationApp({ active, onViewChange }: { active: boolean; onViewChan
   useEffect(() => {
     if (!active) return;
     if (
-      conversations.snapshotLoading
-      || !conversations.initialSyncReady
+      !conversations.initialSyncReady
       || conversations.loadingSession
       || conversations.syncing
     ) return;
@@ -44,7 +43,6 @@ function ConversationApp({ active, onViewChange }: { active: boolean; onViewChan
   }, [
     conversations.initialSyncReady,
     conversations.loadingSession,
-    conversations.snapshotLoading,
     conversations.syncing,
     active,
   ]);

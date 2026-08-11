@@ -6,7 +6,7 @@ import { executionApi } from "../../execution/data/executionApi";
 import { useCodexExecution } from "../../execution/hooks/useCodexExecution";
 import type { ProjectEvent } from "../../execution/model/types";
 import { useModels } from "../../models/hooks/useModels";
-import { readConversationSnapshotAsync, writeConversationSnapshot } from "../data/conversationSnapshot";
+import { writeConversationSnapshot } from "../data/conversationSnapshot";
 import { conversationApi } from "../data/conversationApi";
 import { useConversationEvents } from "../realtime/useConversationEvents";
 import { createOptimisticMessage, createSubmissionId } from "../state/optimisticMessage";
@@ -37,23 +37,7 @@ const conversationLocationKey = () => {
 
 export function useProjectConversations() {
   const [initial] = useState(readInitialConversationState);
-  const [snapshotLoading, setSnapshotLoading] = useState(true);
   const selection = useConversationSession(initial);
-
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("archived") === "1") {
-      setSnapshotLoading(false);
-      return;
-    }
-    let cancelled = false;
-    void readConversationSnapshotAsync().then((snapshot) => {
-      if (cancelled || !snapshot?.session) return;
-      selection.hydrateSnapshot(snapshot.session, Boolean(snapshot.isPartial));
-    }).finally(() => {
-      if (!cancelled) setSnapshotLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, [initial, selection.hydrateSnapshot]);
 
   const execution = useCodexExecution(selection.selectedId);
   const followUpQueue = useFollowUpQueue(selection.selectedId);
@@ -409,7 +393,6 @@ export function useProjectConversations() {
     loadingList: catalog.loadingList,
     initialSyncReady: catalog.initialSyncReady,
     loadingSession: selection.loadingSession,
-    snapshotLoading,
     loadingOlder: selection.loadingOlder,
     syncing: selection.syncing,
     contentSyncState: selection.contentSyncState,

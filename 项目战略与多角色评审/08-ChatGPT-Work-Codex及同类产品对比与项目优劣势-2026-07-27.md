@@ -312,7 +312,7 @@ ChatGPT Work 把 AI 从聊天工具推进到通用工作执行者；Codex 把 AI
 
 ### 本项目依据
 
-- `docs/feature-development/FEATURE_INDEX.md`
+- `docs/feature-development/FEATURE_STATUS_INDEX.md`
 - `docs/feature-development/features/FEAT-001-single-codex-web.md`
 - `docs/feature-development/features/FEAT-002-group-multi-agent.md`
 - `docs/feature-development/features/FEAT-003-attachments-content-rendering.md`

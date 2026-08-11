@@ -19,10 +19,9 @@
 .assistant .actionRow { justify-content: flex-start; }
 .timestamp { display: block; margin-bottom: 6px; color: var(--color-text-muted); font-size: 11px; line-height: 1.3; }
 .user .timestamp { text-align: right; }
-.streamingText { font-size: 15px; line-height: 1.68; white-space: pre-wrap; overflow-wrap: anywhere; animation: stream-reveal 160ms ease-out both; }
+.streamingText { font-size: 15px; line-height: 1.68; white-space: pre-wrap; overflow-wrap: anywhere; }
 .cursor { display: inline-block; width: 2px; height: 1em; margin-left: 3px; vertical-align: -2px; background: var(--color-text); animation: cursor-blink 1s steps(2) infinite; }
 @keyframes cursor-blink { 50% { opacity: .2; } }
-@keyframes stream-reveal { from { opacity: .55; } to { opacity: 1; } }
 .state { display: grid; min-height: 50vh; place-items: center; color: var(--color-text-muted); text-align: center; }
 .loading { padding: 16px 0; color: var(--color-text-muted); font-size: 13px; text-align: center; }
 .loading svg { width: 18px; height: 18px; animation: loading-spin .8s linear infinite; }

@@ -2,15 +2,15 @@ import type { SessionDetail, SessionSummary } from "../model/types";
 
 const storageKey = "negus-conversation-snapshot-v1";
 const legacyStorageKey = "codex-collab-conversation-snapshot-v1";
-const maxSnapshotBytes = 768 * 1024;
-const maxBootstrapBytes = 64 * 1024;
-const bootstrapMessageLimit = 8;
-const databaseName = "negus-conversations";
-const legacyDatabaseName = "codex-collab-conversations";
-const databaseVersion = 1;
-const objectStoreName = "snapshots";
-const objectKey = "current";
-let indexedWriteQueue = Promise.resolve();
+const maxSnapshotCharacters = 1024 * 1024;
+const maxCachedConversations = 5;
+const maxCachedMessages = 60;
+
+export interface CachedConversation {
+  savedAt: string;
+  isPartial?: boolean;
+  session: SessionDetail;
+}
 
 export interface ConversationSnapshot {
   version: 1;
@@ -19,12 +19,29 @@ export interface ConversationSnapshot {
   selectedId: string;
   sessions: SessionSummary[];
   session: SessionDetail | null;
+  recentSessions?: CachedConversation[];
 }
+
+const isSessionDetail = (value: unknown): value is SessionDetail => Boolean(
+  value
+  && typeof value === "object"
+  && typeof (value as SessionDetail).threadId === "string"
+  && Array.isArray((value as SessionDetail).messages),
+);
 
 const validSnapshot = (value: ConversationSnapshot | null): ConversationSnapshot | null => {
   if (!value || value.version !== 1 || !Array.isArray(value.sessions)) return null;
+  if (value.session && !isSessionDetail(value.session)) return null;
   if (value.session && value.session.threadId !== value.selectedId) return null;
-  return value;
+  const recentSessions = Array.isArray(value.recentSessions)
+    ? value.recentSessions.filter((entry) => Boolean(
+      entry
+      && typeof entry.savedAt === "string"
+      && isSessionDetail(entry.session)
+      && entry.session.threadId !== value.selectedId,
+    )).slice(0, maxCachedConversations - 1)
+    : [];
+  return { ...value, recentSessions };
 };
 
 const selectNewestSnapshot = (...snapshots: Array<ConversationSnapshot | null>) => snapshots.reduce<ConversationSnapshot | null>(
@@ -52,116 +69,62 @@ export const readConversationSnapshot = (): ConversationSnapshot | null => selec
   readLocalSnapshot(legacyStorageKey),
 );
 
-const openSnapshotDatabase = (name: string) => new Promise<IDBDatabase | null>((resolve, reject) => {
-  if (typeof window === "undefined" || !window.indexedDB) {
-    resolve(null);
-    return;
-  }
-  const request = window.indexedDB.open(name, databaseVersion);
-  request.onupgradeneeded = () => {
-    const database = request.result;
-    if (!database.objectStoreNames.contains(objectStoreName)) database.createObjectStore(objectStoreName);
-  };
-  request.onsuccess = () => resolve(request.result);
-  request.onerror = () => reject(request.error || new Error("IndexedDB open failed"));
-});
-
-const readIndexedSnapshotFrom = async (name: string): Promise<ConversationSnapshot | null> => {
-  const database = await openSnapshotDatabase(name);
-  if (!database) return null;
-  try {
-    return await new Promise<ConversationSnapshot | null>((resolve, reject) => {
-      const request = database.transaction(objectStoreName, "readonly").objectStore(objectStoreName).get(objectKey);
-      request.onsuccess = () => resolve(validSnapshot(request.result as ConversationSnapshot | null));
-      request.onerror = () => reject(request.error || new Error("IndexedDB read failed"));
-    });
-  } finally {
-    database.close();
-  }
-};
-
-const readIndexedSnapshot = async (): Promise<ConversationSnapshot | null> => {
-  const [current, legacy] = await Promise.all([
-    readIndexedSnapshotFrom(databaseName).catch(() => null),
-    readIndexedSnapshotFrom(legacyDatabaseName).catch(() => null),
-  ]);
-  return selectNewestSnapshot(current, legacy);
-};
-
-const writeIndexedSnapshot = async (snapshot: ConversationSnapshot) => {
-  const database = await openSnapshotDatabase(databaseName);
-  if (!database) return;
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(objectStoreName, "readwrite");
-      transaction.objectStore(objectStoreName).put(snapshot, objectKey);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error || new Error("IndexedDB write failed"));
-      transaction.onabort = () => reject(transaction.error || new Error("IndexedDB write aborted"));
-    });
-  } finally {
-    database.close();
-  }
-};
-
-export const readConversationSnapshotAsync = async (): Promise<ConversationSnapshot | null> => {
-  const local = readConversationSnapshot();
-  try {
-    const indexed = await readIndexedSnapshot();
-    return selectNewestSnapshot(local, indexed);
-  } catch {
-    return local;
-  }
-};
-
 export const writeConversationSnapshot = ({ selectedId, sessions, session }: {
   selectedId: string;
   sessions: SessionSummary[];
   session: SessionDetail | null;
 }) => {
   try {
+    const previous = readConversationSnapshot();
+    const savedAt = new Date().toISOString();
     const cachedMessageCount = session?.threadId === selectedId ? session.messages.length : 0;
-      const cachedSession = session && session.threadId === selectedId
-        ? { ...session, messages: session.messages.slice(-60) }
-        : null;
-      const snapshot: ConversationSnapshot = {
-        version: 1,
-        savedAt: new Date().toISOString(),
-        isPartial: Boolean(cachedSession && (
-          cachedMessageCount > cachedSession.messages.length || cachedSession.hasMore
-        )),
-        selectedId,
-        sessions: sessions.slice(0, 50),
-        session: cachedSession,
-      };
+    const cachedSession = session && session.threadId === selectedId
+      ? { ...session, messages: session.messages.slice(-maxCachedMessages) }
+      : null;
+    const previousEntries: CachedConversation[] = [
+      ...(previous?.session ? [{
+        savedAt: previous.savedAt,
+        isPartial: previous.isPartial,
+        session: previous.session,
+      }] : []),
+      ...(previous?.recentSessions || []),
+    ];
+    const selectedPrevious = previousEntries.find((entry) => entry.session.threadId === selectedId);
+    const seen = new Set<string>();
+    const recentSessions = previousEntries.filter((entry) => {
+      const threadId = entry.session.threadId;
+      if (threadId === selectedId || seen.has(threadId)) return false;
+      seen.add(threadId);
+      return true;
+    }).slice(0, maxCachedConversations - 1);
+    const snapshot: ConversationSnapshot = {
+      version: 1,
+      savedAt,
+      isPartial: Boolean(selectedPrevious?.isPartial || (cachedSession && cachedMessageCount > cachedSession.messages.length)),
+      selectedId,
+      sessions: sessions.slice(0, 50),
+      session: cachedSession,
+      recentSessions,
+    };
     let serialized = JSON.stringify(snapshot);
-    while (serialized.length > maxSnapshotBytes && snapshot.session && snapshot.session.messages.length > 1) {
+    while (serialized.length > maxSnapshotCharacters && snapshot.recentSessions?.length) {
+      const oldest = snapshot.recentSessions[snapshot.recentSessions.length - 1];
+      if (oldest.session.messages.length <= 1) {
+        snapshot.recentSessions.pop();
+      } else {
+        oldest.isPartial = true;
+        oldest.session = {
+          ...oldest.session,
+          messages: oldest.session.messages.slice(Math.ceil(oldest.session.messages.length / 2)),
+        };
+      }
+      serialized = JSON.stringify(snapshot);
+    }
+    while (serialized.length > maxSnapshotCharacters && snapshot.session && snapshot.session.messages.length > 1) {
       snapshot.isPartial = true;
       snapshot.session.messages = snapshot.session.messages.slice(Math.ceil(snapshot.session.messages.length / 4));
       serialized = JSON.stringify(snapshot);
     }
-    if (serialized.length <= maxSnapshotBytes) {
-      let bootstrapSession = snapshot.session
-        ? {
-          ...snapshot.session,
-          messages: snapshot.session.messages.slice(-bootstrapMessageLimit),
-        }
-        : null;
-      let bootstrapSnapshot: ConversationSnapshot = { ...snapshot, isPartial: Boolean(bootstrapSession), session: bootstrapSession };
-      let bootstrapSerialized = JSON.stringify(bootstrapSnapshot);
-      while (bootstrapSerialized.length > maxBootstrapBytes && bootstrapSession && bootstrapSession.messages.length > 1) {
-        bootstrapSession = {
-          ...bootstrapSession,
-          messages: bootstrapSession.messages.slice(Math.ceil(bootstrapSession.messages.length / 2)),
-        };
-        bootstrapSnapshot = { ...snapshot, isPartial: Boolean(bootstrapSession), session: bootstrapSession };
-        bootstrapSerialized = JSON.stringify(bootstrapSnapshot);
-      }
-      if (bootstrapSerialized.length <= maxBootstrapBytes) window.localStorage.setItem(storageKey, bootstrapSerialized);
-      indexedWriteQueue = indexedWriteQueue
-        .catch(() => {})
-        .then(() => writeIndexedSnapshot(snapshot));
-      void indexedWriteQueue.catch(() => {});
-    }
+    if (serialized.length <= maxSnapshotCharacters) window.localStorage.setItem(storageKey, serialized);
   } catch {}
 };

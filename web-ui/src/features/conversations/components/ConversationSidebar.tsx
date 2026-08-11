@@ -47,7 +47,7 @@ export function ConversationSidebar({
   onCloseSidebar,
 }: ConversationSidebarProps) {
   const directory = useProjectDirectory(currentStatus);
-  const workspaceName = project?.root.split(/[\\/]/u).filter(Boolean).slice(-1)[0]
+  const workspaceName = directory.projects.find((entry) => entry.kind === "personal")?.name
     || project?.name
     || "正在读取项目";
   return (

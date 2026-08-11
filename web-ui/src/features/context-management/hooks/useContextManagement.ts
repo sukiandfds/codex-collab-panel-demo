@@ -1,9 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
+import { readLocalCache, writeLocalCache } from "../../../shared/state/localCache";
 import { contextApi } from "../data/contextApi";
 import type { ContextStatus } from "../model/types";
 
 const MAX_CACHED_STATUSES = 100;
+const contextStatusCacheKey = "negus-context-status-v1";
 const statusCache = new Map<string, ContextStatus>();
+const validStatus = (value: unknown): value is ContextStatus => {
+  if (!value || typeof value !== "object") return false;
+  const status = value as Partial<ContextStatus>;
+  return typeof status.threadId === "string"
+    && typeof status.model === "string"
+    && typeof status.reasoningEffort === "string";
+};
+const validStatusRecord = (value: unknown): value is Record<string, ContextStatus> => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.values(value as Record<string, unknown>).every(validStatus);
+};
+const persistedStatuses = readLocalCache(contextStatusCacheKey, validStatusRecord) || {};
 
 const emptyStatus = (threadId: string): ContextStatus => ({
   type: "context_status",
@@ -28,14 +42,21 @@ const rememberStatus = (status: ContextStatus) => {
     if (!oldest) break;
     statusCache.delete(oldest);
   }
+  writeLocalCache(contextStatusCacheKey, { ...persistedStatuses, ...Object.fromEntries(statusCache) });
   return status;
 };
 
+const cachedStatus = (threadId: string) => {
+  const cached = statusCache.get(threadId) || persistedStatuses[threadId];
+  if (!cached) return emptyStatus(threadId);
+  return { ...cached, phase: "idle" as const, message: "" };
+};
+
 export function useContextManagement(threadId: string) {
-  const [storedStatus, setStoredStatus] = useState<ContextStatus>(() => statusCache.get(threadId) ?? emptyStatus(threadId));
+  const [storedStatus, setStoredStatus] = useState<ContextStatus>(() => cachedStatus(threadId));
   const status = storedStatus.threadId === threadId
     ? storedStatus
-    : statusCache.get(threadId) ?? emptyStatus(threadId);
+    : cachedStatus(threadId);
   const setStatus = useCallback((value: ContextStatus | ((current: ContextStatus) => ContextStatus)) => {
     setStoredStatus((current) => rememberStatus(typeof value === "function" ? value(current) : value));
   }, []);
@@ -59,7 +80,7 @@ export function useContextManagement(threadId: string) {
   }, [threadId]);
 
   useEffect(() => {
-    setStatus(statusCache.get(threadId) ?? emptyStatus(threadId));
+    setStatus(cachedStatus(threadId));
     if (!threadId) return;
     const controller = new AbortController();
     void refresh(controller.signal);

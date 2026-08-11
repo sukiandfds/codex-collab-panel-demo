@@ -29,9 +29,10 @@ export function useConversationSession(initial: InitialConversationState) {
   const sessionRequestControllersRef = useRef(new Map<string, AbortController>());
   const pendingSessionSyncRef = useRef(new Map<string, boolean>());
   const pendingOptimisticMessagesRef = useRef(new Map<string, SessionMessage[]>());
-  const sessionCache = useRef(new Map<string, SessionDetail>(initial.session
-    ? [[initial.session.threadId, initial.session]]
-    : []));
+  const sessionCache = useRef(new Map<string, SessionDetail>(
+    initial.cachedSessions.map((cached) => [cached.threadId, cached]),
+  ));
+  const partialSessionIdsRef = useRef(new Set(initial.partialSessionIds));
   const loadSessionRef = useRef<(threadId: string, options?: LoadOptions) => Promise<boolean>>(async () => false);
 
   const loadSessionOnce = useCallback(async (threadId: string, {
@@ -100,6 +101,7 @@ export function useConversationSession(initial: InitialConversationState) {
         : !deltaResponse && latestWithPending ? mergeSessionRefresh(latestWithPending, detail) : detail;
       const resolved = mergePendingOptimisticMessages(next, pendingOptimistic);
       sessionCache.current.set(threadId, resolved);
+      partialSessionIdsRef.current.delete(threadId);
       if (pendingOptimistic.length) pendingOptimisticMessagesRef.current.delete(threadId);
       if (isSelected()) {
         setSession(resolved);
@@ -187,7 +189,10 @@ export function useConversationSession(initial: InitialConversationState) {
     params.delete("employeeId");
     params.delete("conversation");
     window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
-    void loadSession(threadId, { quiet: Boolean(cached) });
+    void loadSession(threadId, {
+      quiet: Boolean(cached),
+      recovery: partialSessionIdsRef.current.has(threadId),
+    });
   }, [loadSession]);
 
   const adoptSelection = useCallback(async (threadId: string, quiet: boolean) => {
@@ -240,34 +245,6 @@ export function useConversationSession(initial: InitialConversationState) {
     params.delete("employeeId");
     params.delete("conversation");
     window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
-  }, []);
-
-  const hydrateSnapshot = useCallback((detail: SessionDetail, partial = false) => {
-    if (!detail.threadId || (selectedIdRef.current && selectedIdRef.current !== detail.threadId)) return false;
-    const current = sessionCache.current.get(detail.threadId);
-    const currentVersion = current?.contentVersion ?? 0;
-    const incomingVersion = detail.contentVersion ?? 0;
-    const currentHasOptimistic = current?.messages.some((message) => message.id.startsWith("optimistic-")) === true;
-    const incomingHasOptimistic = detail.messages.some((message) => message.id.startsWith("optimistic-"));
-    if (current && currentHasOptimistic && !incomingHasOptimistic) return false;
-    // A partial/legacy cache without a content version cannot replace a newer
-    // server-backed session. It may still be used when no current session exists.
-    if (current && currentVersion > incomingVersion) return false;
-    if (current && currentVersion === incomingVersion && current.messages.length >= detail.messages.length) return false;
-    if (!selectedIdRef.current) {
-      selectedIdRef.current = detail.threadId;
-      setSelectedId(detail.threadId);
-      const params = new URLSearchParams(window.location.search);
-      params.set("thread", detail.threadId);
-      window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
-    }
-    sessionCache.current.set(detail.threadId, detail);
-    setSession(detail);
-    setLoadingSession(true);
-    setSyncing(true);
-    setContentSyncState(partial ? "recovering" : "syncing");
-    void loadSessionRef.current(detail.threadId, { quiet: true, retry: false, recovery: partial });
-    return true;
   }, []);
 
   const updateCurrentSession = useCallback((threadId: string, update: (current: SessionDetail) => SessionDetail) => {
@@ -323,7 +300,7 @@ export function useConversationSession(initial: InitialConversationState) {
 
   return {
     selectedId, selectedIdRef, session, loadingSession, loadingOlder, syncing, contentSyncState, sessionError,
-    setSyncing: markSyncing, loadSession, selectSession, adoptSelection, clearSelection, setCreatedSession, hydrateSnapshot,
+    setSyncing: markSyncing, loadSession, selectSession, adoptSelection, clearSelection, setCreatedSession,
     updateCurrentSession, addOptimisticMessage, removeOptimisticMessage, invalidate, loadOlder,
   };
 }

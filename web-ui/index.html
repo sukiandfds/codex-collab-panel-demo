@@ -29,7 +29,7 @@
     </script>
   </head>
   <body>
-    <div id="negus-launch" role="status" aria-label="Negus 正在启动">
+    <div id="negus-launch" role="status" aria-label="Negus 正在启动" style="display: none">
       <div class="negus-launch-content negus-launch-zh">
         <p class="negus-launch-kicker">为什么选择</p>
         <img class="negus-launch-logo" src="/icons/negus-icon-v2.svg" width="144" height="144" alt="Negus" />
@@ -41,6 +41,11 @@
         <p class="negus-launch-copy"><strong>Built for those who lead.</strong><br />Manage AI anytime, anywhere.</p>
       </div>
     </div>
+    <script>
+      if (!document.documentElement.classList.contains("negus-skip-launch")) {
+        document.getElementById("negus-launch").style.removeProperty("display");
+      }
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

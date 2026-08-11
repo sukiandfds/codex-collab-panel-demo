@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { hasAccessToken, withAccessToken } from "../../../shared/api/http";
+import { readLocalCache, writeLocalCache } from "../../../shared/state/localCache";
 import type { ExecutionStatus } from "../../execution/model/types";
 import { projectDirectoryApi } from "../data/projectDirectoryApi";
 import type { DirectoryProject, ProjectRuntimeStatus } from "../model/types";
 
 type StatusByThread = Record<string, ProjectRuntimeStatus>;
+const projectDirectoryCacheKey = "negus-project-directory-v1";
+const validProjects = (value: unknown): value is DirectoryProject[] => Array.isArray(value)
+  && value.every((entry) => Boolean(entry) && typeof entry === "object" && typeof entry.id === "string");
 type DirectoryEvent = {
   type?: string;
   employeeId?: string;
@@ -23,9 +27,10 @@ const sameStatus = (left?: ProjectRuntimeStatus, right?: ProjectRuntimeStatus) =
 );
 
 export function useProjectDirectory(currentStatus?: ExecutionStatus) {
-  const [projects, setProjects] = useState<DirectoryProject[]>([]);
+  const [initialProjects] = useState(() => readLocalCache(projectDirectoryCacheKey, validProjects) || []);
+  const [projects, setProjects] = useState<DirectoryProject[]>(initialProjects);
   const [statusByThread, setStatusByThread] = useState<StatusByThread>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialProjects.length);
   const [error, setError] = useState("");
   const projectsRef = useRef(projects);
   projectsRef.current = projects;
@@ -41,6 +46,7 @@ export function useProjectDirectory(currentStatus?: ExecutionStatus) {
     try {
       const next = await projectDirectoryApi.list(signal);
       setProjects((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next);
+      writeLocalCache(projectDirectoryCacheKey, next);
       for (const entry of next) {
         if (entry.mainThreadId) cacheStatus(entry.mainThreadId, entry.status);
         for (const conversation of entry.conversations || []) {

@@ -36,7 +36,6 @@ export function ExecutionTimeline({ status, contextStatus }: { status: Execution
   const failed = status.phase === "failed" || status.phase === "systemError";
   const interrupted = status.phase === "interrupted";
   const terminalIssue = failed || interrupted;
-  if (!status.active && !status.activities.length && !terminalIssue) return null;
   const activities = (status.activities || []).slice(-4);
   const startedAt = Date.parse(status.startedAt || "");
   const liveDurationMs = Number.isFinite(startedAt) ? now - startedAt : 0;

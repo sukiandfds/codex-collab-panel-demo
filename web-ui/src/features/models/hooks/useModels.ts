@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
+import { readLocalCache, writeLocalCache } from "../../../shared/state/localCache";
 import { modelApi } from "../data/modelApi";
 import type { CodexModel } from "../model/types";
 
+const modelsCacheKey = "negus-models-v1";
+const validModels = (value: unknown): value is CodexModel[] => Array.isArray(value)
+  && value.every((entry) => Boolean(entry)
+    && typeof entry === "object"
+    && typeof entry.model === "string"
+    && Array.isArray(entry.supportedReasoningEfforts));
+
 export function useModels(threadId: string, onChanged: () => void) {
-  const [models, setModels] = useState<CodexModel[]>([]);
+  const [initialModels] = useState(() => readLocalCache(modelsCacheKey, validModels) || []);
+  const [models, setModels] = useState<CodexModel[]>(initialModels);
   const [loading, setLoading] = useState(true);
   const [changing, setChanging] = useState(false);
   const [error, setError] = useState("");
@@ -14,6 +23,7 @@ export function useModels(threadId: string, onChanged: () => void) {
     void modelApi.list(controller.signal)
       .then((result) => {
         setModels(result);
+        writeLocalCache(modelsCacheKey, result);
         setError("");
       })
       .catch((reason) => {

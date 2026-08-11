@@ -82,11 +82,6 @@ export function useReturnToBottom({
     returnToBottom();
   }, [localSendVersion, returnToBottom]);
 
-  useEffect(() => {
-    if (!active) return;
-    schedulePositionUpdate();
-  }, [active, isStreaming, schedulePositionUpdate]);
-
   useEffect(() => () => window.cancelAnimationFrame(positionFrameRef.current), []);
 
   return {

@@ -196,7 +196,7 @@ test("keeps a completed turn terminal when its final item completion arrives lat
   const status = tracker.getStatus("thread-1");
   assert.equal(status.phase, "completed");
   assert.equal(status.active, false);
-  assert.equal(events.filter((event) => event.type === "sessions_changed").length, 3);
+  assert.equal(events.filter((event) => event.type === "sessions_changed").length, 2);
 });
 
 test("assigns monotonic per-thread event sequences", () => {
@@ -404,7 +404,7 @@ test("reports an app-server recovery failure without leaving the page active", (
   assert.equal(tracker.getStatus("thread-1").active, false);
 });
 
-test("distinguishes a completed reply from a completed turn", () => {
+test("keeps the active turn stable until the completed turn arrives", () => {
   const tracker = createExecutionTracker({ broadcast: () => {} });
   tracker.markSubmitted("thread-1");
   tracker.handleProtocolMessage({
@@ -419,8 +419,7 @@ test("distinguishes a completed reply from a completed turn", () => {
     },
   });
 
-  assert.equal(tracker.getStatus("thread-1").phase, "finalizing");
-  assert.equal(tracker.getStatus("thread-1").label, "回复已完成，正在收尾");
+  assert.equal(tracker.getStatus("thread-1").phase, "working");
   assert.equal(tracker.getStatus("thread-1").active, true);
 
   tracker.handleHealthState({

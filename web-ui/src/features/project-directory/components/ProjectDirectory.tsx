@@ -1,9 +1,10 @@
 import { Folder, LoaderCircle } from "lucide-react";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useLayoutEffect, useMemo, useState } from "react";
 import type { ExecutionStatus } from "../../execution/model/types";
 import { openAgentConversation } from "../../agent-sharing/navigation/openAgentConversation";
 import { SessionList } from "../../conversations/components/SessionList";
 import type { ProjectInfo, SessionSummary } from "../../conversations/model/types";
+import { readLocalCache, writeLocalCache } from "../../../shared/state/localCache";
 import type { DirectoryConversation, DirectoryProject, ProjectRuntimeStatus } from "../model/types";
 import { ProjectStatusBadge } from "./ProjectStatusBadge";
 import styles from "./ProjectDirectory.module.css";
@@ -12,6 +13,12 @@ const timeValue = (value?: string | null) => {
   const parsed = Date.parse(String(value || ""));
   return Number.isFinite(parsed) ? parsed : 0;
 };
+
+type ProjectNameMode = "folder" | "project";
+
+const projectNameModeCacheKey = "negus-project-name-mode-v1";
+const isProjectNameMode = (value: unknown): value is ProjectNameMode => value === "folder" || value === "project";
+const folderName = (root?: string) => root?.split(/[\\/]/u).filter(Boolean).slice(-1)[0] || "";
 
 const employeeConversations = (entry: DirectoryProject): DirectoryConversation[] => {
   if (entry.conversations?.length) return entry.conversations;
@@ -95,9 +102,7 @@ export function ProjectDirectory({
   const routeEmployeeId = params.get("employeeId") || params.get("agent") || "";
   const routeThreadId = params.get("thread") || selectedId;
   const routeConversationId = params.get("conversation") || "";
-  const namedProjects = useMemo(() => projects.map((entry) => entry.kind === "personal"
-    ? { ...entry, name: workspaceName, root: project?.root || entry.root }
-    : entry), [project?.root, projects, workspaceName]);
+  const namedProjects = projects;
   const currentProject = useMemo<DirectoryProject | null>(() => namedProjects.find((entry) => entry.id === activeProjectId)
     || namedProjects.find((entry) => entry.employeeId === routeEmployeeId)
     || namedProjects.find((entry) => entry.mainThreadId === routeThreadId
@@ -112,6 +117,9 @@ export function ProjectDirectory({
   const [selectedProjectId, setSelectedProjectId] = useState(currentProject?.id || "");
   const [openingProjectId, setOpeningProjectId] = useState("");
   const [openError, setOpenError] = useState("");
+  const [projectNameMode, setProjectNameMode] = useState<ProjectNameMode>(() => (
+    readLocalCache(projectNameModeCacheKey, isProjectNameMode) || "folder"
+  ));
   const visibleProjects = useMemo(() => {
     const source = namedProjects.length ? namedProjects : currentProject ? [currentProject] : [];
     return source.map((entry, index) => ({ entry, index })).sort((left, right) => (
@@ -121,7 +129,7 @@ export function ProjectDirectory({
     )).map(({ entry }) => entry);
   }, [currentProject, namedProjects]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (currentProject?.id) setSelectedProjectId(currentProject.id);
   }, [currentProject?.id, routeConversationId, routeEmployeeId, routeThreadId, selectedId]);
 
@@ -168,12 +176,29 @@ export function ProjectDirectory({
           const projectStatus = isCurrent && currentStatus?.threadId
             ? statusByThread[currentStatus.threadId] || currentStatus
             : entry.mainThreadId ? statusByThread[entry.mainThreadId] || entry.status : entry.status;
+          const displayName = isPersonal && projectNameMode === "folder"
+            ? folderName(entry.root)
+            : entry.name;
           return (
             <Fragment key={entry.id}>
               {startsSection ? (
-                <div className={`${styles.sectionLabel} ${isEmployee ? styles.employeeSectionLabel : ""}`}>
-                  {isEmployee ? "员工项目" : "项目"}
-                </div>
+                isEmployee ? (
+                  <div className={`${styles.sectionLabel} ${styles.employeeSectionLabel}`}>员工项目</div>
+                ) : (
+                  <button
+                    className={`${styles.sectionLabel} ${styles.sectionToggle}`}
+                    type="button"
+                    aria-label={`当前显示${projectNameMode === "folder" ? "文件夹名" : "项目名"}，点击切换`}
+                    title={`切换为${projectNameMode === "folder" ? "项目名" : "文件夹名"}`}
+                    onClick={() => {
+                      const nextMode = projectNameMode === "folder" ? "project" : "folder";
+                      setProjectNameMode(nextMode);
+                      writeLocalCache(projectNameModeCacheKey, nextMode);
+                    }}
+                  >
+                    {projectNameMode === "folder" ? "文件夹" : "项目"}
+                  </button>
+                )
               ) : null}
               <div className={styles.projectBlock}>
               <button
@@ -196,7 +221,7 @@ export function ProjectDirectory({
                 }}
               >
                 {openingProjectId === entry.id ? <LoaderCircle className={styles.spinner} aria-hidden="true" /> : <Folder aria-hidden="true" />}
-                <span className={styles.projectText}><strong>{entry.name || "未命名项目"}</strong></span>
+                <span className={styles.projectText}><strong>{displayName || "未命名项目"}</strong></span>
                 <ProjectStatusBadge status={projectStatus} compact />
               </button>
               {!navigationOnly && isSelected ? (
