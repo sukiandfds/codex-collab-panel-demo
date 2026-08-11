@@ -59,6 +59,7 @@ export const createAgentConversationStoreRouter = ({ primary, fallbacks = [] }) 
       const existing = locateAgent(options?.agentId, "direct");
       return existing?.binding || primary.openForAgent(options);
     },
+    openGroupForAgent: (options) => primary.openGroupForAgent(options),
     findByAgent: (agentId) => locateAgent(agentId)?.binding || null,
     findByAgentKind: (agentId, conversationKind) => locateAgent(agentId, conversationKind)?.binding || null,
     findByRuntimeSession: (runtimeKind, runtimeSessionId) => locateRuntime(runtimeKind, runtimeSessionId)?.binding || null,

@@ -48,11 +48,15 @@ const initialAgent = (definition, saved = {}) => ({
   updatedAt: saved.updatedAt || null,
 });
 
-export const createGroupRoomStore = async ({ stateFile, project, broadcast }) => {
+export const createGroupRoomStore = async ({ stateFile, project, projectId = "", roomId = "", broadcast = () => {}, onMessageCreated = () => {} }) => {
   let stored = {};
   try {
     stored = JSON.parse(await fs.readFile(stateFile, "utf8"));
   } catch {}
+
+  const projectName = cleanText(project, 160) || "project";
+  const linkedProjectId = cleanText(projectId, 200) || cleanText(stored.projectId, 200) || projectName;
+  const linkedRoomId = cleanText(roomId, 120) || cleanText(stored.roomId, 120) || "current-project";
 
   const savedAgents = new Map((Array.isArray(stored.agents) ? stored.agents : []).map((agent) => [agent.id, agent]));
   const storedContextSequences = stored.agentContextSequences && typeof stored.agentContextSequences === "object"
@@ -81,7 +85,9 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
 
   const persist = () => {
     const payload = JSON.stringify({
-      version: 3,
+      version: 4,
+      projectId: linkedProjectId,
+      roomId: linkedRoomId,
       messages: messages.slice(-300),
       agents: [...agents.values()].map(({ instructions, ...agent }) => agent),
       agentContextSequences: Object.fromEntries(agentContextSequences),
@@ -96,14 +102,16 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
   };
 
   const publicAgent = ({ instructions, ...agent }) => agent;
+  const emit = (value) => broadcast({ ...value, roomId: linkedRoomId });
   const activeMembers = () => {
     const cutoff = Date.now() - 60000;
     return [...members.values()].filter((member) => Date.parse(member.lastSeenAt) >= cutoff);
   };
 
   const snapshot = () => ({
-    project,
-    room: { id: "current-project", name: `${project} 项目群` },
+    project: projectName,
+    projectId: linkedProjectId,
+    room: { id: linkedRoomId, projectId: linkedProjectId, name: `${projectName} 项目群` },
     messages: [...messages],
     agents: [...agents.values()].map(publicAgent),
     members: activeMembers(),
@@ -135,7 +143,7 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     if (!id || !displayName) throw Object.assign(new Error("成员名称不能为空"), { statusCode: 400 });
     const member = { id, name: displayName, lastSeenAt: new Date().toISOString() };
     members.set(id, member);
-    broadcast({ type: "group_members_changed", members: activeMembers() });
+    emit({ type: "group_members_changed", members: activeMembers() });
     return member;
   };
 
@@ -192,7 +200,18 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     messages.push(message);
     if (messages.length > 300) messages.splice(0, messages.length - 300);
     await persist();
-    broadcast({ type: "group_message_created", message });
+    emit({ type: "group_message_created", message });
+    if (message.type === "agent") {
+      try {
+        await onMessageCreated({
+          message: { ...message },
+          projectId: linkedProjectId,
+          roomId: linkedRoomId,
+        });
+      } catch (error) {
+        console.warn(`[group-room] employee message link failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     return { message, created: true };
   };
 
@@ -229,7 +248,7 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     if (message.artifactIds.includes(id)) return message;
     message.artifactIds.push(id);
     await persist();
-    broadcast({ type: "group_message_updated", message: { ...message } });
+    emit({ type: "group_message_updated", message: { ...message } });
     return message;
   };
 
@@ -240,7 +259,7 @@ export const createGroupRoomStore = async ({ stateFile, project, broadcast }) =>
     agents.set(agentId, next);
     await persist();
     const agent = publicAgent(next);
-    broadcast({ type: "group_agent_updated", agent });
+    emit({ type: "group_agent_updated", agent });
     return agent;
   };
 

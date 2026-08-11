@@ -1,6 +1,6 @@
 import { readJson, sendJson } from "../http/request-utils.mjs";
 
-export const createArtifactRoutes = ({ groupRoom, artifacts, webOutputs }) => async (request, response, url) => {
+export const createArtifactRoutes = ({ groupRoom, roomDirectory, artifacts, webOutputs }) => async (request, response, url) => {
   const previewMatch = /^\/artifact-preview\/([^/]+)$/u.exec(url.pathname);
   if (previewMatch && request.method === "GET") {
     const preview = await webOutputs.readPreview(decodeURIComponent(previewMatch[1]));
@@ -10,13 +10,14 @@ export const createArtifactRoutes = ({ groupRoom, artifacts, webOutputs }) => as
   }
   if (url.pathname === "/api/artifacts/publish" && request.method === "POST") {
     const body = await readJson(request);
-    const agent = groupRoom.getAgent(String(body.createdByAgent || "").trim());
+    const room = roomDirectory?.require(String(body.roomId || groupRoom.snapshot().room.id).trim()) || groupRoom;
+    const agent = room.getAgent(String(body.createdByAgent || "").trim());
     if (!agent) {
       sendJson(response, { error: "创建交付物的 Agent 不存在" }, 404);
       return true;
     }
     const messageId = String(body.messageId || "").trim();
-    if (messageId && !groupRoom.getMessage(messageId)) {
+    if (messageId && !room.getMessage(messageId)) {
       sendJson(response, { error: "关联的群消息不存在" }, 404);
       return true;
     }
@@ -29,7 +30,7 @@ export const createArtifactRoutes = ({ groupRoom, artifacts, webOutputs }) => as
       mediaId: body.mediaId,
       relativePath: body.relativePath,
     });
-    if (messageId) await groupRoom.attachArtifact(messageId, artifact.id);
+    if (messageId) await room.attachArtifact(messageId, artifact.id);
     sendJson(response, artifact, 201);
     return true;
   }

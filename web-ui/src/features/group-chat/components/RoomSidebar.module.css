@@ -1,10 +1,19 @@
 .sidebar { min-width: 0; background: var(--color-sidebar); }
 .brandRow { display: flex; height: var(--topbar-height); align-items: center; padding: 0 16px; }
 .brand { font-size: 18px; font-weight: 670; }
-.projectHeader { display: flex; min-height: 38px; align-items: center; gap: 9px; margin: 0 7px 5px; padding: 0 9px; border-radius: 6px; color: var(--color-text); font-size: 13px; font-weight: 600; }
+.projectList { display: grid; gap: 2px; padding: 8px 7px 9px; border-bottom: 1px solid var(--color-border); }
+.projectBlock { min-width: 0; }
+.projectHeader { display: flex; width: 100%; min-height: 38px; align-items: center; gap: 9px; border: 0; padding: 0 9px; border-radius: 6px; background: transparent; color: var(--color-text); cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; text-align: left; }
+.projectHeader:hover { background: var(--color-surface-hover); }
 .projectHeader svg { width: 16px; height: 16px; flex: 0 0 16px; color: var(--color-text-secondary); stroke-width: 1.7; }
 .projectHeader span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.memberSection { padding: 12px 12px 8px; border-top: 1px solid var(--color-border); }
+.roomList { display: grid; gap: 2px; padding-left: 14px; }
+.roomRow { display: flex; width: 100%; min-width: 0; min-height: 34px; align-items: center; gap: 8px; border: 0; padding: 0 9px; border-radius: 6px; background: transparent; color: var(--color-text-secondary); cursor: pointer; font: inherit; font-size: 12px; text-align: left; }
+.roomRow:hover { background: var(--color-surface-hover); color: var(--color-text); }
+.roomRow svg { width: 14px; height: 14px; flex: 0 0 14px; stroke-width: 1.7; }
+.roomRow span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activeRoom { background: var(--color-surface-active); color: var(--color-text); font-weight: 600; }
+.memberSection { padding: 12px 12px 8px; border-top: 0; }
 .sectionLabel { display: flex; align-items: center; gap: 6px; margin: 0 4px 8px; color: #858585; font-size: 11px; font-weight: 600; }
 .sectionLabel svg { width: 13px; height: 13px; }
 .memberRow { display: flex; width: 100%; min-width: 0; min-height: 36px; align-items: center; gap: 9px; border: 0; border-radius: 6px; padding: 6px 7px; background: transparent; color: var(--color-text-secondary); cursor: pointer; font: inherit; font-size: 12px; text-align: left; }

@@ -1,18 +1,28 @@
 import { readJson, sendJson } from "../http/request-utils.mjs";
 import { mentionedAgentIds } from "../multi-agent/discussion-prompt.mjs";
 
-export const createGroupRoutes = ({ groupRoom, media, multiAgent, webOutputs }) => async (request, response, url) => {
+export const createGroupRoutes = ({ groupRoom, roomDirectory, media, multiAgent, multiAgentDirectory, webOutputs }) => async (request, response, url) => {
+  const roomIdFrom = (body = {}) => String(body.roomId || url.searchParams.get("roomId") || groupRoom.snapshot().room.id).trim();
+  const resolveRoom = (body = {}) => roomDirectory?.require(roomIdFrom(body)) || groupRoom;
+  const resolveAgentService = (roomId) => multiAgentDirectory?.get(roomId) || multiAgent;
+
+  if (url.pathname === "/api/group/rooms" && request.method === "GET") {
+    sendJson(response, { rooms: roomDirectory?.list?.() || [groupRoom.snapshot().room] });
+    return true;
+  }
   if (url.pathname === "/api/group/snapshot") {
-    sendJson(response, groupRoom.snapshot());
+    sendJson(response, resolveRoom().snapshot());
     return true;
   }
   if ((url.pathname === "/api/group/join" || url.pathname === "/api/group/presence") && request.method === "POST") {
     const body = await readJson(request);
-    sendJson(response, groupRoom.touchMember(body.memberId, body.name));
+    sendJson(response, resolveRoom(body).touchMember(body.memberId, body.name));
     return true;
   }
   if (url.pathname === "/api/group/agent-settings" && request.method === "POST") {
     const body = await readJson(request);
+    const room = resolveRoom(body);
+    const service = resolveAgentService(room.snapshot().room.id);
     const agentId = String(body.agentId || "").trim();
     const model = String(body.model || "").trim();
     const reasoningEffort = String(body.reasoningEffort || "").trim();
@@ -20,21 +30,23 @@ export const createGroupRoutes = ({ groupRoom, media, multiAgent, webOutputs }) 
       sendJson(response, { error: "Agent、模型和推理强度不能为空" }, 400);
       return true;
     }
-    sendJson(response, await multiAgent.updateAgentSettings(agentId, { model, reasoningEffort }));
+    sendJson(response, await service.updateAgentSettings(agentId, { model, reasoningEffort }));
     return true;
   }
   if (url.pathname !== "/api/group/message" || request.method !== "POST") return false;
 
   const body = await readJson(request);
+  const room = resolveRoom(body);
+  const service = resolveAgentService(room.snapshot().room.id);
   let mode = body.mode === "development" ? "development" : "discussion";
-  const member = groupRoom.touchMember(body.memberId, body.authorName);
+  const member = room.touchMember(body.memberId, body.authorName);
   const text = String(body.text || "").trim();
   const attachments = media.resolveMany(body.attachmentIds);
   if (!text && !attachments.length) {
     sendJson(response, { error: "消息不能为空" }, 400);
     return true;
   }
-  const agents = groupRoom.snapshot().agents;
+  const agents = room.snapshot().agents;
   const explicitAgentIds = mentionedAgentIds(text, agents);
   const requestedAgentIds = Array.isArray(body.agentIds) ? body.agentIds : [body.agentId];
   const availableAgentIds = new Set(agents.map((agent) => agent.id));
@@ -46,7 +58,7 @@ export const createGroupRoutes = ({ groupRoom, media, multiAgent, webOutputs }) 
     targetAgentIds.splice(0, targetAgentIds.length, "developer");
     mode = "development";
   }
-  const { message, created } = await groupRoom.addMessageWithStatus({
+  const { message, created } = await room.addMessageWithStatus({
     type: "human",
     authorId: member.id,
     authorName: member.name,
@@ -61,7 +73,7 @@ export const createGroupRoutes = ({ groupRoom, media, multiAgent, webOutputs }) 
     sendJson(response, { message, execution: null, deduplicated: true }, 202);
     return true;
   }
-  const execution = await multiAgent.enqueueDiscussion({
+  const execution = await service.enqueueDiscussion({
     agentIds: targetAgentIds,
     mode,
     requestText: text || "请查看附件并根据内容进行处理。",

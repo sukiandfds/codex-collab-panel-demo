@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { AppShell } from "../../components/AppShell/AppShell";
+import { SidebarHeader } from "../../components/Sidebar/SidebarHeader";
 import { WindowBar } from "../../components/WindowBar/WindowBar";
 import type { ViewSurface } from "../../components/ViewSwitcher/ViewSwitcher";
-import { AgentRoster } from "./components/AgentRoster";
 import { GroupComposer } from "./components/GroupComposer";
 import { GroupHeader } from "./components/GroupHeader";
 import { MemberDialog } from "./components/MemberDialog";
 import { MemberProfileDrawer } from "./components/MemberProfileDrawer";
 import { MessageTimeline } from "./components/MessageTimeline";
-import { RoomSidebar } from "./components/RoomSidebar";
 import { useGroupRoom } from "./hooks/useGroupRoom";
 import type { GroupMode, GroupProfile } from "./model/types";
 import { useDeviceInfo } from "../device/hooks/useDeviceInfo";
 import { useArtifacts } from "../artifacts/hooks/useArtifacts";
+import { projectDirectoryApi } from "../project-directory/data/projectDirectoryApi";
+import type { DirectoryProject } from "../project-directory/model/types";
+import { ProjectNavigationDirectory } from "../project-directory/components/ProjectDirectory";
 import { RefreshNotice } from "../app-update/components/AppUpdateNotice";
 import styles from "./GroupApp.module.css";
 
@@ -23,6 +25,7 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
   const [mode, setMode] = useState<GroupMode>("discussion");
   const [agentId, setAgentId] = useState("manager");
   const [profile, setProfile] = useState<GroupProfile | null>(null);
+  const [projects, setProjects] = useState<DirectoryProject[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [localSendVersion, setLocalSendVersion] = useState(0);
   const snapshot = group.snapshot;
@@ -44,6 +47,29 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
 
   const agents = snapshot?.agents || [];
   const members = snapshot?.members || [];
+  const sidebarProjects = useMemo<DirectoryProject[]>(() => projects.length ? projects : group.rooms.map((room) => ({
+    id: room.projectId,
+    projectId: room.projectId,
+    name: room.name.replace(/\s*项目群$/u, ""),
+    kind: "personal",
+  })), [group.rooms, projects]);
+  const activeProjectId = sidebarProjects.find((entry) => entry.kind !== "employee"
+    && (entry.projectId || entry.id) === snapshot?.projectId)?.id || "";
+  const activeProject = sidebarProjects.find((entry) => entry.id === activeProjectId);
+  const sidebarWorkspaceName = activeProject?.root?.split(/[\\/]/u).filter(Boolean).slice(-1)[0]
+    || activeProject?.name
+    || snapshot?.project
+    || "Negus";
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void projectDirectoryApi.list(controller.signal)
+      .then((next) => {
+        if (!controller.signal.aborted) setProjects(next);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
 
   return (
     <>
@@ -53,8 +79,19 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
         onCloseSidebar={() => setSidebarOpen(false)}
         sidebar={
           <div className={styles.sidebarContent}>
-            <RoomSidebar project={snapshot?.project || "Negus"} members={members} onOpenProfile={(member) => { setProfile({ kind: "member", profile: member }); setSidebarOpen(false); }} />
-            <AgentRoster agents={agents} onOpenProfile={(agent) => { setProfile({ kind: "agent", profile: agent }); setSidebarOpen(false); }} />
+            <SidebarHeader />
+            <ProjectNavigationDirectory
+              workspaceName={sidebarWorkspaceName}
+              projects={sidebarProjects}
+              activeProjectId={activeProjectId}
+              onProjectOpen={(project) => {
+                const projectId = project.projectId || project.id;
+                const room = group.rooms.find((entry) => entry.projectId === projectId)
+                  || (snapshot?.projectId === projectId ? snapshot.room : null);
+                if (room) group.selectRoom(room.id);
+              }}
+              onOpened={() => setSidebarOpen(false)}
+            />
           </div>
         }
         header={
@@ -111,6 +148,7 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
       <MemberDialog initialName={group.member?.name || ""} open={!group.member} onSubmit={join} />
       <MemberProfileDrawer
         profile={profile}
+        roomId={group.roomId}
         onClose={() => setProfile(null)}
         onAgentUpdated={(agent) => setProfile({ kind: "agent", profile: agent })}
       />

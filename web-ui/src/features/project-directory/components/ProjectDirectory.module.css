@@ -1,5 +1,7 @@
 .directory { min-width: 0; min-height: 0; overflow-y: auto; border-bottom: 1px solid var(--color-border); padding: 8px 7px 9px; }
 .projectList { display: grid; gap: 2px; }
+.sectionLabel { padding: 3px 9px 4px; color: var(--color-text-muted); font-size: 11px; font-weight: 600; }
+.employeeSectionLabel { margin-top: 7px; border-top: 1px solid var(--color-border); padding-top: 10px; }
 .projectBlock { min-width: 0; }
 .project { display: flex; width: 100%; min-width: 0; min-height: 38px; align-items: center; gap: 9px; padding: 0 9px; border: 0; border-radius: 6px; background: transparent; color: var(--color-text); cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; text-align: left; }
 .project:hover { background: var(--color-surface-hover); }

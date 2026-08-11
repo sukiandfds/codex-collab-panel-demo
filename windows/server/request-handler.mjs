@@ -14,13 +14,13 @@ import { createEmployeeGrowthRoutes } from "./routes/employee-growth-routes.mjs"
 
 export const createRequestHandler = ({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime, submissions,
-  followUpQueue, contextManagement, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
+  followUpQueue, contextManagement, groupRoom, roomDirectory, multiAgent, multiAgentDirectory, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
   agentConversationStore, agentPublicationService, runtimeRegistry,
   employeeRuntime, employeeProjectDirectory, employeeGrowth,
 }) => {
   const routes = [
     createVersionRoutes({ readWebVersion }),
-    createArtifactRoutes({ groupRoom, artifacts, webOutputs }),
+    createArtifactRoutes({ groupRoom, roomDirectory, artifacts, webOutputs }),
     createAgentPublicationRoutes({
       conversationStore: agentConversationStore,
       publicationService: agentPublicationService,
@@ -30,7 +30,7 @@ export const createRequestHandler = ({
     ...(employeeRuntime ? [createEmployeeRoutes({ employeeRuntime })] : []),
     ...(employeeProjectDirectory ? [createEmployeeProjectDirectoryRoutes({ directory: employeeProjectDirectory })] : []),
     ...(employeeGrowth ? [createEmployeeGrowthRoutes({ growth: employeeGrowth })] : []),
-    createGroupRoutes({ groupRoom, media, multiAgent, webOutputs }),
+    createGroupRoutes({ groupRoom, roomDirectory, media, multiAgent, multiAgentDirectory, webOutputs }),
     createFollowUpQueueRoutes({ queue: followUpQueue, media }),
     createConversationRoutes({
       conversations, execution, followUpQueue, contextManagement, media, submissionStore: submissions,
@@ -38,6 +38,7 @@ export const createRequestHandler = ({
       publishThreadEvent: execution.publishThreadEvent,
       agentConversationStore,
       employeeRuntime,
+      roomDirectory,
     }),
     createUsageRoutes({ fushengUsage }),
     createSystemRoutes({ token, project, projectRoot, device, observerPort, media, realtime }),

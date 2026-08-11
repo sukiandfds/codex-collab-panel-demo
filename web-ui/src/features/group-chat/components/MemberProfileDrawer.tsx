@@ -9,8 +9,9 @@ import { groupApi } from "../data/groupApi";
 import type { GroupAgent, GroupProfile } from "../model/types";
 import styles from "./MemberProfileDrawer.module.css";
 
-export function MemberProfileDrawer({ profile, onClose, onAgentUpdated }: {
+export function MemberProfileDrawer({ profile, roomId, onClose, onAgentUpdated }: {
   profile: GroupProfile | null;
+  roomId: string;
   onClose: () => void;
   onAgentUpdated: (agent: GroupAgent) => void;
 }) {
@@ -77,7 +78,7 @@ export function MemberProfileDrawer({ profile, onClose, onAgentUpdated }: {
     setApplying(true);
     setError("");
     try {
-      const updated = await groupApi.updateAgentSettings(agent.id, draftModel, draftEffort);
+      const updated = await groupApi.updateAgentSettings(agent.id, draftModel, draftEffort, roomId);
       onAgentUpdated(updated);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));

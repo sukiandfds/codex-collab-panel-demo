@@ -114,12 +114,6 @@ contextManagement = await createContextManagementService({
   getRuntimeContext: conversations.getRuntimeContext,
   compactContext: conversations.compactContext,
 });
-const groupRoom = await createGroupRoomStore({
-  stateFile: path.join(projectRoot, "runtime", "group-room.json"),
-  project,
-  broadcast: realtime.broadcast,
-});
-const groupRoomDirectory = createGroupRoomDirectory({ rooms: [groupRoom] });
 const employeeRegistry = await createEmployeeProjectRegistry({
   stateFile: path.join(projectRoot, "runtime", "employee-projects.json"),
   workspaceRoot: projectRoot,
@@ -130,6 +124,65 @@ const projectIdentity = await createProjectIdentityStore({
   projectRoot,
   registry: employeeRegistry,
 });
+const projectIdentities = projectIdentity.list();
+const roomIdForProject = (identity) => identity.kind === "personal"
+  ? "current-project"
+  : `project-room:${identity.projectId}`;
+const broadcastEmployeeGroupMessage = async ({ message, projectId, roomId }) => {
+  const employeeId = String(message?.agentId || message?.authorId || "").trim();
+  const employee = employeeRegistry.get(employeeId);
+  const roomStore = groupRoomDirectory?.get?.(roomId);
+  const agent = roomStore?.getAgent?.(employeeId);
+  const threadId = String(agent?.threadId || "").trim();
+  if (!employee || !roomStore || !threadId || message?.type !== "agent") return;
+  const binding = await employeeConversationStore?.openGroupForAgent?.({
+    agentId: employeeId,
+    roomId,
+    projectId,
+    threadId,
+    title: `${roomStore.snapshot().room.name} · ${agent.name}`,
+  });
+  if (!binding) return;
+  const projectedMessage = {
+    id: `group:${roomId}:${message.id}`,
+    role: "assistant",
+    text: String(message.text || ""),
+    createdAt: message.createdAt,
+    source: "group",
+    projectId,
+    roomId,
+    groupMessageId: message.id,
+  };
+  realtime.broadcast({
+    type: "employee_message_completed",
+    employeeId,
+    threadId,
+    conversationId: binding.conversationId,
+    message: projectedMessage,
+    source: "group",
+    projectId,
+    roomId,
+  });
+  realtime.broadcast({ type: "sessions_changed", threadId, conversationId: binding.conversationId, employeeId, source: "group", projectId, roomId });
+};
+const groupRoomEntries = await Promise.all(projectIdentities.map(async (identity) => {
+  const roomId = roomIdForProject(identity);
+  const stateFile = identity.kind === "personal"
+    ? path.join(projectRoot, "runtime", "group-room.json")
+    : path.join(projectRoot, "runtime", "group-rooms", `${encodeURIComponent(identity.projectId)}.json`);
+  const room = await createGroupRoomStore({
+    stateFile,
+    project: identity.name,
+    projectId: identity.projectId,
+    roomId,
+    broadcast: realtime.broadcast,
+    onMessageCreated: broadcastEmployeeGroupMessage,
+  });
+  return { identity, room };
+}));
+const groupRoom = groupRoomEntries.find(({ identity }) => identity.kind === "personal")?.room
+  || groupRoomEntries[0]?.room;
+const groupRoomDirectory = createGroupRoomDirectory({ rooms: groupRoomEntries.map(({ room }) => room) });
 const employeeConversationStore = await createAgentConversationStore({
   stateFile: path.join(projectRoot, "runtime", "employee-conversations.json"),
   historyRoot: path.join(projectRoot, "runtime", "employee-conversations"),
@@ -165,6 +218,7 @@ const employeeProjectDirectory = createEmployeeProjectDirectory({
   conversations,
   execution,
   employeeConversations: employeeConversationStore,
+  roomDirectory: groupRoomDirectory,
 });
 legacyAgentConversationStore = await createAgentConversationStore({
   stateFile: path.join(projectRoot, "runtime", "agent-conversations.json"),
@@ -201,15 +255,20 @@ const resolveArtifactInputs = (artifactIds) => [...new Set(Array.isArray(artifac
       return [];
     }
   });
-const multiAgent = createMultiAgentService({
-  projectRoot,
-  room: groupRoom,
-  broadcast: realtime.broadcast,
-  webOutputs,
-  attachmentContent,
-  resolveAttachments: media.resolveMany,
-  resolveArtifacts: resolveArtifactInputs,
-});
+const multiAgentDirectory = new Map(groupRoomEntries.map(({ identity, room }) => {
+  const roomId = room.snapshot().room.id;
+  const service = createMultiAgentService({
+    projectRoot: identity.root || identity.roots?.project || projectRoot,
+    room,
+    broadcast: (event) => realtime.broadcast({ ...event, roomId }),
+    webOutputs,
+    attachmentContent,
+    resolveAttachments: media.resolveMany,
+    resolveArtifacts: resolveArtifactInputs,
+  });
+  return [roomId, service];
+}));
+const multiAgent = multiAgentDirectory.get(groupRoom.snapshot().room.id);
 const runtimeRegistry = createRuntimeAdapterRegistry({
   adapters: [createCodexRuntimeAdapter({
     conversations,
@@ -232,7 +291,7 @@ const serveStatic = createStaticFileServer(webRoot);
 const readWebVersion = createWebVersionReader(webRoot);
 const requestHandler = createRequestHandler({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime, submissions,
-  followUpQueue, contextManagement, groupRoom, multiAgent, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
+  followUpQueue, contextManagement, groupRoom, roomDirectory: groupRoomDirectory, multiAgent, multiAgentDirectory, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
   agentConversationStore, agentPublicationService, runtimeRegistry, employeeRuntime,
   employeeProjectDirectory, employeeGrowth,
 });
@@ -246,10 +305,10 @@ const close = () => {
   conversations.close();
   void imageGenerationRuns.close();
   void contextManagement.close();
-  multiAgent.close();
+  for (const service of new Set(multiAgentDirectory.values())) service.close();
   webOutputs.close();
   void artifacts.close();
-  void groupRoom.close();
+  for (const { room } of groupRoomEntries) void room.close();
   employeeRuntime.close();
   void employeeGrowthStore.close();
   void employeeConversationStore.close();

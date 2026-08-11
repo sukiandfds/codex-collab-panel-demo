@@ -59,13 +59,24 @@ export interface GroupActiveWork {
   phase: "working";
 }
 
+export interface GroupRoom {
+  id: string;
+  name: string;
+  projectId: string;
+}
+
 export interface GroupSnapshot {
   project: string;
-  room: { id: string; name: string };
+  projectId: string;
+  room: GroupRoom;
   messages: GroupMessage[];
   agents: GroupAgent[];
   members: GroupMember[];
   activeWorks?: GroupActiveWork[];
+}
+
+export interface GroupRoomListResponse {
+  rooms: GroupRoom[];
 }
 
 export type GroupProfile =
@@ -84,11 +95,11 @@ export interface GroupSendResponse {
 }
 
 export type GroupEvent =
-  | { type: "connected" }
-  | { type: "group_message_created"; message: GroupMessage }
-  | { type: "group_message_updated"; message: GroupMessage }
-  | { type: "group_agent_updated"; agent: GroupAgent }
-  | { type: "group_members_changed"; members: GroupMember[] }
-  | { type: "group_agent_started"; agentId: string; agentName: string; workId: string; mode: GroupMode; startedAt: string }
-  | { type: "group_agent_delta"; agentId: string; workId?: string; itemId: string; delta: string }
+  | { type: "connected"; roomId?: string }
+  | { type: "group_message_created"; roomId?: string; message: GroupMessage }
+  | { type: "group_message_updated"; roomId?: string; message: GroupMessage }
+  | { type: "group_agent_updated"; roomId?: string; agent: GroupAgent }
+  | { type: "group_members_changed"; roomId?: string; members: GroupMember[] }
+  | { type: "group_agent_started"; roomId?: string; agentId: string; agentName: string; workId: string; mode: GroupMode; startedAt: string }
+  | { type: "group_agent_delta"; roomId?: string; agentId: string; workId?: string; itemId: string; delta: string }
   | ArtifactRealtimeEvent;

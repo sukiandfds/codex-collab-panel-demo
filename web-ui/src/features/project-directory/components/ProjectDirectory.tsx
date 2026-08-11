@@ -1,7 +1,7 @@
 import { Folder, LoaderCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { postJson } from "../../../shared/api/http";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { ExecutionStatus } from "../../execution/model/types";
+import { openAgentConversation } from "../../agent-sharing/navigation/openAgentConversation";
 import { SessionList } from "../../conversations/components/SessionList";
 import type { ProjectInfo, SessionSummary } from "../../conversations/model/types";
 import type { DirectoryConversation, DirectoryProject, ProjectRuntimeStatus } from "../model/types";
@@ -64,12 +64,9 @@ interface ProjectDirectoryProps {
   onArchive: (threadId: string) => Promise<boolean>;
   onUnarchive: (threadId: string) => Promise<boolean>;
   onOpened?: () => void;
-}
-
-interface OpenEmployeeConversationResponse {
-  conversationId: string;
-  runtimeKind: string;
-  threadId: string | null;
+  activeProjectId?: string;
+  navigationOnly?: boolean;
+  onProjectOpen?: (project: DirectoryProject) => void | Promise<void>;
 }
 
 export function ProjectDirectory({
@@ -90,6 +87,9 @@ export function ProjectDirectory({
   onArchive,
   onUnarchive,
   onOpened,
+  activeProjectId,
+  navigationOnly = false,
+  onProjectOpen,
 }: ProjectDirectoryProps) {
   const params = new URLSearchParams(window.location.search);
   const routeEmployeeId = params.get("employeeId") || params.get("agent") || "";
@@ -98,7 +98,8 @@ export function ProjectDirectory({
   const namedProjects = useMemo(() => projects.map((entry) => entry.kind === "personal"
     ? { ...entry, name: workspaceName, root: project?.root || entry.root }
     : entry), [project?.root, projects, workspaceName]);
-  const currentProject = useMemo<DirectoryProject | null>(() => namedProjects.find((entry) => entry.employeeId === routeEmployeeId)
+  const currentProject = useMemo<DirectoryProject | null>(() => namedProjects.find((entry) => entry.id === activeProjectId)
+    || namedProjects.find((entry) => entry.employeeId === routeEmployeeId)
     || namedProjects.find((entry) => entry.mainThreadId === routeThreadId
       || entry.mainConversationId === routeConversationId
       || entry.conversations?.some((conversation) => (
@@ -107,14 +108,15 @@ export function ProjectDirectory({
         || conversation.id === selectedId
       )))
     || namedProjects.find((entry) => entry.kind === "personal")
-    || (project ? { id: "current", name: workspaceName, root: project.root, kind: "personal", lastActivityAt: sessions[0]?.updatedAt } : null), [namedProjects, project, routeConversationId, routeEmployeeId, routeThreadId, selectedId, sessions, workspaceName]);
+    || (project ? { id: "current", name: workspaceName, root: project.root, kind: "personal", lastActivityAt: sessions[0]?.updatedAt } : null), [activeProjectId, namedProjects, project, routeConversationId, routeEmployeeId, routeThreadId, selectedId, sessions, workspaceName]);
   const [selectedProjectId, setSelectedProjectId] = useState(currentProject?.id || "");
   const [openingProjectId, setOpeningProjectId] = useState("");
   const [openError, setOpenError] = useState("");
   const visibleProjects = useMemo(() => {
     const source = namedProjects.length ? namedProjects : currentProject ? [currentProject] : [];
     return source.map((entry, index) => ({ entry, index })).sort((left, right) => (
-      timeValue(right.entry.lastActivityAt) - timeValue(left.entry.lastActivityAt)
+      Number(left.entry.kind === "employee") - Number(right.entry.kind === "employee")
+      || timeValue(right.entry.lastActivityAt) - timeValue(left.entry.lastActivityAt)
       || left.index - right.index
     )).map(({ entry }) => entry);
   }, [currentProject, namedProjects]);
@@ -122,23 +124,6 @@ export function ProjectDirectory({
   useEffect(() => {
     if (currentProject?.id) setSelectedProjectId(currentProject.id);
   }, [currentProject?.id, routeConversationId, routeEmployeeId, routeThreadId, selectedId]);
-
-  const navigateEmployeeConversation = (entry: DirectoryProject, conversation: DirectoryConversation) => {
-    const params = new URLSearchParams(window.location.search);
-    params.delete("view");
-    params.delete("archived");
-    params.delete("employee");
-    params.delete("employeeId");
-    params.set("agent", entry.employeeId || "");
-    if (conversation.threadId) params.set("thread", conversation.threadId);
-    else params.delete("thread");
-    if (conversation.conversationId) params.set("conversation", conversation.conversationId);
-    else params.delete("conversation");
-    const query = params.toString();
-    window.history.pushState({ surface: "conversation", agentId: entry.employeeId, threadId: conversation.threadId }, "", `/${query ? `?${query}` : ""}`);
-    window.dispatchEvent(new Event("negus:navigate"));
-    onOpened?.();
-  };
 
   const openConversation = async (entry: DirectoryProject, conversation: DirectoryConversation) => {
     if (!entry.employeeId) {
@@ -150,19 +135,12 @@ export function ProjectDirectory({
     setOpenError("");
     setOpeningProjectId(entry.id);
     try {
-      if (!conversation.pendingOpen) {
-        navigateEmployeeConversation(entry, conversation);
-        return;
-      }
-      const result = await postJson<OpenEmployeeConversationResponse>("/api/agent-conversations/open", { agentId: entry.employeeId });
-      if (!result.threadId) throw new Error("当前 Runtime 暂不支持此单聊页面");
-      navigateEmployeeConversation(entry, {
-        ...conversation,
-        pendingOpen: false,
-        threadId: result.threadId,
-        conversationId: result.conversationId || null,
-        id: result.threadId,
+      await openAgentConversation({
+        agentId: entry.employeeId,
+        threadId: conversation.pendingOpen ? "" : conversation.threadId,
+        conversationId: conversation.pendingOpen ? "" : conversation.conversationId,
       });
+      onOpened?.();
     } catch (reason) {
       setOpenError(reason instanceof Error ? reason.message : "暂时无法进入单聊");
     } finally {
@@ -176,10 +154,12 @@ export function ProjectDirectory({
         {openError ? <span className={styles.error} role="alert">{openError}</span> : null}
         {loading && !visibleProjects.length ? <span className={styles.muted}>正在读取项目</span> : null}
         {!loading && error && !visibleProjects.length ? <span className={styles.muted}>项目状态暂不可用</span> : null}
-        {visibleProjects.map((entry) => {
+        {visibleProjects.map((entry, index) => {
           const isCurrent = entry.id === currentProject?.id;
           const isSelected = entry.id === selectedProjectId;
           const isPersonal = entry.kind === "personal";
+          const isEmployee = entry.kind === "employee";
+          const startsSection = index === 0 || isEmployee !== (visibleProjects[index - 1]?.kind === "employee");
           const usesSessionFallback = isPersonal && !entry.conversations?.length;
           const conversations = isPersonal
             ? entry.conversations?.length ? entry.conversations : sessions.map((session, index) => ({ id: session.threadId, threadId: session.threadId, title: session.title, main: index === 0, lastActivityAt: session.updatedAt, messageCount: session.messageCount, archived: session.archived }))
@@ -189,13 +169,37 @@ export function ProjectDirectory({
             ? statusByThread[currentStatus.threadId] || currentStatus
             : entry.mainThreadId ? statusByThread[entry.mainThreadId] || entry.status : entry.status;
           return (
-            <div className={styles.projectBlock} key={entry.id}>
-              <button className={`${styles.project} ${isSelected ? styles.active : ""}`} type="button" aria-expanded={isSelected} onClick={() => setSelectedProjectId((current) => current === entry.id ? "" : entry.id)}>
+            <Fragment key={entry.id}>
+              {startsSection ? (
+                <div className={`${styles.sectionLabel} ${isEmployee ? styles.employeeSectionLabel : ""}`}>
+                  {isEmployee ? "员工项目" : "项目"}
+                </div>
+              ) : null}
+              <div className={styles.projectBlock}>
+              <button
+                className={`${styles.project} ${isSelected ? styles.active : ""}`}
+                type="button"
+                aria-expanded={navigationOnly ? undefined : isSelected}
+                onClick={() => {
+                  if (!navigationOnly) {
+                    setSelectedProjectId((current) => current === entry.id ? "" : entry.id);
+                    return;
+                  }
+                  if (isEmployee) {
+                    const mainConversation = conversations.find((conversation) => conversation.main) || conversations[0];
+                    if (mainConversation) void openConversation(entry, mainConversation);
+                    return;
+                  }
+                  setSelectedProjectId(entry.id);
+                  void onProjectOpen?.(entry);
+                  onOpened?.();
+                }}
+              >
                 {openingProjectId === entry.id ? <LoaderCircle className={styles.spinner} aria-hidden="true" /> : <Folder aria-hidden="true" />}
                 <span className={styles.projectText}><strong>{entry.name || "未命名项目"}</strong></span>
                 <ProjectStatusBadge status={projectStatus} compact />
               </button>
-              {isSelected ? (
+              {!navigationOnly && isSelected ? (
                 <div className={styles.sessionSlot}>
                   <SessionList
                     sessions={projectSessions}
@@ -215,10 +219,47 @@ export function ProjectDirectory({
                   />
                 </div>
               ) : null}
-            </div>
+              </div>
+            </Fragment>
           );
         })}
       </div>
     </nav>
+  );
+}
+
+const unavailableArchiveAction = async () => false;
+
+export function ProjectNavigationDirectory({ workspaceName, projects, activeProjectId, loading = false, error = "", onProjectOpen, onOpened }: {
+  workspaceName: string;
+  projects: DirectoryProject[];
+  activeProjectId?: string;
+  loading?: boolean;
+  error?: string;
+  onProjectOpen: (project: DirectoryProject) => void | Promise<void>;
+  onOpened?: () => void;
+}) {
+  return (
+    <ProjectDirectory
+      project={null}
+      workspaceName={workspaceName}
+      projects={projects}
+      loading={loading}
+      error={error}
+      sessions={[]}
+      selectedId=""
+      statusByThread={{}}
+      sessionsLoading={false}
+      sessionsError=""
+      archivedView={false}
+      archiveBusyId=""
+      onSelect={() => {}}
+      onArchive={unavailableArchiveAction}
+      onUnarchive={unavailableArchiveAction}
+      onOpened={onOpened}
+      activeProjectId={activeProjectId}
+      navigationOnly
+      onProjectOpen={onProjectOpen}
+    />
   );
 }

@@ -14,7 +14,7 @@ const publicAttachment = ({ id, name, mimeType, url, width, height, readStatus, 
 export const createConversationRoutes = ({
   conversations, execution, followUpQueue, contextManagement, media, submissionStore,
   broadcast = () => {}, publishThreadEvent = (_threadId, event) => broadcast(event), agentConversationStore,
-  employeeRuntime,
+  employeeRuntime, roomDirectory,
 }) => {
   const inFlightSubmissions = new Map();
   const submissionTtlMs = 60000;
@@ -80,7 +80,7 @@ export const createConversationRoutes = ({
     return promise;
   };
 
-  const authorizeAgentThread = async ({ threadId, conversationId }) => {
+  const authorizeAgentThread = async ({ threadId, conversationId, allowGroup = false }) => {
     if (!agentConversationStore) return null;
     const cleanThreadId = String(threadId || "").trim();
     const cleanConversationId = String(conversationId || "").trim();
@@ -94,6 +94,7 @@ export const createConversationRoutes = ({
     const binding = await agentConversationStore.resolve({ conversationId: cleanConversationId });
     const allowed = binding.runtimeSessionId === cleanThreadId;
     if (!allowed) throw Object.assign(new Error("conversationId 与 threadId 不匹配"), { statusCode: 409 });
+    if (binding.conversationKind === "group" && allowGroup) return binding;
     if (binding.conversationKind !== "direct") {
       throw Object.assign(new Error("Agent 单聊尚未绑定独立 Thread"), { statusCode: 409 });
     }
@@ -106,7 +107,48 @@ export const createConversationRoutes = ({
       && employeeRuntime.ownsConversation?.(binding),
   );
 
+  const readGroupAgentSession = (binding, pagination = {}) => {
+    const room = roomDirectory?.get?.(binding.roomId);
+    const snapshot = room?.snapshot?.();
+    const allMessages = (snapshot?.messages || [])
+      .filter((message) => message?.type === "agent"
+        && (message.agentId === binding.agentId || message.authorId === binding.agentId)
+        && String(message.text || "").trim())
+      .map((message) => ({
+        id: `group:${binding.roomId}:${message.id}`,
+        role: "assistant",
+        text: String(message.text || ""),
+        createdAt: message.createdAt,
+        source: "group",
+        projectId: binding.projectId,
+        roomId: binding.roomId,
+        groupMessageId: message.id,
+      }));
+    const end = Math.min(Number.isSafeInteger(pagination.before) ? pagination.before : allMessages.length, allMessages.length);
+    const start = pagination.limit ? Math.max(0, end - pagination.limit) : 0;
+    const messages = allMessages.slice(start, end);
+    const latest = allMessages[allMessages.length - 1];
+    return {
+      threadId: binding.runtimeSessionId,
+      source: "codex",
+      title: binding.title || `${snapshot?.room?.name || "项目群"} · 员工回复`,
+      updatedAt: latest?.createdAt || "",
+      messageCount: allMessages.length,
+      latestUser: "",
+      latestAssistant: latest?.text || "",
+      archived: false,
+      conversationKind: "group",
+      readOnly: true,
+      messages,
+      hasMore: start > 0,
+      nextBefore: start || null,
+      nextCursor: null,
+      conversationId: binding.conversationId,
+    };
+  };
+
   const readAgentSession = async (binding, source, pagination) => {
+    if (binding.conversationKind === "group") return readGroupAgentSession(binding, pagination);
     const localMessages = await agentConversationStore.readMessages(binding.conversationId);
     let runtime = null;
     try {
@@ -128,6 +170,13 @@ export const createConversationRoutes = ({
     const ordered = [...messages.values()].sort((left, right) => (
       Date.parse(left.createdAt || "") - Date.parse(right.createdAt || "")
     ));
+    const latestUser = [...ordered].reverse().find((message) => message.role === "user")?.text || "";
+    const latestAssistant = [...ordered].reverse().find((message) => message.role === "assistant")?.text || "";
+    const updatedAt = ordered.reduce((latest, message) => {
+      const value = Date.parse(message.createdAt || "");
+      const latestValue = Date.parse(latest || "");
+      return Number.isFinite(value) && (!Number.isFinite(latestValue) || value > latestValue) ? message.createdAt : latest;
+    }, runtime?.updatedAt || "");
     return {
       ...(runtime || {
         threadId: binding.runtimeSessionId,
@@ -140,6 +189,9 @@ export const createConversationRoutes = ({
         archived: false,
       }),
       threadId: binding.runtimeSessionId,
+      latestUser,
+      latestAssistant,
+      updatedAt,
       messages: ordered,
       messageCount: ordered.length,
       hasMore: false,
@@ -510,7 +562,7 @@ export const createConversationRoutes = ({
     const conversationId = String(url.searchParams.get("conversationId") || "").trim();
     if (conversationId && agentConversationStore) {
       const binding = await agentConversationStore.resolve({ conversationId });
-      if (binding.conversationKind !== "direct") {
+      if (binding.conversationKind !== "direct" && binding.conversationKind !== "group") {
         sendJson(response, { error: "该 Agent 对话不是独立单聊" }, 409);
         return true;
       }
@@ -540,7 +592,7 @@ export const createConversationRoutes = ({
     const conversationId = url.searchParams.get("conversationId") || "";
     const source = url.searchParams.get("source") || "all";
     const pagination = paginationFrom(url);
-    const binding = await authorizeAgentThread({ threadId, conversationId });
+    const binding = await authorizeAgentThread({ threadId, conversationId, allowGroup: true });
     const session = binding
       ? await readAgentSession(binding, source, pagination)
       : await conversations.findSession(threadId, source, pagination);

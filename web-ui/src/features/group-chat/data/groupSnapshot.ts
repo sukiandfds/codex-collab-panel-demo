@@ -3,6 +3,10 @@ import { keepUnacknowledgedMessages, upsertGroupMessage } from "./groupMessageSt
 import type { GroupMessage, GroupSnapshot } from "../model/types";
 
 const storageKey = "negus-group-snapshot-v1";
+const storageKeyFor = (roomId: string) => roomId
+  && roomId !== "current-project"
+  ? `${storageKey}:${encodeURIComponent(roomId)}`
+  : storageKey;
 const messageLimit = 80;
 const maxBytes = 384 * 1024;
 
@@ -58,9 +62,9 @@ export const reconcileGroupSnapshot = (
   });
 };
 
-export const readGroupSnapshot = (): GroupSnapshot | null => {
+export const readGroupSnapshot = (roomId = ""): GroupSnapshot | null => {
   try {
-    const snapshot = JSON.parse(window.localStorage.getItem(storageKey) || "null") as GroupSnapshot | null;
+    const snapshot = JSON.parse(window.localStorage.getItem(storageKeyFor(roomId)) || "null") as GroupSnapshot | null;
     if (!validSnapshot(snapshot)) return null;
     return {
       ...snapshot,
@@ -84,16 +88,16 @@ export const writeGroupSnapshot = (snapshot: GroupSnapshot) => {
       activeWorks: [],
     };
     const serialized = JSON.stringify(cached);
-    if (serialized.length <= maxBytes) window.localStorage.setItem(storageKey, serialized);
+    if (serialized.length <= maxBytes) window.localStorage.setItem(storageKeyFor(snapshot.room.id), serialized);
   } catch {
     // Storage may be unavailable in private or restricted mobile browsers.
   }
 };
 
 let prefetch: Promise<void> | null = null;
-export const prefetchGroupSnapshot = () => {
+export const prefetchGroupSnapshot = (roomId = "") => {
   if (!prefetch) {
-    prefetch = groupApi.snapshot()
+    prefetch = groupApi.snapshot(roomId)
       .then(writeGroupSnapshot)
       .catch(() => {})
       .finally(() => { prefetch = null; });

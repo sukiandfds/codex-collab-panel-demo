@@ -40,6 +40,8 @@ export interface SessionSummary {
   latestAssistant: string;
   archived?: boolean;
   archivable?: boolean;
+  conversationKind?: string;
+  readOnly?: boolean;
   forkedFromId?: string | null;
 }
 

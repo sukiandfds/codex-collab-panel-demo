@@ -43,6 +43,7 @@ export const createEmployeeProjectDirectory = ({
   conversations,
   execution,
   employeeConversations,
+  roomDirectory,
   personalStatus,
 }) => {
   const readEmployeeStatus = async (employeeId) => {
@@ -75,6 +76,46 @@ export const createEmployeeProjectDirectory = ({
     return latestTimestamp(timestamps);
   };
 
+  const groupConversationsFor = async (employee, conversationStatuses) => {
+    const rooms = roomDirectory?.listForAgent?.(employee.id) || [];
+    const entries = await Promise.all(rooms.map(async (room) => {
+      const roomStore = roomDirectory?.get?.(room.id);
+      const agent = roomStore?.getAgent?.(employee.id);
+      const threadId = clean(agent?.threadId, 120);
+      if (!roomStore || !threadId) return null;
+      const binding = await employeeConversations?.openGroupForAgent?.({
+        agentId: employee.id,
+        roomId: room.id,
+        projectId: room.projectId,
+        threadId,
+        title: `${clean(room.name, 200) || "项目群"} · ${clean(agent.name, 120) || employee.name}`,
+      });
+      if (!binding) return null;
+      const messages = roomStore.snapshot().messages
+        .filter((message) => message?.type === "agent"
+          && (message.agentId === employee.id || message.authorId === employee.id)
+          && String(message.text || "").trim());
+      const lastActivityAt = latestTimestamp(messages.map((message) => message.createdAt));
+      const status = publicStatus(agent);
+      const statusKey = clean(binding.runtimeSessionId, 120);
+      if (statusKey) conversationStatuses[statusKey] = status;
+      return {
+        id: binding.conversationId,
+        threadId: binding.runtimeSessionId,
+        conversationId: binding.conversationId,
+        projectId: clean(room.projectId, 200) || null,
+        role: "project",
+        runtimeKind: binding.runtimeKind,
+        runtimeSessionId: binding.runtimeSessionId,
+        title: binding.title || `${clean(room.name, 200) || "项目群"} · 员工回复`,
+        main: false,
+        lastActivityAt,
+        status,
+      };
+    }));
+    return entries.filter(Boolean);
+  };
+
   const list = async () => {
     const employees = registry?.list?.() || [];
     try { await projectIdentity?.sync?.(); } catch {}
@@ -90,8 +131,29 @@ export const createEmployeeProjectDirectory = ({
       const mainThreadId = clean(employee.mainThreadId || boundConversation?.threadId || boundConversation?.runtimeSessionId, 120) || null;
       const status = await readEmployeeStatus(employee.id);
       const statusKey = clean(mainThreadId || mainConversationId, 120);
-      const lastActivityAt = await employeeLastActivity({ ...employee, conversationId: mainConversationId, mainThreadId });
+      const mainLastActivityAt = await employeeLastActivity({ ...employee, conversationId: mainConversationId, mainThreadId });
+      const groupConversations = await groupConversationsFor(employee, conversationStatuses);
+      const lastActivityAt = latestTimestamp([
+        mainLastActivityAt,
+        ...groupConversations.map((conversation) => conversation.lastActivityAt),
+      ]);
       if (statusKey) conversationStatuses[statusKey] = status;
+      const employeeConversationEntries = [
+        ...(mainThreadId || mainConversationId ? [{
+          id: clean(mainThreadId || mainConversationId, 120),
+          threadId: mainThreadId,
+          conversationId: mainConversationId,
+          projectId: clean(identity?.projectId, 200) || clean(employee.projectKey, 120) || `employee-${employee.id}`,
+          role: "main",
+          runtimeKind: clean(boundConversation?.runtimeKind || employee.runtimeKind, 80) || "codex",
+          runtimeSessionId: clean(boundConversation?.runtimeSessionId || mainThreadId, 200) || null,
+          title: "主对话",
+          main: true,
+          lastActivityAt: mainLastActivityAt,
+          status,
+        }] : []),
+        ...groupConversations,
+      ];
       return {
         id: clean(employee.projectKey, 120) || `employee-${employee.id}`,
         projectId: clean(identity?.projectId, 200) || clean(employee.projectKey, 120) || `employee-${employee.id}`,
@@ -112,19 +174,7 @@ export const createEmployeeProjectDirectory = ({
         mainThreadId,
         status,
         lastActivityAt,
-        conversations: mainThreadId || mainConversationId ? [{
-          id: clean(mainThreadId || mainConversationId, 120),
-          threadId: mainThreadId,
-          conversationId: mainConversationId,
-          projectId: clean(identity?.projectId, 200) || clean(employee.projectKey, 120) || `employee-${employee.id}`,
-          role: "main",
-          runtimeKind: clean(boundConversation?.runtimeKind || employee.runtimeKind, 80) || "codex",
-          runtimeSessionId: clean(boundConversation?.runtimeSessionId || mainThreadId, 200) || null,
-          title: "主对话",
-          main: true,
-          lastActivityAt,
-          status,
-        }] : [],
+        conversations: employeeConversationEntries,
       };
     }));
     let sessions = [];

@@ -11,7 +11,6 @@ import { ExecutionTimeline } from "../../execution/components/ExecutionTimeline"
 import type { ExecutionStatus } from "../../execution/model/types";
 import type { ContextStatus } from "../../context-management/model/types";
 import styles from "./ConversationView.module.css";
-import { EmployeeGrowthPanel } from "../../employee-growth/components/EmployeeGrowthPanel";
 
 const padTimePart = (value: number) => String(value).padStart(2, "0");
 
@@ -131,8 +130,7 @@ interface ConversationViewProps {
 
 type ConversationItem =
   | { id: string; type: "message"; message: SessionMessage; streaming: boolean }
-  | { id: string; type: "execution" }
-  | { id: string; type: "growth" };
+  | { id: string; type: "execution" };
 
 export function ConversationView({
   active = true,
@@ -219,27 +217,14 @@ export function ConversationView({
       },
       streaming: executionStatus.active && !completedExecution,
     }] : []),
-    ...(agentScoped ? [{ id: "employee-growth", type: "growth" as const }] : []),
   ];
-  const latestConversationIndex = visibleItems.reduce(
-    (latestIndex, item, index) => item.type === "growth" ? latestIndex : index,
-    -1,
-  );
   const hasVisibleItems = visibleItems.length > 0;
-  const latestFollowIndex = latestConversationIndex >= 0 ? latestConversationIndex : Math.max(0, visibleItems.length - 1);
-  const trailingContentHeightRef = useRef(agentScoped ? 260 : 0);
-  const trailingContentScopeRef = useRef(agentScoped);
-  if (trailingContentScopeRef.current !== agentScoped) {
-    trailingContentScopeRef.current = agentScoped;
-    trailingContentHeightRef.current = agentScoped ? 260 : 0;
-  }
-  const getTrailingContentHeight = useCallback(() => trailingContentHeightRef.current, []);
+  const latestFollowIndex = Math.max(0, visibleItems.length - 1);
   const virtualizer = useVirtualizer({
     count: visibleItems.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: (index) => visibleItems[index]?.type === "execution"
       ? 120
-      : visibleItems[index]?.type === "growth" ? 260
       : visibleItems[index]?.message.role === "user" ? 84 : 160,
     overscan: 6,
     getItemKey: (index) => visibleItems[index]?.id || index,
@@ -264,6 +249,7 @@ export function ConversationView({
   }, [active, latestFollowIndex, rememberScrollPosition, virtualizer, visibleItems.length]);
 
   const getScrollElement = useCallback(() => scrollRef.current, []);
+  const getTrailingContentHeight = useCallback(() => 0, []);
   const {
     visible: showReturnToBottom,
     stickToBottomRef,
@@ -304,7 +290,7 @@ export function ConversationView({
         rememberScrollPosition(root, threadId);
       } else {
         virtualizer.scrollToOffset(savedTop, { align: "start" });
-        resetReturnToBottom(isNearBottom(root, trailingContentHeightRef.current));
+        resetReturnToBottom(isNearBottom(root, 0));
         rememberScrollPosition(root, threadId);
       }
     }
@@ -463,16 +449,11 @@ export function ConversationView({
                   key={virtualRow.key}
                   ref={(element) => {
                     virtualizer.measureElement(element);
-                    if (item.type === "growth" && element) {
-                      trailingContentHeightRef.current = element.getBoundingClientRect().height;
-                    }
                   }}
                   style={{ transform: `translateY(${virtualRow.start}px)` }}
                 >
                   {item.type === "execution"
                     ? <ExecutionTimeline status={executionStatus} contextStatus={contextStatus} />
-                    : item.type === "growth"
-                      ? <EmployeeGrowthPanel />
                     : (
                       <Message
                         message={item.message}

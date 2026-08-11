@@ -1,13 +1,7 @@
 import { useState } from "react";
 import { LoaderCircle, MessageCircle } from "lucide-react";
-import { postJson } from "../../../shared/api/http";
+import { openAgentConversation } from "../navigation/openAgentConversation";
 import styles from "./AgentMessageLauncher.module.css";
-
-interface OpenAgentConversationResponse {
-  conversationId: string;
-  runtimeKind: string;
-  threadId: string | null;
-}
 
 export function AgentMessageLauncher({ agentId, onOpened }: { agentId: string; onOpened?: () => void }) {
   const [opening, setOpening] = useState(false);
@@ -18,18 +12,7 @@ export function AgentMessageLauncher({ agentId, onOpened }: { agentId: string; o
     setOpening(true);
     setError("");
     try {
-      const result = await postJson<OpenAgentConversationResponse>("/api/agent-conversations/open", { agentId });
-      if (!result.threadId) throw new Error("当前 Runtime 暂不支持此单聊页面");
-      const params = new URLSearchParams(window.location.search);
-      params.delete("view");
-      params.delete("archived");
-      params.delete("employee");
-      params.set("thread", result.threadId);
-      params.set("agent", agentId);
-      if (result.conversationId) params.set("conversation", result.conversationId);
-      const query = params.toString();
-      window.history.pushState({ surface: "conversation", agentId, threadId: result.threadId }, "", `/${query ? `?${query}` : ""}`);
-      window.dispatchEvent(new Event("negus:navigate"));
+      await openAgentConversation({ agentId });
       setOpening(false);
       onOpened?.();
     } catch (reason) {

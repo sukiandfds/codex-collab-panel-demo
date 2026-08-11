@@ -99,6 +99,9 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
       runtimeSessionId,
       runtimeSessions: normalizeRuntimeSessions(binding),
       conversationKind: clean(binding.conversationKind, 40) || "legacy",
+      roomId: clean(binding.roomId, 120) || null,
+      projectId: clean(binding.projectId, 200) || null,
+      title: clean(binding.title, 240) || null,
       createdAt: binding.createdAt || new Date().toISOString(),
       updatedAt: binding.updatedAt || binding.createdAt || new Date().toISOString(),
     });
@@ -132,21 +135,45 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
   const findByAgentKind = (agentId, conversationKind) => [...bindings.values()]
     .find((binding) => binding.agentId === agentId && binding.conversationKind === conversationKind) || null;
 
-  const bindRuntime = async ({ conversationId = "", agentId, runtimeKind = "codex", runtimeSessionId, conversationKind = "" }) => {
+  const findByAgentRoom = (agentId, roomId) => [...bindings.values()]
+    .find((binding) => binding.agentId === agentId
+      && binding.conversationKind === "group"
+      && binding.roomId === roomId) || null;
+
+  const bindRuntime = async ({
+    conversationId = "",
+    agentId,
+    runtimeKind = "codex",
+    runtimeSessionId,
+    conversationKind = "",
+    roomId = "",
+    projectId = "",
+    title = "",
+  }) => {
     const cleanAgentId = clean(agentId, 80);
     const cleanRuntimeKind = clean(runtimeKind, 40) || "codex";
     const cleanRuntimeSessionId = clean(runtimeSessionId, 120);
+    const requestedConversationKind = clean(conversationKind, 40);
+    const cleanRoomId = clean(roomId, 120);
     if (!cleanAgentId || !cleanRuntimeSessionId) throw statusError("Agent 对话绑定不完整", 400);
     if (!groupRoom.getAgent(cleanAgentId)) throw statusError("Agent 不存在", 404);
     const existing = clean(conversationId, 120)
       ? bindings.get(clean(conversationId, 120))
-      : conversationKind === "direct"
+      : requestedConversationKind === "direct"
         ? findByAgentKind(cleanAgentId, "direct")
-        : conversationKind === "legacy"
+        : requestedConversationKind === "legacy"
           ? findByAgentKind(cleanAgentId, "legacy")
-          : findByAgent(cleanAgentId);
+          : requestedConversationKind === "group"
+            ? findByAgentRoom(cleanAgentId, cleanRoomId)
+            : findByAgent(cleanAgentId);
+    const cleanConversationKind = requestedConversationKind || existing?.conversationKind || "direct";
     const runtimeBinding = findByRuntimeSession(cleanRuntimeKind, cleanRuntimeSessionId);
-    if (runtimeBinding && runtimeBinding.conversationId !== existing?.conversationId) {
+    const canShareRuntime = runtimeBinding
+      && existing?.conversationId !== runtimeBinding.conversationId
+      && runtimeBinding.agentId === cleanAgentId
+      && runtimeBinding.conversationKind !== "direct"
+      && cleanConversationKind !== "direct";
+    if (runtimeBinding && runtimeBinding.conversationId !== existing?.conversationId && !canShareRuntime) {
       throw statusError("Runtime 会话已绑定其他对话", 409);
     }
     const now = new Date().toISOString();
@@ -166,7 +193,10 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
       runtimeKind: cleanRuntimeKind,
       runtimeSessionId: cleanRuntimeSessionId,
       runtimeSessions,
-      conversationKind: clean(conversationKind, 40) || existing?.conversationKind || "direct",
+      conversationKind: cleanConversationKind || existing?.conversationKind || "direct",
+      roomId: cleanRoomId || existing?.roomId || null,
+      projectId: clean(projectId, 200) || existing?.projectId || null,
+      title: clean(title, 240) || existing?.title || null,
       createdAt: existing?.createdAt || now,
       updatedAt: now,
     };
@@ -221,6 +251,26 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
       runtimeKind,
       runtimeSessionId,
       conversationKind: "direct",
+    });
+  };
+
+  const openGroupForAgent = async ({ agentId, roomId, projectId = "", threadId = "", title = "" }) => {
+    const cleanAgentId = clean(agentId, 80);
+    const cleanRoomId = clean(roomId, 120);
+    const room = roomDirectory?.get?.(cleanRoomId)
+      || (groupRoom.snapshot().room.id === cleanRoomId ? groupRoom : null);
+    const agent = room?.getAgent(cleanAgentId);
+    const runtimeSessionId = clean(threadId, 120) || clean(agent?.threadId, 120);
+    if (!room || !agent || !runtimeSessionId) return null;
+    return bindRuntime({
+      conversationId: `group:${cleanRoomId}:${cleanAgentId}`,
+      agentId: cleanAgentId,
+      runtimeKind: "codex",
+      runtimeSessionId,
+      conversationKind: "group",
+      roomId: cleanRoomId,
+      projectId,
+      title,
     });
   };
 
@@ -319,6 +369,7 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
     openForAgent,
     findByAgent,
     findByAgentKind,
+    findByAgentRoom,
     findByRuntimeSession,
     readMessages,
     readMessage,
@@ -326,6 +377,7 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
     recordRuntimeMessage,
     recordRuntimeEvent,
     getShareTargets,
+    openGroupForAgent,
     close: () => writeQueue,
   };
 };

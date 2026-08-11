@@ -1,11 +1,9 @@
 import { Archive, ArchiveRestore, RefreshCw, SquarePen } from "lucide-react";
-import { useEffect, useState } from "react";
 import { SidebarHeader } from "../../../components/Sidebar/SidebarHeader";
 import type { ProjectInfo, SessionSummary } from "../model/types";
 import type { ExecutionStatus } from "../../execution/model/types";
 import { useProjectDirectory } from "../../project-directory/hooks/useProjectDirectory";
 import { ProjectDirectory } from "../../project-directory/components/ProjectDirectory";
-import { EmployeeCapabilityPanel } from "../../employee-capabilities/components/EmployeeCapabilityPanel";
 import { ConnectionStatus } from "./ConnectionStatus";
 import styles from "./ConversationSidebar.module.css";
 
@@ -52,17 +50,6 @@ export function ConversationSidebar({
   const workspaceName = project?.root.split(/[\\/]/u).filter(Boolean).slice(-1)[0]
     || project?.name
     || "正在读取项目";
-  const [employeeId, setEmployeeId] = useState(() => new URLSearchParams(window.location.search).get("agent") || "");
-  useEffect(() => {
-    const syncEmployeeRoute = () => setEmployeeId(new URLSearchParams(window.location.search).get("agent") || "");
-    window.addEventListener("popstate", syncEmployeeRoute);
-    window.addEventListener("negus:navigate", syncEmployeeRoute);
-    return () => {
-      window.removeEventListener("popstate", syncEmployeeRoute);
-      window.removeEventListener("negus:navigate", syncEmployeeRoute);
-    };
-  }, []);
-
   return (
     <aside className={styles.sidebar} aria-label="当前项目会话">
       <SidebarHeader
@@ -106,7 +93,6 @@ export function ConversationSidebar({
         onUnarchive={onUnarchive}
         onOpened={onCloseSidebar}
       />
-      <EmployeeCapabilityPanel employeeId={employeeId} />
       <ConnectionStatus connected={connected} />
     </aside>
   );

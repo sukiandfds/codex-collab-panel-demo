@@ -6,7 +6,7 @@ import { upsertGroupMessage } from "../data/groupMessageState";
 import { reconcileGroupSnapshot } from "../data/groupSnapshot";
 import type { GroupEvent, GroupSnapshot, GroupStreamingMessage } from "../model/types";
 
-export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapshot | null>>) {
+export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapshot | null>>, roomId: string) {
   const [connected, setConnected] = useState(false);
   const [streaming, setStreaming] = useState<Record<string, GroupStreamingMessage>>({});
   const [artifactEvent, setArtifactEvent] = useState<ArtifactRealtimeEvent | null>(null);
@@ -18,6 +18,10 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
   useEffect(() => {
     let disposed = false;
     let openedOnce = false;
+    setConnected(false);
+    streamingBuffer.current = {};
+    setStreaming({});
+    setArtifactEvent(null);
 
     const clearReconnectTimer = () => {
       if (reconnectTimerRef.current === null) return;
@@ -27,7 +31,7 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
 
     const reconcileSnapshot = async () => {
       try {
-        const next = await groupApi.snapshot();
+        const next = await groupApi.snapshot(roomId);
         if (disposed) return;
         const completedWorkIds = new Set(next.messages
           .filter((message) => !message.pending && message.workId)
@@ -68,6 +72,8 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
       events.onmessage = (message) => {
       try {
         const event = JSON.parse(message.data) as GroupEvent;
+        const eventRoomId = "roomId" in event ? event.roomId : "";
+        if (event.type.startsWith("group_") && eventRoomId && eventRoomId !== roomId) return;
         if (event.type === "group_message_created") {
           setSnapshot((current) => current && {
             ...current,
@@ -215,7 +221,7 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
       sourceRef.current = null;
       if (streamingFrame.current) window.cancelAnimationFrame(streamingFrame.current);
     };
-  }, [setSnapshot]);
+  }, [roomId, setSnapshot]);
 
   return { connected, streaming, artifactEvent };
 }

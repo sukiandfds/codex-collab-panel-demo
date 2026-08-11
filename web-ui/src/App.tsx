@@ -124,7 +124,7 @@ function ConversationApp({ active, onViewChange }: { active: boolean; onViewChan
           localSendVersion={conversations.localSendVersion}
         />
       }
-      composer={
+      composer={conversations.session?.readOnly ? null : (
         <ConversationComposer
           key={conversations.selectedId}
           connected={conversations.connected}
@@ -158,7 +158,7 @@ function ConversationApp({ active, onViewChange }: { active: boolean; onViewChan
           onModelChange={conversations.changeModel}
           onReasoningEffortChange={conversations.changeReasoningEffort}
         />
-      }
+      )}
     />
   );
 }
