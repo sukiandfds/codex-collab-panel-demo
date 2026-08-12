@@ -6,7 +6,7 @@ const clean = (value, maxLength = 200) => String(value || "").trim().slice(0, ma
 const employeeDefinitions = [
   {
     id: "manager",
-    name: "Project Manager Agent",
+    name: "运营管理",
     shortName: "PM",
     responsibility: "Clarify goals, split work, and report project outcomes.",
     projectKey: "employee-manager",
@@ -15,7 +15,7 @@ const employeeDefinitions = [
   },
   {
     id: "researcher",
-    name: "Research Agent",
+    name: "产品分析",
     shortName: "Research",
     responsibility: "Perform read-only research, technical verification, and evidence comparison.",
     projectKey: "employee-researcher",
@@ -24,7 +24,7 @@ const employeeDefinitions = [
   },
   {
     id: "developer",
-    name: "Developer Director Agent",
+    name: "技术研发",
     shortName: "Developer",
     responsibility: "Implement confirmed code changes, verify them, and report results.",
     projectKey: "employee-developer",
@@ -36,6 +36,15 @@ const employeeDefinitions = [
       "The main conversation splits work, reviews results, and reports to the user. Changing a model, CLI, or Runtime must not change the developer identity or history.",
       "Legacy policy marker: \u53ea\u80fd\u8ba8\u8bba.",
     ].join(" "),
+  },
+  {
+    id: "reviewer",
+    name: "风控质量",
+    shortName: "Review",
+    responsibility: "Review implementation risks, regressions, security issues, and missing checks.",
+    projectKey: "employee-reviewer",
+    runtimeKind: "codex",
+    instructions: "You are the long-lived Negus review employee. Keep your stable identity independent from any Thread, model, or runtime. Review implementations for bugs, regressions, security issues, and missing checks. Do not modify files unless the user explicitly authorizes a fix.",
   },
 ];
 

@@ -94,7 +94,7 @@
 .actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: auto; border-top: 1px solid var(--color-border); padding: 12px 18px calc(16px + env(safe-area-inset-bottom)); }
 .cancelButton, .confirmButton { height: 32px; border: 0; border-radius: 6px; padding: 0 14px; font: inherit; font-size: 12px; font-weight: 600; }
 .cancelButton { background: transparent; color: var(--color-text-secondary); }
-.confirmButton { background: var(--color-text); color: var(--color-bg); }
+.confirmButton { width: 76px; flex: 0 0 76px; background: var(--color-text); color: var(--color-bg); }
 .cancelButton:hover:not(:disabled) { background: var(--color-surface-hover); color: var(--color-text); }
 .confirmButton:hover:not(:disabled) { opacity: .9; }
 .cancelButton:disabled, .confirmButton:disabled { cursor: default; opacity: .45; }

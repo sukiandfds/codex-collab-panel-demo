@@ -1,4 +1,3 @@
-import { groupApi } from "./groupApi";
 import { keepUnacknowledgedMessages, upsertGroupMessage } from "./groupMessageState";
 import type { GroupMessage, GroupSnapshot } from "../model/types";
 
@@ -92,15 +91,4 @@ export const writeGroupSnapshot = (snapshot: GroupSnapshot) => {
   } catch {
     // Storage may be unavailable in private or restricted mobile browsers.
   }
-};
-
-let prefetch: Promise<void> | null = null;
-export const prefetchGroupSnapshot = (roomId = "") => {
-  if (!prefetch) {
-    prefetch = groupApi.snapshot(roomId)
-      .then(writeGroupSnapshot)
-      .catch(() => {})
-      .finally(() => { prefetch = null; });
-  }
-  return prefetch;
 };

@@ -95,6 +95,7 @@ export function MessageTimeline({
             : member ? { kind: "member", profile: member } : null;
           const liveStream = message.workId ? streaming[message.workId] : undefined;
           const pendingAgent = message.type === "agent" && message.pending;
+          const authorName = agent?.name || message.authorName;
           return (
           <Fragment key={message.id}>
             {index === 0 || dayKey(messages[index - 1].createdAt) !== dayKey(message.createdAt)
@@ -108,11 +109,11 @@ export function MessageTimeline({
                   aria-label={`查看${profile.profile.name}的个人信息`}
                   onClick={() => onOpenProfile(profile)}
                 >
-                  {message.type === "agent" ? "AI" : message.authorName.slice(0, 1)}
+                  {message.type === "agent" ? "AI" : authorName.slice(0, 1)}
                 </button>
-              ) : <span className={`${styles.messageAvatar} ${message.type === "agent" ? styles.agentMessageAvatar : ""}`}>{message.type === "agent" ? "AI" : message.type === "system" ? "!" : message.authorName.slice(0, 1)}</span>}
+              ) : <span className={`${styles.messageAvatar} ${message.type === "agent" ? styles.agentMessageAvatar : ""}`}>{message.type === "agent" ? "AI" : message.type === "system" ? "!" : authorName.slice(0, 1)}</span>}
               <div className={styles.messageContent}>
-                <div className={styles.messageMeta}><strong>{message.authorName}</strong><span>{pendingAgent ? "..." : timeText(message.createdAt, message.type === "agent")}</span>{message.mode === "development" ? <em>开发</em> : null}</div>
+                <div className={styles.messageMeta}><strong>{authorName}</strong><span>{pendingAgent ? "..." : timeText(message.createdAt, message.type === "agent")}</span>{message.mode === "development" ? <em>开发</em> : null}</div>
                 {message.type === "agent"
                   ? pendingAgent
                     ? <p className={styles.streamingText}>{liveStream?.text || message.text}<i className={styles.cursor} /></p>

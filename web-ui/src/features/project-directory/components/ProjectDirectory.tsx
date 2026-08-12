@@ -1,4 +1,4 @@
-import { Folder, LoaderCircle } from "lucide-react";
+import { ContactRound, Folder, LoaderCircle } from "lucide-react";
 import { Fragment, useLayoutEffect, useMemo, useState } from "react";
 import type { ExecutionStatus } from "../../execution/model/types";
 import { openAgentConversation } from "../../agent-sharing/navigation/openAgentConversation";
@@ -19,6 +19,12 @@ type ProjectNameMode = "folder" | "project";
 const projectNameModeCacheKey = "negus-project-name-mode-v1";
 const isProjectNameMode = (value: unknown): value is ProjectNameMode => value === "folder" || value === "project";
 const folderName = (root?: string) => root?.split(/[\\/]/u).filter(Boolean).slice(-1)[0] || "";
+const employeeDisplayNames: Record<string, string> = {
+  manager: "运营管理",
+  researcher: "产品分析",
+  developer: "技术研发",
+  reviewer: "风控质量",
+};
 
 const employeeConversations = (entry: DirectoryProject): DirectoryConversation[] => {
   if (entry.conversations?.length) return entry.conversations;
@@ -74,6 +80,7 @@ interface ProjectDirectoryProps {
   activeProjectId?: string;
   navigationOnly?: boolean;
   onProjectOpen?: (project: DirectoryProject) => void | Promise<void>;
+  onEmployeeOpen?: (project: DirectoryProject) => void | Promise<void>;
 }
 
 export function ProjectDirectory({
@@ -97,6 +104,7 @@ export function ProjectDirectory({
   activeProjectId,
   navigationOnly = false,
   onProjectOpen,
+  onEmployeeOpen,
 }: ProjectDirectoryProps) {
   const params = new URLSearchParams(window.location.search);
   const routeEmployeeId = params.get("employeeId") || params.get("agent") || "";
@@ -178,12 +186,12 @@ export function ProjectDirectory({
             : entry.mainThreadId ? statusByThread[entry.mainThreadId] || entry.status : entry.status;
           const displayName = isPersonal && projectNameMode === "folder"
             ? folderName(entry.root)
-            : entry.name;
+            : isEmployee ? employeeDisplayNames[entry.employeeId || ""] || entry.name.replace(/\s*Agent$/iu, "") : entry.name;
           return (
             <Fragment key={entry.id}>
               {startsSection ? (
                 isEmployee ? (
-                  <div className={`${styles.sectionLabel} ${styles.employeeSectionLabel}`}>员工项目</div>
+                  <div className={`${styles.sectionLabel} ${styles.employeeSectionLabel}`}>Agent 管理</div>
                 ) : (
                   <button
                     className={`${styles.sectionLabel} ${styles.sectionToggle}`}
@@ -211,6 +219,11 @@ export function ProjectDirectory({
                     return;
                   }
                   if (isEmployee) {
+                    if (onEmployeeOpen) {
+                      void onEmployeeOpen(entry);
+                      onOpened?.();
+                      return;
+                    }
                     const mainConversation = conversations.find((conversation) => conversation.main) || conversations[0];
                     if (mainConversation) void openConversation(entry, mainConversation);
                     return;
@@ -220,7 +233,9 @@ export function ProjectDirectory({
                   onOpened?.();
                 }}
               >
-                {openingProjectId === entry.id ? <LoaderCircle className={styles.spinner} aria-hidden="true" /> : <Folder aria-hidden="true" />}
+                {openingProjectId === entry.id
+                  ? <LoaderCircle className={styles.spinner} aria-hidden="true" />
+                  : isEmployee ? <ContactRound aria-hidden="true" /> : <Folder aria-hidden="true" />}
                 <span className={styles.projectText}><strong>{displayName || "未命名项目"}</strong></span>
                 <ProjectStatusBadge status={projectStatus} compact />
               </button>
@@ -255,13 +270,14 @@ export function ProjectDirectory({
 
 const unavailableArchiveAction = async () => false;
 
-export function ProjectNavigationDirectory({ workspaceName, projects, activeProjectId, loading = false, error = "", onProjectOpen, onOpened }: {
+export function ProjectNavigationDirectory({ workspaceName, projects, activeProjectId, loading = false, error = "", onProjectOpen, onEmployeeOpen, onOpened }: {
   workspaceName: string;
   projects: DirectoryProject[];
   activeProjectId?: string;
   loading?: boolean;
   error?: string;
   onProjectOpen: (project: DirectoryProject) => void | Promise<void>;
+  onEmployeeOpen?: (project: DirectoryProject) => void | Promise<void>;
   onOpened?: () => void;
 }) {
   return (
@@ -285,6 +301,7 @@ export function ProjectNavigationDirectory({ workspaceName, projects, activeProj
       activeProjectId={activeProjectId}
       navigationOnly
       onProjectOpen={onProjectOpen}
+      onEmployeeOpen={onEmployeeOpen}
     />
   );
 }

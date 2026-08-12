@@ -1,33 +1,47 @@
-.composerArea { position: absolute; z-index: 5; right: 0; bottom: 0; left: 0; width: 100%; min-width: 0; max-width: 100%; padding: 22px 30px 14px; background: linear-gradient(180deg, transparent 0, var(--color-bg) 30%); }
+.composerArea { position: absolute; z-index: 5; right: 0; bottom: 0; left: 0; width: 100%; min-width: 0; max-width: 100%; padding: 22px 30px 14px; background: linear-gradient(180deg, transparent 0, var(--color-bg) 30%); pointer-events: none; }
 .errorText { margin: 0 4px 7px; color: #d58c83; font-size: 11px; }
-.composer { width: min(var(--content-width), 100%); min-width: 0; max-width: 100%; min-height: 92px; margin: 0 auto; border: 1px solid var(--color-border-strong); border-radius: 16px; background: var(--color-composer); box-shadow: 0 18px 40px rgb(0 0 0 / 30%); }
-.composer:focus-within { border-color: #545454; }
-.composer textarea { display: block; width: 100%; min-height: 51px; max-height: 160px; overflow-y: auto; resize: none; border: 0; appearance: none; outline: 0; padding: 13px 14px 3px; background: transparent; color: var(--color-text); font-size: 14px; line-height: 1.5; }
+.composer { width: min(var(--content-width), 100%); min-width: 0; max-width: 100%; min-height: 92px; margin: 0 auto; border: 1px solid var(--color-border-strong); border-radius: 16px; background: var(--color-composer); box-shadow: 0 18px 40px rgb(0 0 0 / 30%); pointer-events: auto; }
+.composer:focus-within { border-color: var(--color-border-focus); }
+.composer textarea { display: block; width: 100%; min-height: 51px; max-height: 160px; overflow-y: auto; resize: none; border: 0; appearance: none; outline: 0; padding: 10px 14px 6px; background: transparent; color: var(--color-text); font-size: 14px; line-height: 1.5; }
+.composer textarea:focus, .composer textarea:focus-visible { outline: 0; box-shadow: none; }
+.composer textarea:disabled { opacity: 1; }
 .composer textarea::placeholder { color: var(--color-text-muted); }
 .footer { display: flex; min-width: 0; min-height: 36px; align-items: center; padding: 0 9px 7px 14px; }
 .leadingControls, .settingsControls { display: flex; min-width: 0; align-items: center; }
 .leadingControls { gap: 4px; }
-.settingsControls { gap: 4px; }
-.modeSwitch { display: flex; padding: 2px; border: 1px solid #303030; border-radius: 6px; background: #161616; }
-.modeSwitch button { display: flex; height: 26px; align-items: center; gap: 5px; border: 0; border-radius: 4px; padding: 0 8px; background: transparent; color: #818181; cursor: pointer; font-size: 11px; }
-.modeSwitch button svg { width: 13px; height: 13px; }
-.modeSwitch .activeMode { background: #303030; color: #ededed; }
-.settingsControls select { max-width: 170px; height: 30px; border: 1px solid #333; border-radius: 6px; outline: 0; padding: 0 26px 0 8px; background: #202020; color: #c9c9c9; font-size: 11px; }
-.modeHint { color: #707070; font-size: 11px; }
+.commandButton { display: grid; width: var(--control-icon-button-size); height: var(--control-icon-button-size); flex: 0 0 var(--control-icon-button-size); place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--color-text-secondary, #bbb); cursor: pointer; transition: var(--control-transition); }
+.commandButton:hover, .commandButton:focus-visible { background: var(--color-control-hover); color: var(--color-text, #eee); }
+.commandButton:disabled { opacity: .4; cursor: default; }
+.commandButton svg { width: var(--control-icon-size); height: var(--control-icon-size); stroke-width: 1.8; }
+.settingsControls { gap: 2px; }
+.personnelControl { position: relative; min-width: 0; }
+.personnelMenu { position: absolute; right: max(18px, calc((100% - 760px) / 2)); bottom: calc(100% + 7px); left: max(18px, calc((100% - 760px) / 2)); z-index: 8; border: 1px solid #3b3b3b; border-radius: 8px; padding: 5px; background: #202020; box-shadow: 0 16px 42px rgb(0 0 0 / 48%); }
+.personnelMenu > div:last-child { position: static; right: auto; bottom: auto; left: auto; max-height: 232px; border: 0; padding: 0; box-shadow: none; }
+.discussionOption { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 9px; margin-bottom: 3px; border-radius: 5px; padding: 7px 8px; background: var(--color-control-hover); color: var(--color-text); }
+.discussionOption > svg { width: 15px; height: 15px; margin: 7px; stroke-width: 1.8; }
+.discussionOption > span { display: grid; gap: 2px; }
+.discussionOption strong { font-size: 12px; }
+.discussionOption small { color: var(--color-text-muted); font-size: 10px; }
+.settingTrigger { display: inline-flex; max-width: 190px; height: var(--control-text-height); align-items: center; gap: 5px; border: 0; border-radius: var(--control-radius); padding: 0 7px; background: transparent; color: var(--color-text-muted); font-size: 12px; font-weight: 500; line-height: 1; white-space: nowrap; transition: var(--control-transition); }
+.settingTrigger:hover:not(:disabled), .settingTrigger[aria-expanded="true"] { background: var(--color-control-hover); color: var(--color-text); cursor: pointer; }
+.settingTrigger:disabled { opacity: 1; cursor: default; }
+.settingTrigger span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settingTrigger svg { width: var(--control-icon-size); height: var(--control-icon-size); flex: 0 0 var(--control-icon-size); stroke-width: 1.8; }
 .composerSpacer { flex: 1; }
-.sendButton { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border: 0; border-radius: 50%; background: var(--color-text); color: var(--color-bg); cursor: pointer; }
+.sendButton { display: grid; width: var(--control-icon-button-size); height: var(--control-icon-button-size); flex: 0 0 var(--control-icon-button-size); place-items: center; border: 0; border-radius: 50%; background: var(--color-text); color: var(--color-bg); cursor: pointer; transition: var(--control-transition); }
 .sendButton:disabled { background: #777; color: #292929; cursor: default; opacity: .55; }
-.sendButton svg { width: 15px; height: 15px; }
+.sendButton svg { width: var(--control-icon-size); height: var(--control-icon-size); stroke-width: 1.9; }
 
 @media (max-width: 760px) {
   .composerArea { padding: 10px 12px max(10px, env(safe-area-inset-bottom)); }
   .footer { display: grid; grid-template-columns: minmax(0, 1fr) 36px; row-gap: 2px; padding: 0 9px 8px 10px; }
   .leadingControls { grid-column: 1; grid-row: 1; overflow: hidden; }
+  .leadingControls > .commandButton { width: var(--control-touch-icon-button-size); height: var(--control-touch-icon-button-size); flex-basis: var(--control-touch-icon-button-size); }
   .composerSpacer { display: none; }
-  .settingsControls { grid-column: 1 / -1; grid-row: 2; display: flex; width: 100%; overflow: hidden; }
-  .settingsControls select { min-width: 0; max-width: 150px; }
-  .modeHint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sendButton { grid-column: 2; grid-row: 1; width: 36px; height: 36px; }
+  .settingsControls { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; width: 100%; }
+  .settingTrigger { width: 100%; max-width: none; height: var(--control-touch-text-height); justify-content: space-between; }
+  .sendButton { grid-column: 2; grid-row: 1; width: var(--control-touch-icon-button-size); height: var(--control-touch-icon-button-size); }
+  .personnelMenu { right: 10px; left: 10px; }
 }
 
 @media (any-pointer: coarse) {

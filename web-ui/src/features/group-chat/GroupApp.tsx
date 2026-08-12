@@ -10,22 +10,27 @@ import { MemberDialog } from "./components/MemberDialog";
 import { MemberProfileDrawer } from "./components/MemberProfileDrawer";
 import { MessageTimeline } from "./components/MessageTimeline";
 import { useGroupRoom } from "./hooks/useGroupRoom";
-import type { GroupMode, GroupProfile } from "./model/types";
+import type { GroupProfile } from "./model/types";
 import { useDeviceInfo } from "../device/hooks/useDeviceInfo";
 import { useArtifacts } from "../artifacts/hooks/useArtifacts";
 import { projectDirectoryApi } from "../project-directory/data/projectDirectoryApi";
 import type { DirectoryProject } from "../project-directory/model/types";
 import { ProjectNavigationDirectory } from "../project-directory/components/ProjectDirectory";
+import { readLocalCache, writeLocalCache } from "../../shared/state/localCache";
 import { RefreshNotice } from "../app-update/components/AppUpdateNotice";
 import styles from "./GroupApp.module.css";
+
+const projectDirectoryCacheKey = "negus-project-directory-v1";
+const validProjects = (value: unknown): value is DirectoryProject[] => Array.isArray(value)
+  && value.every((entry) => Boolean(entry) && typeof entry === "object" && typeof entry.id === "string");
 
 export function GroupApp({ active = true, onViewChange }: { active?: boolean; onViewChange?: (surface: Exclude<ViewSurface, "progress">) => void }) {
   const group = useGroupRoom();
   const device = useDeviceInfo(group.connected);
-  const [mode, setMode] = useState<GroupMode>("discussion");
-  const [agentId, setAgentId] = useState("manager");
   const [profile, setProfile] = useState<GroupProfile | null>(null);
-  const [projects, setProjects] = useState<DirectoryProject[]>([]);
+  const [projects, setProjects] = useState<DirectoryProject[]>(() => (
+    readLocalCache(projectDirectoryCacheKey, validProjects) || []
+  ));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [localSendVersion, setLocalSendVersion] = useState(0);
   const snapshot = group.snapshot;
@@ -35,10 +40,10 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
     await group.join(name);
   };
   const sendMessage = useCallback(async (text: string, targetAgentIds: string[], attachmentIds: string[] = []) => {
-    const accepted = await group.send(mode, targetAgentIds, text, attachmentIds);
+    const accepted = await group.send("discussion", targetAgentIds, text, attachmentIds);
     if (accepted) setLocalSendVersion((version) => version + 1);
     return accepted;
-  }, [group.send, mode]);
+  }, [group.send]);
 
   useEffect(() => {
     if (!active || !group.initialSyncReady) return;
@@ -65,7 +70,10 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
     const controller = new AbortController();
     void projectDirectoryApi.list(controller.signal)
       .then((next) => {
-        if (!controller.signal.aborted) setProjects(next);
+        if (!controller.signal.aborted) {
+          setProjects(next);
+          writeLocalCache(projectDirectoryCacheKey, next);
+        }
       })
       .catch(() => {});
     return () => controller.abort();
@@ -89,6 +97,10 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
                 const room = group.rooms.find((entry) => entry.projectId === projectId)
                   || (snapshot?.projectId === projectId ? snapshot.room : null);
                 if (room) group.selectRoom(room.id);
+              }}
+              onEmployeeOpen={(project) => {
+                const agent = agents.find((entry) => entry.id === project.employeeId);
+                if (agent) setProfile({ kind: "agent", profile: agent });
               }}
               onOpened={() => setSidebarOpen(false)}
             />
@@ -133,14 +145,10 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
         ) : <main className={styles.loading} role="status" aria-label="正在连接项目群"><LoaderCircle className={styles.spinner} aria-hidden="true" /></main>}
         composer={snapshot ? (
         <GroupComposer
-          mode={mode}
-          agentId={agentId}
           agents={agents}
           members={members}
           disabled={!group.member || group.sending}
           error={group.error}
-          onModeChange={setMode}
-          onAgentChange={setAgentId}
           onSend={sendMessage}
         />
         ) : <div className={styles.composerPlaceholder} />}
