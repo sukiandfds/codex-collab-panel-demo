@@ -10,10 +10,10 @@ import type { Artifact, ArtifactReviewDecision } from "../../artifacts/model/typ
 import type { GroupAgent, GroupMember, GroupMessage, GroupProfile, GroupStreamingMessage } from "../model/types";
 import styles from "./MessageTimeline.module.css";
 
-const timeText = (value: string, withSeconds = false) => new Intl.DateTimeFormat("zh-CN", {
+const timeText = (value: string) => new Intl.DateTimeFormat("zh-CN", {
   hour: "2-digit",
   minute: "2-digit",
-  ...(withSeconds ? { second: "2-digit" } : {}),
+  second: "2-digit",
 }).format(new Date(value));
 const dayKey = (value: string) => new Date(value).toLocaleDateString("zh-CN");
 const dayText = (value: string) => {
@@ -26,6 +26,7 @@ export function MessageTimeline({
   messages,
   agents,
   members,
+  currentMemberId,
   streaming,
   artifacts,
   artifactLoadErrors,
@@ -39,6 +40,7 @@ export function MessageTimeline({
   messages: GroupMessage[];
   agents: GroupAgent[];
   members: GroupMember[];
+  currentMemberId: string;
   streaming: Record<string, GroupStreamingMessage>;
   artifacts: Record<string, Artifact>;
   artifactLoadErrors: Record<string, boolean>;
@@ -96,6 +98,7 @@ export function MessageTimeline({
           const liveStream = message.workId ? streaming[message.workId] : undefined;
           const pendingAgent = message.type === "agent" && message.pending;
           const authorName = agent?.name || message.authorName;
+          const ownMessage = message.type === "human" && Boolean(currentMemberId) && message.authorId === currentMemberId;
           return (
           <Fragment key={message.id}>
             {index === 0 || dayKey(messages[index - 1].createdAt) !== dayKey(message.createdAt)
@@ -113,22 +116,24 @@ export function MessageTimeline({
                 </button>
               ) : <span className={`${styles.messageAvatar} ${message.type === "agent" ? styles.agentMessageAvatar : ""}`}>{message.type === "agent" ? "AI" : message.type === "system" ? "!" : authorName.slice(0, 1)}</span>}
               <div className={styles.messageContent}>
-                <div className={styles.messageMeta}><strong>{authorName}</strong><span>{pendingAgent ? "..." : timeText(message.createdAt, message.type === "agent")}</span>{message.mode === "development" ? <em>开发</em> : null}</div>
-                {message.type === "agent"
-                  ? pendingAgent
-                    ? <p className={styles.streamingText}>{liveStream?.text || message.text}<i className={styles.cursor} /></p>
-                    : <div className={styles.markdown}><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text}</ReactMarkdown></div>
-                  : message.text ? <p>{message.text}</p> : null}
-                <AttachmentDisplay files={message.attachments || []} />
-                <ArtifactCollection
-                  artifactIds={message.artifactIds || []}
-                  artifacts={artifacts}
-                  loadErrors={artifactLoadErrors}
-                  reviewingIds={reviewingArtifactIds}
-                  reviewerName={reviewerName}
-                  onRetry={onRetryArtifact}
-                  onReview={onReviewArtifact}
-                />
+                <div className={styles.messageMeta}><strong>{authorName}</strong><span>{pendingAgent ? "..." : timeText(message.createdAt)}</span>{message.mode === "development" ? <em>开发</em> : null}</div>
+                <div className={`${styles.messageBubble} ${ownMessage ? styles.ownMessageBubble : ""}`}>
+                  {message.type === "agent"
+                    ? pendingAgent
+                      ? <p className={styles.streamingText}>{liveStream?.text || message.text}<i className={styles.cursor} /></p>
+                      : <div className={styles.markdown}><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text}</ReactMarkdown></div>
+                    : message.text ? <p>{message.text}</p> : null}
+                  <AttachmentDisplay files={message.attachments || []} />
+                  <ArtifactCollection
+                    artifactIds={message.artifactIds || []}
+                    artifacts={artifacts}
+                    loadErrors={artifactLoadErrors}
+                    reviewingIds={reviewingArtifactIds}
+                    reviewerName={reviewerName}
+                    onRetry={onRetryArtifact}
+                    onReview={onReviewArtifact}
+                  />
+                </div>
               </div>
             </article>
           </Fragment>
@@ -143,7 +148,9 @@ export function MessageTimeline({
               ) : <span className={`${styles.messageAvatar} ${styles.agentMessageAvatar}`}>AI</span>}
               <div className={styles.messageContent}>
                 <div className={styles.messageMeta}><strong>{agent?.name || "Codex Agent"}</strong><span>...</span></div>
-                <p className={styles.streamingText}>{value.text}<i className={styles.cursor} /></p>
+                <div className={styles.messageBubble}>
+                  <p className={styles.streamingText}>{value.text}<i className={styles.cursor} /></p>
+                </div>
               </div>
             </article>
           );

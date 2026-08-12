@@ -122,6 +122,7 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
             messages={snapshot.messages}
             agents={agents}
             members={members}
+            currentMemberId={group.member?.id || ""}
             streaming={group.streaming}
             artifacts={artifactState.artifacts}
             artifactLoadErrors={artifactState.loadErrors}
