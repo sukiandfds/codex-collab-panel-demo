@@ -94,7 +94,7 @@ function Message({
       {!executionPlaceholder ? <div className={styles.body}>
         {streaming ? <div className={styles.streamingText}>{message.text}<i className={styles.cursor} /></div> : <ContentRenderer message={message} />}
         {message.deliveryState === "pending" ? (
-          <span className={styles.deliveryState} title="???????????" aria-label="???????????">
+          <span className={styles.deliveryState} title="正在确认指令是否已送达" aria-label="正在确认指令是否已送达">
             <Clock3 aria-hidden="true" />
           </span>
         ) : null}
@@ -380,16 +380,16 @@ export function ConversationView({
       {error ? (
         <RefreshNotice
           surface="conversation"
-          title="???????"
-          detail="???????????????????"
-          actionLabel="????"
+          title="内容暂时未更新"
+          detail="连接长时间没有响应，请刷新网页后重试。"
+          actionLabel="刷新网页"
           onAction={() => window.location.reload()}
         />
       ) : null}
       <div className={styles.scrollArea} ref={scrollRef}>
-        <section className={styles.conversation} aria-label="??????" aria-live="polite">
-        {loading && !session ? <div className={styles.loading} role="status" aria-label="??????"><LoaderCircle aria-hidden="true" /></div> : null}
-        {!loading && !error && !session && listAvailable ? <div className={styles.state}>???????????</div> : null}
+        <section className={styles.conversation} aria-label="真实项目对话" aria-live="polite">
+        {loading && !session ? <div className={styles.loading} role="status" aria-label="正在读取对话"><LoaderCircle aria-hidden="true" /></div> : null}
+        {!loading && !error && !session && listAvailable ? <div className={styles.state}>当前项目暂无可显示对话</div> : null}
         {session ? (
           <div className={styles.virtualList} style={{ height: virtualizer.getTotalSize() }}>
             {virtualizer.getVirtualItems().map((virtualRow) => {
@@ -442,7 +442,7 @@ export function ConversationView({
         ) : null}
         </section>
       </div>
-      {loadingOlder ? <div className={styles.older} role="status" aria-label="????????"><LoaderCircle aria-hidden="true" /></div> : null}
+      {loadingOlder ? <div className={styles.older} role="status" aria-label="正在加载更早消息"><LoaderCircle aria-hidden="true" /></div> : null}
       <JumpToLatest visible={showReturnToBottom} className={styles.jumpToLatest} onClick={returnToBottom} />
     </div>
   );
