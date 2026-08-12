@@ -47,7 +47,7 @@ test("registry provisions isolated context roots and keeps legacy developer bind
   await fs.writeFile(stateFile, JSON.stringify({ employees: [{ id: "developer", mainThreadId: "old-thread", conversationId: "old-conversation" }] }));
   const registry = await createEmployeeProjectRegistry({ stateFile, workspaceRoot: root });
   t.after(() => registry.close());
-  assert.deepEqual(registry.list().map((item) => item.id), ["manager", "researcher", "developer"]);
+  assert.deepEqual(registry.list().map((item) => item.id), ["manager", "researcher", "developer", "reviewer"]);
   assert.equal(registry.get("developer").mainThreadId, "old-thread");
   assert.equal(registry.get("developer").conversationId, "old-conversation");
   assert.notEqual(registry.get("manager").contextRoot, registry.get("developer").contextRoot);
@@ -73,8 +73,8 @@ test("growth stores facts immediately and keeps rules/skills pending until appro
     employeeRuntime: { getStatus: async () => ({ status: { phase: "idle", active: false } }) },
   });
   const listing = await directory.list();
-  assert.equal(listing.projects.length, 4);
-  assert.equal(listing.projects.filter((item) => item.kind === "employee").length, 3);
+  assert.equal(listing.projects.length, 5);
+  assert.equal(listing.projects.filter((item) => item.kind === "employee").length, 4);
 });
 
 test("reviewer failures return a failed result without throwing", async (t) => {

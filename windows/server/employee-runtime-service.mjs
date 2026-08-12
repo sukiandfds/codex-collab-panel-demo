@@ -51,6 +51,7 @@ export const createEmployeeRuntimeService = ({
   let closed = false;
 
   for (const employee of registry.list()) {
+    rememberInitialThread(employee);
     statuses.set(employee.id, {
       phase: "idle",
       label: employee.modificationConfirmed ? "等待任务" : "等待确认",
@@ -59,6 +60,11 @@ export const createEmployeeRuntimeService = ({
       turnId: "",
       updatedAt: employee.updatedAt || null,
     });
+  }
+
+  function rememberInitialThread(employee) {
+    const threadId = clean(employee?.mainThreadId, 120);
+    if (threadId) threadEmployees.set(threadId, employee.id);
   }
 
   const statusFor = (employeeId) => statuses.get(employeeId) || {
@@ -374,6 +380,7 @@ export const createEmployeeRuntimeService = ({
         const result = await client.request("turn/start", {
           threadId,
           input: [{ type: "text", text: cleanText, text_elements: [] }],
+          cwd: clean(employee.projectRoot, 400) || projectRoot,
           ...(context && client.turnDeveloperInstructions === true
             ? { developerInstructions: context }
             : {}),
@@ -468,6 +475,7 @@ export const createEmployeeRuntimeService = ({
           && clean(employee.mainThreadId, 120) === clean(binding?.runtimeSessionId, 120),
       );
     },
+    ownsThread: (threadId) => threadEmployees.has(clean(threadId, 120)),
     close,
   };
 };

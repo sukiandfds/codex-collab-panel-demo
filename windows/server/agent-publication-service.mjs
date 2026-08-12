@@ -7,7 +7,7 @@ const fingerprintFor = ({ conversationId, messageId, roomId }) => JSON.stringify
   roomId: clean(roomId, 120),
 });
 
-export const createAgentPublicationService = ({ conversationStore, conversations, runtimeRegistry, groupRoom, roomDirectory, publicationStore }) => {
+export const createAgentPublicationService = ({ conversationStore, conversations, groupRoom, roomDirectory, publicationStore }) => {
   const inFlight = new Map();
 
   const readSourceMessage = async (binding, messageId) => {
@@ -18,9 +18,7 @@ export const createAgentPublicationService = ({ conversationStore, conversations
       }
       return localMessage;
     }
-    const session = runtimeRegistry
-      ? await runtimeRegistry.readConversation(binding)
-      : await conversations.findSession(binding.runtimeSessionId, "all");
+    const session = await conversations.findSession(binding.runtimeSessionId, "all");
     const message = session?.messages?.find((entry) => entry.id === clean(messageId, 160));
     if (!message || message.role !== "assistant" || !message.turnId || !String(message.text || "").trim()) {
       throw statusError("只能带走已完成的 Agent 文字回复", 409);

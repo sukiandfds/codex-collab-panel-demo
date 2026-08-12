@@ -179,6 +179,11 @@ export const createEmployeeProjectDirectory = ({
     }));
     let sessions = [];
     try { sessions = await conversations?.listSessions?.("all", false) || []; } catch {}
+    const employeeThreadIds = new Set([
+      ...employees.map((employee) => clean(employee.mainThreadId, 120)),
+      ...(roomDirectory?.threadIds?.() || []),
+    ].filter(Boolean));
+    sessions = sessions.filter((session) => !employeeThreadIds.has(clean(session?.threadId, 120)));
     const sessionStatuses = sessions.map((session) => {
       const threadId = clean(session?.threadId, 120);
       let status = idleStatus();

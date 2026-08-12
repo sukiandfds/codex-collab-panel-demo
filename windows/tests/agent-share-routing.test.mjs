@@ -21,12 +21,6 @@ test("routes Agent conversation opening, target selection, and pure publication 
   const calls = [];
   const route = createAgentPublicationRoutes({
     conversationStore: {
-      openForAgent: async ({ agentId }) => ({
-        conversationId: "conversation-1",
-        agentId,
-        runtimeKind: "codex",
-        runtimeSessionId: "thread-1",
-      }),
       getShareTargets: async (query) => {
         calls.push({ type: "targets", query });
         return {
@@ -42,7 +36,15 @@ test("routes Agent conversation opening, target selection, and pure publication 
         return { message: { id: "group-message-1", type: "agent" }, deduplicated: false };
       },
     },
-    runtimeRegistry: {},
+    employeeRuntime: {
+      open: async (agentId) => ({
+        conversation: {
+          id: "conversation-1",
+          runtimeKind: "codex",
+          threadId: agentId === "manager" ? "thread-1" : null,
+        },
+      }),
+    },
   });
 
   await withServer(async (request, response) => {

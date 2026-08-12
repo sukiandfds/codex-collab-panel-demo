@@ -101,12 +101,6 @@ export const createConversationRoutes = ({
     return binding;
   };
 
-  const isEmployeeBinding = (binding) => Boolean(
-    employeeRuntime
-      && binding?.conversationKind === "direct"
-      && employeeRuntime.ownsConversation?.(binding),
-  );
-
   const readGroupAgentSession = (binding, pagination = {}) => {
     const room = roomDirectory?.get?.(binding.roomId);
     const snapshot = room?.snapshot?.();
@@ -149,55 +143,7 @@ export const createConversationRoutes = ({
 
   const readAgentSession = async (binding, source, pagination) => {
     if (binding.conversationKind === "group") return readGroupAgentSession(binding, pagination);
-    const localMessages = await agentConversationStore.readMessages(binding.conversationId);
-    let runtime = null;
-    try {
-      runtime = await conversations.findSession(binding.runtimeSessionId, source, pagination);
-    } catch {
-      // The local Agent record remains readable when its previous Runtime is unavailable.
-    }
-    if (!localMessages.length) return runtime;
-    const messages = new Map((runtime?.messages || []).map((message) => [message.id, message]));
-    for (const message of localMessages) {
-      const runtimeMessage = messages.get(message.id);
-      const runtimeCreatedAt = runtimeMessage?.createdAt;
-      messages.set(message.id, runtimeMessage ? {
-        ...runtimeMessage,
-        ...message,
-        createdAt: Number.isFinite(Date.parse(runtimeCreatedAt || "")) ? runtimeCreatedAt : message.createdAt,
-      } : message);
-    }
-    const ordered = [...messages.values()].sort((left, right) => (
-      Date.parse(left.createdAt || "") - Date.parse(right.createdAt || "")
-    ));
-    const latestUser = [...ordered].reverse().find((message) => message.role === "user")?.text || "";
-    const latestAssistant = [...ordered].reverse().find((message) => message.role === "assistant")?.text || "";
-    const updatedAt = ordered.reduce((latest, message) => {
-      const value = Date.parse(message.createdAt || "");
-      const latestValue = Date.parse(latest || "");
-      return Number.isFinite(value) && (!Number.isFinite(latestValue) || value > latestValue) ? message.createdAt : latest;
-    }, runtime?.updatedAt || "");
-    return {
-      ...(runtime || {
-        threadId: binding.runtimeSessionId,
-        source: "codex",
-        title: "Agent 对话",
-        updatedAt: "",
-        messageCount: null,
-        latestUser: "",
-        latestAssistant: "",
-        archived: false,
-      }),
-      threadId: binding.runtimeSessionId,
-      latestUser,
-      latestAssistant,
-      updatedAt,
-      messages: ordered,
-      messageCount: ordered.length,
-      hasMore: false,
-      nextBefore: null,
-      nextCursor: null,
-    };
+    return conversations.findSession(binding.runtimeSessionId, source, pagination);
   };
 
   return async (request, response, url) => {
@@ -220,10 +166,6 @@ export const createConversationRoutes = ({
     }
     const conversationId = String(body.conversationId || "").trim();
     const binding = await authorizeAgentThread({ threadId, conversationId });
-    const employeeBinding = isEmployeeBinding(binding);
-    if (employeeBinding && Array.isArray(body.attachmentIds) && body.attachmentIds.length) {
-      throw Object.assign(new Error("员工单聊暂不支持附件"), { statusCode: 400 });
-    }
     const submissionId = String(body.submissionId || "").trim().slice(0, 160) || randomUUID();
     const messageId = `optimistic-${submissionId}`;
     const createdAt = new Date().toISOString();
@@ -257,7 +199,7 @@ export const createConversationRoutes = ({
     }
     const run = async () => {
       const status = execution.getStatus(threadId);
-      if (!employeeBinding && status.active && !status.turnId) {
+      if (status.active && !status.turnId) {
         const error = new Error("Codex 正在启动当前任务，请稍后再试");
         error.statusCode = 409;
         throw error;
@@ -273,28 +215,10 @@ export const createConversationRoutes = ({
       });
       let result;
       try {
-        if (employeeBinding) {
-          const employeeResult = await employeeRuntime.sendMessage({
-            employeeId: binding.agentId,
-            text,
-            requestId: submissionId,
-          });
-          return {
-            body: {
-              threadId: employeeResult?.threadId || threadId,
-              turnId: employeeResult?.turnId || "",
-              status: employeeResult?.status || "inProgress",
-              submissionId,
-              messageId,
-            },
-            statusCode: 202,
-          };
-        }
         result = status.active
           ? await conversations.steerMessage(threadId, status.turnId, text, attachments, submissionId)
           : await conversations.sendMessage(threadId, text, attachments, submissionId);
       } catch (error) {
-        if (employeeBinding) throw error;
         const recovered = execution.getStatus(threadId);
         if (status.active || !recovered.turnId || recovered.turnId === status.turnId) throw error;
         return {
@@ -579,7 +503,15 @@ export const createConversationRoutes = ({
       return true;
     }
     const sessions = await conversations.listSessions(source, archived);
-    sendJson(response, sessions.map(({ messages, file, ...summary }) => summary));
+    const groupThreadIds = new Set(roomDirectory?.threadIds?.() || []);
+    const visibleSessions = sessions.filter((session) => {
+      const threadId = String(session?.threadId || "").trim();
+      if (!threadId) return false;
+      if (employeeRuntime?.ownsThread?.(threadId)) return false;
+      if (groupThreadIds.has(threadId)) return false;
+      return !agentConversationStore?.findByRuntimeSession?.("codex", threadId);
+    });
+    sendJson(response, visibleSessions.map(({ messages, file, ...summary }) => summary));
     return true;
   }
   if (url.pathname === "/api/session" && request.method === "POST") {

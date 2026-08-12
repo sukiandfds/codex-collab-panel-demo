@@ -40,9 +40,14 @@ export const createGroupRoomDirectory = ({ rooms = [] } = {}) => {
   };
 
   const list = () => [...registered.values()].map((roomStore) => roomStore.snapshot().room);
+  const threadIds = () => [...new Set([...registered.values()]
+    .flatMap((roomStore) => roomStore.snapshot().agents || [])
+    .map((agent) => clean(agent?.threadId, 120))
+    .filter(Boolean))];
 
   return {
     list,
+    threadIds,
     listForAgent,
     readAgentMessages,
     get: (roomId) => registered.get(String(roomId || "").trim()) || null,

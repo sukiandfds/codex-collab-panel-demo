@@ -1,22 +1,14 @@
 import { readJson, sendJson } from "../http/request-utils.mjs";
 
-export const createAgentPublicationRoutes = ({ conversationStore, publicationService, runtimeRegistry, employeeRuntime }) => async (request, response, url) => {
+export const createAgentPublicationRoutes = ({ conversationStore, publicationService, employeeRuntime }) => async (request, response, url) => {
   if (url.pathname === "/api/agent-conversations/open" && request.method === "POST") {
     const body = await readJson(request);
-    if (employeeRuntime?.open) {
-      const session = await employeeRuntime.open(body.agentId);
-      sendJson(response, {
-        conversationId: session.conversation.id,
-        runtimeKind: session.conversation.runtimeKind,
-        threadId: session.conversation.threadId,
-      }, 201);
-      return true;
-    }
-    const binding = await conversationStore.openForAgent({ agentId: body.agentId, runtimeRegistry });
+    if (!employeeRuntime?.open) throw Object.assign(new Error("员工运行服务不可用"), { statusCode: 503 });
+    const session = await employeeRuntime.open(body.agentId);
     sendJson(response, {
-      conversationId: binding.conversationId,
-      runtimeKind: binding.runtimeKind,
-      threadId: binding.runtimeKind === "codex" ? binding.runtimeSessionId : null,
+      conversationId: session.conversation.id,
+      runtimeKind: session.conversation.runtimeKind,
+      threadId: session.conversation.threadId,
     }, 201);
     return true;
   }

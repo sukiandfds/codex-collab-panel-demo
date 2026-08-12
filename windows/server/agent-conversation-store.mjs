@@ -227,33 +227,6 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
     });
   };
 
-  const openForAgent = async ({ agentId, runtimeRegistry }) => {
-    const cleanAgentId = clean(agentId, 80);
-    const agent = groupRoom.getAgent(cleanAgentId);
-    if (!agent) throw statusError("Agent 不存在", 404);
-    const existing = findByAgentKind(cleanAgentId, "direct");
-    if (existing) {
-      return existing;
-    }
-    const legacyBinding = findByAgentKind(cleanAgentId, "legacy");
-    const runtimeKind = legacyBinding?.runtimeKind || "codex";
-    if (!runtimeRegistry?.ensureConversation) {
-      throw statusError(`Runtime 无法打开 Agent 对话：${runtimeKind}`, 503);
-    }
-    const runtimeSessionId = await runtimeRegistry.ensureConversation({
-      runtimeKind,
-      agent,
-      conversationId: "",
-    });
-    return bindRuntime({
-      conversationId: "",
-      agentId: cleanAgentId,
-      runtimeKind,
-      runtimeSessionId,
-      conversationKind: "direct",
-    });
-  };
-
   const openGroupForAgent = async ({ agentId, roomId, projectId = "", threadId = "", title = "" }) => {
     const cleanAgentId = clean(agentId, 80);
     const cleanRoomId = clean(roomId, 120);
@@ -366,7 +339,6 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
   return {
     resolve,
     bindRuntime,
-    openForAgent,
     findByAgent,
     findByAgentKind,
     findByAgentRoom,

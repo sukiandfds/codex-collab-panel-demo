@@ -14,6 +14,7 @@ export { buildDiscussionPrompt, mentionedAgentIds } from "./multi-agent/discussi
 
 export const createMultiAgentService = ({
   projectRoot,
+  employeeWorkRoots = {},
   room,
   broadcast,
   webOutputs,
@@ -24,7 +25,6 @@ export const createMultiAgentService = ({
 }) => {
   const client = createAppServerClient();
   const threadAgents = new Map();
-  const conversationThreads = new Map();
   const activeModes = new Map();
   const allowAutomaticCollaboration = autoCollaboration === true;
   let currentRun = null;
@@ -183,7 +183,7 @@ export const createMultiAgentService = ({
       }
 
       const result = await client.request("thread/start", {
-        cwd: projectRoot,
+        cwd: employeeWorkRoots[agent.id] || projectRoot,
         developerInstructions: currentAgent.instructions,
         ephemeral: false,
         serviceName: "negus",
@@ -196,33 +196,6 @@ export const createMultiAgentService = ({
       currentAgent = room.getAgent(currentAgent.id) || { ...nextAgent, threadId: null };
     }
     throw new Error("无法建立 Agent Thread");
-  };
-
-  const ensureAgentConversationThread = async (agentId) => {
-    const agent = room.getAgent(agentId);
-    if (!agent) throw Object.assign(new Error("Agent does not exist"), { statusCode: 404 });
-    const existing = conversationThreads.get(agent.id);
-    if (existing) return existing;
-    const creation = (async () => {
-      const result = await client.request("thread/start", {
-        cwd: projectRoot,
-        developerInstructions: agent.instructions,
-        ephemeral: false,
-        serviceName: "negus-agent",
-      });
-      const threadId = result.thread.id;
-      await client.request("thread/name/set", { threadId, name: `${agent.name} direct conversation` });
-      if (agent.model) await client.request("thread/settings/update", { threadId, model: agent.model });
-      if (agent.reasoningEffort) await client.request("thread/settings/update", { threadId, effort: agent.reasoningEffort });
-      return threadId;
-    })();
-    conversationThreads.set(agent.id, creation);
-    try {
-      return await creation;
-    } catch (error) {
-      if (conversationThreads.get(agent.id) === creation) conversationThreads.delete(agent.id);
-      throw error;
-    }
   };
 
   const updateAgentSettings = async (agentId, settings) => {
@@ -282,6 +255,7 @@ export const createMultiAgentService = ({
       mode,
       messages: context.messages,
       outputInstructions,
+      targetProjectRoot: projectRoot,
     });
     activeModes.set(agentId, mode);
 
@@ -418,5 +392,5 @@ export const createMultiAgentService = ({
     client.close();
   };
 
-  return { enqueueDiscussion, updateAgentSettings, ensureAgentThread, ensureAgentConversationThread, close };
+  return { enqueueDiscussion, updateAgentSettings, ensureAgentThread, close };
 };

@@ -15,7 +15,7 @@ import { createEmployeeGrowthRoutes } from "./routes/employee-growth-routes.mjs"
 export const createRequestHandler = ({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime, submissions,
   followUpQueue, contextManagement, groupRoom, roomDirectory, multiAgent, multiAgentDirectory, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
-  agentConversationStore, agentPublicationService, runtimeRegistry,
+  agentConversationStore, agentPublicationService,
   employeeRuntime, employeeProjectDirectory, employeeGrowth,
 }) => {
   const routes = [
@@ -24,7 +24,6 @@ export const createRequestHandler = ({
     createAgentPublicationRoutes({
       conversationStore: agentConversationStore,
       publicationService: agentPublicationService,
-      runtimeRegistry,
       employeeRuntime,
     }),
     ...(employeeRuntime ? [createEmployeeRoutes({ employeeRuntime })] : []),

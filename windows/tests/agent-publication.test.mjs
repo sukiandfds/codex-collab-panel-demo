@@ -8,8 +8,6 @@ import { createAgentPublicationService } from "../server/agent-publication-servi
 import { createGroupRoomStore } from "../server/group-room-store.mjs";
 import { createPublicationStore } from "../server/publication-store.mjs";
 import { createGroupRoomDirectory } from "../server/group-room-directory.mjs";
-import { createRuntimeAdapterRegistry } from "../server/runtime-adapter-registry.mjs";
-import { createConversationRoutes } from "../server/routes/conversation-routes.mjs";
 
 const fixture = async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "negus-agent-publication-"));
@@ -184,146 +182,6 @@ test("rejects unfinished and oversized replies without truncating them", async (
   assert.equal(groupRoom.snapshot().messages.length, 0);
 });
 
-test("opens an Agent conversation through the registered Runtime without changing Agent identity", async (t) => {
-  const { conversationStore, groupRoom } = await fixture(t);
-  await groupRoom.updateAgent("manager", { threadId: null });
-  let ensureCount = 0;
-  const runtimeRegistry = createRuntimeAdapterRegistry({
-    adapters: [{
-      kind: "codex",
-      readConversation: async () => null,
-      ensureConversation: async (agent) => {
-        ensureCount += 1;
-        await groupRoom.updateAgent(agent.id, { threadId: "thread-created" });
-        return "thread-created";
-      },
-    }],
-  });
-
-  const first = await conversationStore.openForAgent({ agentId: "manager", runtimeRegistry });
-  const second = await conversationStore.openForAgent({ agentId: "manager", runtimeRegistry });
-  assert.equal(first.conversationId, second.conversationId);
-  assert.equal(first.agentId, "manager");
-  assert.equal(first.runtimeKind, "codex");
-  assert.equal(first.runtimeSessionId, "thread-created");
-  assert.equal(ensureCount, 1);
-});
-
-test("keeps an Agent direct conversation Thread separate from the group Thread", async (t) => {
-  const { conversationStore, groupRoom } = await fixture(t);
-  const groupThreadId = groupRoom.getAgent("manager").threadId;
-  let ensureCount = 0;
-  const runtimeRegistry = createRuntimeAdapterRegistry({
-    adapters: [{
-      kind: "codex",
-      readConversation: async () => null,
-      ensureConversation: async () => {
-        ensureCount += 1;
-        return "thread-direct";
-      },
-    }],
-  });
-
-  const first = await conversationStore.openForAgent({ agentId: "manager", runtimeRegistry });
-  const second = await conversationStore.openForAgent({ agentId: "manager", runtimeRegistry });
-  assert.equal(first.conversationKind, "direct");
-  assert.equal(first.runtimeSessionId, "thread-direct");
-  assert.notEqual(first.runtimeSessionId, groupThreadId);
-  assert.equal(groupRoom.getAgent("manager").threadId, groupThreadId);
-  assert.equal(second.conversationId, first.conversationId);
-  assert.equal(second.runtimeSessionId, first.runtimeSessionId);
-  assert.equal(ensureCount, 1);
-});
-
-test("isolates a new direct history from legacy group history and authorizes its current Runtime", async (t) => {
-  const { service, conversationStore, groupRoom } = await fixture(t);
-  const legacy = await conversationStore.resolve({ threadId: "thread-manager" });
-  const legacyMessage = {
-    id: "legacy-history",
-    role: "assistant",
-    text: "legacy group context",
-    turnId: "turn-legacy",
-  };
-  await conversationStore.appendMessage({ conversationId: legacy.conversationId, message: legacyMessage });
-
-  const runtimeRegistry = createRuntimeAdapterRegistry({
-    adapters: [{
-      kind: "codex",
-      readConversation: async () => null,
-      ensureConversation: async () => "thread-direct",
-    }],
-  });
-  const direct = await conversationStore.openForAgent({ agentId: "manager", runtimeRegistry });
-  assert.notEqual(direct.conversationId, legacy.conversationId);
-  assert.equal(direct.conversationKind, "direct");
-  assert.deepEqual(await conversationStore.readMessages(direct.conversationId), []);
-  assert.equal((await conversationStore.readMessage(legacy.conversationId, legacyMessage.id)).text, legacyMessage.text);
-
-  const directMessage = {
-    id: "direct-history",
-    role: "assistant",
-    text: "direct answer **Markdown**",
-    turnId: "turn-direct",
-  };
-  await conversationStore.appendMessage({ conversationId: direct.conversationId, message: directMessage });
-  const target = (await conversationStore.getShareTargets({ conversationId: direct.conversationId })).rooms[0];
-  const published = await service.publish({
-    requestId: "share-direct-history",
-    conversationId: direct.conversationId,
-    messageId: directMessage.id,
-    roomId: target.id,
-  });
-  assert.equal(published.message.authorId, "manager");
-  assert.equal(published.message.text, directMessage.text);
-
-  await conversationStore.bindRuntime({
-    conversationId: direct.conversationId,
-    agentId: "manager",
-    runtimeKind: "codex",
-    runtimeSessionId: "thread-direct-old",
-  });
-  await conversationStore.bindRuntime({
-    conversationId: direct.conversationId,
-    agentId: "manager",
-    runtimeKind: "codex",
-    runtimeSessionId: direct.runtimeSessionId,
-  });
-  const route = createConversationRoutes({
-    conversations: {
-      findSession: async (threadId) => ({ threadId, messages: [] }),
-    },
-    execution: { getStatus: () => ({ active: false, turnId: "" }) },
-    contextManagement: {},
-    media: { resolveMany: () => [] },
-    agentConversationStore: conversationStore,
-  });
-  const invokeSession = (threadId, conversationId) => {
-    const request = { method: "GET" };
-    const response = {
-      status: 0,
-      body: "",
-      writeHead(status) { this.status = status; },
-      end(value) { this.body = value || ""; },
-    };
-    const url = new URL(`http://127.0.0.1/api/session?threadId=${encodeURIComponent(threadId)}&conversationId=${encodeURIComponent(conversationId)}`);
-    return { response, promise: route(request, response, url) };
-  };
-
-  await assert.rejects(
-    invokeSession(legacy.runtimeSessionId, direct.conversationId).promise,
-    (error) => error.statusCode === 409,
-  );
-  await assert.rejects(
-    invokeSession("thread-direct-old", direct.conversationId).promise,
-    (error) => error.statusCode === 409,
-  );
-  const current = invokeSession(direct.runtimeSessionId, direct.conversationId);
-  await current.promise;
-  assert.equal(current.response.status, 200);
-  assert.equal(JSON.parse(current.response.body).threadId, direct.runtimeSessionId);
-  assert.equal(groupRoom.snapshot().messages.at(-1).text, directMessage.text);
-});
-
 test("does not write legacy group Runtime events into Agent history", async (t) => {
   const { conversationStore } = await fixture(t);
   const legacy = await conversationStore.resolve({ threadId: "thread-manager" });
@@ -336,14 +194,12 @@ test("does not write legacy group Runtime events into Agent history", async (t) 
   assert.equal(ignored, null);
   assert.deepEqual(await conversationStore.readMessages(legacy.conversationId), []);
 
-  const runtimeRegistry = createRuntimeAdapterRegistry({
-    adapters: [{
-      kind: "codex",
-      readConversation: async () => null,
-      ensureConversation: async () => "thread-direct",
-    }],
+  const direct = await conversationStore.bindRuntime({
+    agentId: "manager",
+    runtimeKind: "codex",
+    runtimeSessionId: "thread-direct",
+    conversationKind: "direct",
   });
-  const direct = await conversationStore.openForAgent({ agentId: "manager", runtimeRegistry });
   const recorded = await conversationStore.recordRuntimeMessage("codex", direct.runtimeSessionId, {
     id: "direct-event",
     role: "assistant",

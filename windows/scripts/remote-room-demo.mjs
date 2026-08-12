@@ -22,10 +22,8 @@ import { createWebOutputService } from "../server/web-output-service.mjs";
 import { createFushengUsageService } from "../server/fusheng-usage-service.mjs";
 import { createImageGenerationRunStore } from "../server/image-generation/image-generation-run-store.mjs";
 import { createAgentConversationStore } from "../server/agent-conversation-store.mjs";
-import { createAgentConversationStoreRouter } from "../server/agent-conversation-store-router.mjs";
 import { createPublicationStore } from "../server/publication-store.mjs";
 import { createAgentPublicationService } from "../server/agent-publication-service.mjs";
-import { createCodexRuntimeAdapter, createRuntimeAdapterRegistry } from "../server/runtime-adapter-registry.mjs";
 import { createGroupRoomDirectory } from "../server/group-room-directory.mjs";
 import { createEmployeeProjectRegistry } from "../server/employee-project-registry.mjs";
 import { createProjectIdentityStore } from "../server/project-identity-store.mjs";
@@ -35,6 +33,7 @@ import { createEmployeeGrowthStore } from "../server/employee-growth-store.mjs";
 import { createEmployeeGrowthReviewer } from "../server/employee-growth-reviewer.mjs";
 import { createEmployeeGrowthService } from "../server/employee-growth-service.mjs";
 import { createAttachmentContentService } from "../server/attachment-content-service.mjs";
+import { loadEmployeeDefinitions } from "../server/employee-definitions.mjs";
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -46,6 +45,7 @@ const port = Number(getArg("--port", "9360"));
 const observerPort = Number(getArg("--observer-port", "9350"));
 const project = getArg("--project", "negus");
 const projectRoot = path.resolve(getArg("--project-root", process.cwd()));
+const employeesRoot = path.join(projectRoot, "employees");
 const webRoot = path.resolve(getArg("--web-root", path.join(process.cwd(), "web-ui", "dist")));
 const token = getArg("--token", randomBytes(12).toString("hex"));
 const deviceName = String(getArg("--device-name", os.hostname())).trim() || os.hostname();
@@ -69,6 +69,7 @@ const execution = createExecutionTracker({
   onTurnTerminal: (event) => followUpQueue?.handleTurnTerminal(event),
 });
 let contextManagement;
+let employeeRegistry;
 const jsonlConversations = createJsonlConversationStore({
   sessionRoot,
   projectRoot,
@@ -76,7 +77,6 @@ const jsonlConversations = createJsonlConversationStore({
   onChange: realtime.broadcast,
 });
 let agentConversationStore;
-let legacyAgentConversationStore;
 const appServerConversations = createAppServerConversationStore({
   projectRoot,
   attachmentContent,
@@ -89,6 +89,19 @@ const appServerConversations = createAppServerConversationStore({
   onSubmitted: execution.markSubmitted,
   onFailed: execution.markFailed,
   onHealthState: execution.handleHealthState,
+  threadRuntimeOptions: async (thread) => {
+    const employee = employeeRegistry?.list?.().find((entry) => entry.mainThreadId === thread?.id);
+    if (!employee) return null;
+    const policy = employee.modificationConfirmed
+      ? { sandbox: "workspace-write", approvalPolicy: "on-request" }
+      : { sandbox: "read-only", approvalPolicy: "never" };
+    return {
+      resume: policy,
+      turn: {
+        cwd: employee.projectRoot,
+      },
+    };
+  },
 });
 const conversationVersions = createConversationVersionStore({
   stateFile: path.join(projectRoot, "runtime", "conversation-versions.json"),
@@ -114,9 +127,11 @@ contextManagement = await createContextManagementService({
   getRuntimeContext: conversations.getRuntimeContext,
   compactContext: conversations.compactContext,
 });
-const employeeRegistry = await createEmployeeProjectRegistry({
+const employeeDefinitions = await loadEmployeeDefinitions(employeesRoot);
+employeeRegistry = await createEmployeeProjectRegistry({
   stateFile: path.join(projectRoot, "runtime", "employee-projects.json"),
   workspaceRoot: projectRoot,
+  definitions: employeeDefinitions,
 });
 const projectIdentity = await createProjectIdentityStore({
   stateFile: path.join(projectRoot, "runtime", "project-identities.json"),
@@ -165,7 +180,7 @@ const broadcastEmployeeGroupMessage = async ({ message, projectId, roomId }) => 
   });
   realtime.broadcast({ type: "sessions_changed", threadId, conversationId: binding.conversationId, employeeId, source: "group", projectId, roomId });
 };
-const groupRoomEntries = await Promise.all(projectIdentities.map(async (identity) => {
+const groupRoomEntries = await Promise.all(projectIdentities.filter((identity) => identity.kind !== "employee").map(async (identity) => {
   const roomId = roomIdForProject(identity);
   const stateFile = identity.kind === "personal"
     ? path.join(projectRoot, "runtime", "group-room.json")
@@ -175,6 +190,14 @@ const groupRoomEntries = await Promise.all(projectIdentities.map(async (identity
     project: identity.name,
     projectId: identity.projectId,
     roomId,
+    agentDefinitions: employeeRegistry.listRuntimeProfiles().map((employee) => ({
+      id: employee.id,
+      name: employee.name,
+      shortName: employee.shortName,
+      aliases: employee.aliases,
+      responsibility: employee.responsibility,
+      instructions: employee.instructions,
+    })),
     broadcast: realtime.broadcast,
     onMessageCreated: broadcastEmployeeGroupMessage,
   });
@@ -207,7 +230,6 @@ const employeeRuntime = createEmployeeRuntimeService({
   broadcast: realtime.broadcast,
   growthService: employeeGrowth,
   contextProvider: employeeGrowth.getContext,
-  execution,
 });
 const employeeProjectDirectory = createEmployeeProjectDirectory({
   project,
@@ -220,15 +242,7 @@ const employeeProjectDirectory = createEmployeeProjectDirectory({
   employeeConversations: employeeConversationStore,
   roomDirectory: groupRoomDirectory,
 });
-legacyAgentConversationStore = await createAgentConversationStore({
-  stateFile: path.join(projectRoot, "runtime", "agent-conversations.json"),
-  groupRoom,
-  roomDirectory: groupRoomDirectory,
-});
-agentConversationStore = createAgentConversationStoreRouter({
-  primary: employeeConversationStore,
-  fallbacks: [legacyAgentConversationStore],
-});
+agentConversationStore = employeeConversationStore;
 const publicationStore = await createPublicationStore({
   stateFile: path.join(projectRoot, "runtime", "agent-publications.json"),
 });
@@ -259,6 +273,7 @@ const multiAgentDirectory = new Map(groupRoomEntries.map(({ identity, room }) =>
   const roomId = room.snapshot().room.id;
   const service = createMultiAgentService({
     projectRoot: identity.root || identity.roots?.project || projectRoot,
+    employeeWorkRoots: Object.fromEntries(employeeRegistry.list().map((employee) => [employee.id, employee.projectRoot])),
     room,
     broadcast: (event) => realtime.broadcast({ ...event, roomId }),
     webOutputs,
@@ -269,15 +284,9 @@ const multiAgentDirectory = new Map(groupRoomEntries.map(({ identity, room }) =>
   return [roomId, service];
 }));
 const multiAgent = multiAgentDirectory.get(groupRoom.snapshot().room.id);
-const runtimeRegistry = createRuntimeAdapterRegistry({
-  adapters: [createCodexRuntimeAdapter({
-    conversations,
-    ensureSession: (agent) => multiAgent.ensureAgentConversationThread(agent.id),
-  })],
-});
 const agentPublicationService = createAgentPublicationService({
   conversationStore: agentConversationStore,
-  runtimeRegistry,
+  conversations,
   groupRoom,
   roomDirectory: groupRoomDirectory,
   publicationStore,
@@ -292,7 +301,7 @@ const readWebVersion = createWebVersionReader(webRoot);
 const requestHandler = createRequestHandler({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime, submissions,
   followUpQueue, contextManagement, groupRoom, roomDirectory: groupRoomDirectory, multiAgent, multiAgentDirectory, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
-  agentConversationStore, agentPublicationService, runtimeRegistry, employeeRuntime,
+  agentConversationStore, agentPublicationService, employeeRuntime,
   employeeProjectDirectory, employeeGrowth,
 });
 const server = http.createServer(requestHandler);
@@ -314,7 +323,6 @@ const close = () => {
   void employeeConversationStore.close();
   void projectIdentity.close();
   void employeeRegistry.close();
-  void legacyAgentConversationStore.close();
   void publicationStore.close();
   server.close();
 };

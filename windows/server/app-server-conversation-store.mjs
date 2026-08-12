@@ -68,6 +68,7 @@ const promptFromSlashCommand = (text, attachments = []) => {
 export const createAppServerConversationStore = ({
   projectRoot, registerMedia, onProtocolMessage, onSubmitted, onFailed, onHealthState,
   attachmentContent,
+  threadRuntimeOptions = async () => null,
   client = createAppServerClient(),
   supervision = {},
 }) => {
@@ -342,27 +343,30 @@ export const createAppServerConversationStore = ({
 
   const ensureProjectThread = async (threadId) => {
     const thread = await getThread(threadId);
-    if (!thread?.cwd || path.resolve(thread.cwd).toLowerCase() !== path.resolve(projectRoot).toLowerCase()) {
+    const belongsToProject = thread?.cwd
+      && path.resolve(thread.cwd).toLowerCase() === path.resolve(projectRoot).toLowerCase();
+    const runtimeOptions = belongsToProject ? null : await threadRuntimeOptions(thread);
+    if (!belongsToProject && !runtimeOptions) {
       throw new Error("This conversation does not belong to the current project.");
     }
     threadCache.set(thread.id, thread);
-    return thread;
+    return { thread, runtimeOptions };
   };
 
   const resumeThread = async (threadId) => {
-    const thread = await ensureProjectThread(threadId);
+    const { runtimeOptions } = await ensureProjectThread(threadId);
     const freshRuntime = freshThreadRuntime.get(threadId);
     if (freshRuntime) return freshRuntime;
-    return client.request("thread/resume", { threadId, persistExtendedHistory: true });
+    return client.request("thread/resume", { threadId, persistExtendedHistory: true, ...(runtimeOptions?.resume || {}) });
   };
 
   const forkSession = async (threadId, lastTurnId) => {
-    await ensureProjectThread(threadId);
+    const { thread } = await ensureProjectThread(threadId);
     if (!lastTurnId) throw new Error("请选择一个已完成的对话位置再继续");
     const result = await client.request("thread/fork", {
       threadId,
       lastTurnId,
-      cwd: projectRoot,
+      cwd: thread.cwd || projectRoot,
     });
     if (!result?.thread) throw new Error("Codex 未返回新的分支会话");
     threadCache.set(result.thread.id, result.thread);
@@ -391,10 +395,12 @@ export const createAppServerConversationStore = ({
     onSubmitted?.(threadId);
     try {
       await resumeThread(threadId);
+      const { runtimeOptions } = await ensureProjectThread(threadId);
       const result = await client.request("turn/start", {
         threadId,
         input: await inputFromAttachments(promptFromSlashCommand(text, attachments), attachments, attachmentContent),
         ...(submissionId ? { clientUserMessageId: submissionId } : {}),
+        ...(runtimeOptions?.turn || {}),
       });
       freshThreadRuntime.delete(threadId);
       return result;
