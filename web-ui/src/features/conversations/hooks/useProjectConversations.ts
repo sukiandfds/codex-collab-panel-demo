@@ -278,10 +278,10 @@ export function useProjectConversations() {
   }, [catalog.createSession, catalog.forkSession, execution.status.active, selection.selectedIdRef, selection.session, sendDirectMessage]);
 
   const beginEditMessage = useCallback((message: SessionMessage) => {
-    if (message.role !== "user" || !message.turnId || execution.status.active || selection.session?.archived) return;
+    if (message.role !== "user" || !message.turnId || selection.session?.archived) return;
     editingMessageRef.current = message;
     setEditingMessage(message);
-  }, [execution.status.active, selection.session?.archived]);
+  }, [selection.session?.archived]);
 
   const cancelEditMessage = useCallback(() => {
     editingMessageRef.current = null;

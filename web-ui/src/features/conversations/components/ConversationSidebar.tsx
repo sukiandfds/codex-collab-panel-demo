@@ -1,4 +1,5 @@
 import { Archive, ArchiveRestore, RefreshCw, SquarePen } from "lucide-react";
+import { useEffect, useState } from "react";
 import { SidebarHeader } from "../../../components/Sidebar/SidebarHeader";
 import type { ProjectInfo, SessionSummary } from "../model/types";
 import type { ExecutionStatus } from "../../execution/model/types";
@@ -18,7 +19,7 @@ interface ConversationSidebarProps {
   archiveBusyId: string;
   error: string;
   onSelect: (threadId: string) => void;
-  onCreate: () => Promise<boolean>;
+  onCreate: (projectRoot?: string) => Promise<boolean>;
   onRefresh: () => void;
   onArchiveViewChange: (archived: boolean) => Promise<void>;
   onArchive: (threadId: string) => Promise<boolean>;
@@ -47,6 +48,11 @@ export function ConversationSidebar({
   onCloseSidebar,
 }: ConversationSidebarProps) {
   const directory = useProjectDirectory(currentStatus);
+  const defaultProjectRoot = directory.projects.find((entry) => entry.kind === "personal")?.root || project?.root || "";
+  const [activeProjectRoot, setActiveProjectRoot] = useState(defaultProjectRoot);
+  useEffect(() => {
+    if (!activeProjectRoot && defaultProjectRoot) setActiveProjectRoot(defaultProjectRoot);
+  }, [activeProjectRoot, defaultProjectRoot]);
   const workspaceName = directory.projects.find((entry) => entry.kind === "personal")?.name
     || project?.name
     || "正在读取项目";
@@ -55,7 +61,7 @@ export function ConversationSidebar({
       <SidebarHeader
         actions={(
           <>
-          <button className={styles.iconButton} type="button" aria-label="新建对话" title="新建对话" disabled={creating} onClick={() => void onCreate()}>
+          <button className={styles.iconButton} type="button" aria-label="新建对话" title="新建对话" disabled={creating} onClick={() => void onCreate(activeProjectRoot)}>
             <SquarePen aria-hidden="true" />
           </button>
           <button className={styles.iconButton} type="button" aria-label="刷新会话" title="刷新会话" onClick={onRefresh}>
@@ -92,6 +98,7 @@ export function ConversationSidebar({
         onArchive={onArchive}
         onUnarchive={onUnarchive}
         onOpened={onCloseSidebar}
+        onActiveProjectChange={(entry) => setActiveProjectRoot(entry.root || defaultProjectRoot)}
       />
       <ConnectionStatus connected={connected} />
     </aside>

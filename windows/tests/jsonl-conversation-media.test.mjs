@@ -76,3 +76,37 @@ test("keeps archived JSONL sessions out of the active list", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("lists sessions from each configured business project and preserves cwd", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "codex-jsonl-projects-"));
+  const mainRoot = path.join(root, "main");
+  const financeRoot = path.join(root, "finance");
+  const threadIds = [
+    "00000000-0000-4000-8000-000000000021",
+    "00000000-0000-4000-8000-000000000022",
+  ];
+  await mkdir(mainRoot);
+  await mkdir(financeRoot);
+  for (const [index, projectRoot] of [mainRoot, financeRoot].entries()) {
+    const lines = [
+      { type: "session_meta", payload: { id: threadIds[index], cwd: projectRoot, title: `Project ${index + 1}` } },
+      { type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "Hello" }] } },
+    ];
+    await writeFile(path.join(root, `rollout-${threadIds[index]}.jsonl`), `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`, "utf8");
+  }
+
+  const store = createJsonlConversationStore({
+    sessionRoot: root,
+    projectRoot: mainRoot,
+    projectRoots: [mainRoot, financeRoot],
+    registerMedia: () => null,
+    onChange: () => {},
+  });
+  try {
+    const sessions = await store.listSessions();
+    assert.deepEqual(new Set(sessions.map((session) => session.cwd)), new Set([mainRoot, financeRoot]));
+  } finally {
+    store.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});

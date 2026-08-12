@@ -516,7 +516,10 @@ export const createConversationRoutes = ({
   }
   if (url.pathname === "/api/session" && request.method === "POST") {
     const body = await readJson(request);
-    sendJson(response, await conversations.createSession(String(body.model || "").trim()), 201);
+    sendJson(response, await conversations.createSession(
+      String(body.model || "").trim(),
+      String(body.projectRoot || "").trim(),
+    ), 201);
     return true;
   }
   if (url.pathname === "/api/session") {

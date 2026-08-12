@@ -61,6 +61,29 @@ test("creates a persisted project thread and exposes the real model catalog", as
   assert.equal(calls.filter((call) => call.method === "model/list").length, 2);
 });
 
+test("creates a thread in a registered business project and rejects unknown folders", async () => {
+  const calls = [];
+  const client = {
+    subscribe: () => () => {},
+    close: () => {},
+    request: async (method, params) => {
+      calls.push({ method, params });
+      return { thread: { id: "finance-thread", cwd: params.cwd, source: "appServer", updatedAt: 100 } };
+    },
+  };
+  const store = createAppServerConversationStore({
+    projectRoot: "D:\\main",
+    projectRoots: ["D:\\main", "D:\\finance"],
+    registerMedia: () => null,
+    client,
+  });
+
+  await store.createSession("gpt-5.6-sol", "D:\\finance");
+  assert.equal(calls[0].params.cwd, "D:\\finance");
+  await assert.rejects(() => store.createSession("", "D:\\unknown"), /not registered/iu);
+  store.close();
+});
+
 test("updates a fresh thread before its first turn without trying to resume it", async () => {
   const calls = [];
   const thread = {
@@ -504,6 +527,7 @@ test("forks, archives, and restores a project thread through app-server actions"
     latestAssistant: "",
     archived: false,
     forkedFromId: null,
+    cwd: "D:\\project",
   });
   assert.deepEqual(calls.slice(-2).map((call) => call.method), ["thread/archive", "thread/unarchive"]);
   store.close();

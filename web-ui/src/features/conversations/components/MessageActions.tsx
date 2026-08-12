@@ -10,7 +10,6 @@ interface MessageActionsProps {
   forking: boolean;
   onFork: () => Promise<boolean>;
   editable: boolean;
-  editDisabled?: boolean;
   editing: boolean;
   onEdit: () => void;
   retryable?: boolean;
@@ -38,7 +37,7 @@ const copyWithFallback = async (text: string) => {
   if (!copied) throw new Error("clipboard unavailable");
 };
 
-export function MessageActions({ text, forkable, forkDisabled = false, forking, onFork, editable, editDisabled = false, editing, onEdit, retryable = false, retrying = false, onRetry, shareable = false, threadId = "", messageId = "" }: MessageActionsProps) {
+export function MessageActions({ text, forkable, forkDisabled = false, forking, onFork, editable, editing, onEdit, retryable = false, retrying = false, onRetry, shareable = false, threadId = "", messageId = "" }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const resetTimerRef = useRef<number | null>(null);
@@ -101,7 +100,7 @@ export function MessageActions({ text, forkable, forkDisabled = false, forking, 
           type="button"
           aria-label={editing ? "正在编辑" : "重新编辑"}
           title={editing ? "正在编辑" : "重新编辑"}
-          disabled={editing || editDisabled}
+          disabled={editing}
           onClick={onEdit}
         >
           <Edit3 aria-hidden="true" />

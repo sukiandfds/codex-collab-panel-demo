@@ -202,6 +202,39 @@ test("lists supplemental-only image sessions after the native empty thread disap
   service.close();
 });
 
+test("merges JSONL-only project sessions into a successful app-server list", async () => {
+  const primary = {
+    listSessions: async () => [{
+      threadId: "native-thread",
+      title: "Native",
+      updatedAt: "2026-08-12T10:00:00.000Z",
+      cwd: "D:\\main",
+    }],
+    close: () => {},
+  };
+  const fallback = {
+    listSessions: async () => [{
+      threadId: "native-thread",
+      title: "Native from JSONL",
+      updatedAt: "2026-08-12T09:00:00.000Z",
+      cwd: "D:\\main",
+    }, {
+      threadId: "finance-thread",
+      title: "完善税务报表",
+      updatedAt: "2026-08-12T08:00:00.000Z",
+      cwd: "D:\\finance",
+    }],
+    close: () => {},
+  };
+  const service = createConversationService({ primary, fallback });
+
+  const sessions = await service.listSessions("all", false);
+  assert.deepEqual(sessions.map((session) => session.threadId), ["native-thread", "finance-thread"]);
+  assert.equal(sessions[0].title, "Native");
+  assert.equal(sessions[1].cwd, "D:\\finance");
+  service.close();
+});
+
 test("migrates a supplemental-only image conversation before sending its next message", async () => {
   const sends = [];
   const primary = {

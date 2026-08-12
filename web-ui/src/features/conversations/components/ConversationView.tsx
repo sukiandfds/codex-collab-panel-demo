@@ -26,6 +26,12 @@ const messageTime = (value?: string) => {
 
 const normalizedText = (value: string) => value.replace(/\s+/gu, " ").trim();
 
+const messageListKey = (message: SessionMessage) => (
+  message.role === "user" && message.submissionId
+    ? `submission:${message.submissionId}`
+    : message.itemId || message.id
+);
+
 const finalMessageMatchesStream = (message: SessionMessage, executionStatus: ExecutionStatus, streamingText: string) => (
   message.role === "assistant"
   && Boolean(executionStatus.turnId)
@@ -45,7 +51,6 @@ function Message({
   forking = false,
   onFork,
   editable = false,
-  editDisabled = false,
   editing = false,
   onEdit,
   retryable = false,
@@ -64,7 +69,6 @@ function Message({
   forking?: boolean;
   onFork: () => Promise<boolean>;
   editable?: boolean;
-  editDisabled?: boolean;
   editing?: boolean;
   onEdit: () => void;
   retryable?: boolean;
@@ -95,16 +99,15 @@ function Message({
           </span>
         ) : null}
       </div> : null}
-      {!streaming && !executionPlaceholder ? (
+      {!executionPlaceholder ? (
         <div className={styles.actionRow}>
-          <MessageActions
+          {!streaming ? <MessageActions
             text={message.text}
             forkable={forkable}
             forkDisabled={forkDisabled}
             forking={forking}
             onFork={onFork}
             editable={editable}
-            editDisabled={editDisabled}
             editing={editing}
             onEdit={onEdit}
             retryable={retryable}
@@ -113,7 +116,7 @@ function Message({
             shareable={shareable}
             threadId={threadId}
             messageId={message.id}
-          />
+          /> : null}
         </div>
       ) : null}
     </article>
@@ -205,7 +208,7 @@ export function ConversationView({
     : undefined;
   const visibleItems: ConversationItem[] = [
     ...displayMessages.map((message) => ({
-      id: `message:${message.itemId || message.id}`,
+      id: `message:${messageListKey(message)}`,
       message,
       streaming: false,
       execution: showExecution && message.id === executionMessage?.id,
@@ -229,7 +232,9 @@ export function ConversationView({
         id: "streaming-assistant",
         role: "assistant" as const,
         text: visibleStreamingText,
-        createdAt: completedExecution ? executionStatus.updatedAt || undefined : undefined,
+        createdAt: completedExecution
+          ? executionStatus.updatedAt || executionStatus.startedAt || undefined
+          : executionStatus.startedAt || undefined,
         turnId: executionStatus.turnId || undefined,
         itemId: executionStatus.streamingItemId || undefined,
       },
@@ -246,7 +251,6 @@ export function ConversationView({
     overscan: 6,
     getItemKey: (index) => visibleItems[index]?.id || index,
     anchorTo: "end",
-    followOnAppend: "auto",
     scrollEndThreshold: 120,
   });
   const rememberScrollPosition = useCallback((root = scrollRef.current, threadId = currentSessionRef.current?.threadId) => {
@@ -269,7 +273,6 @@ export function ConversationView({
     visible: showReturnToBottom,
     stickToBottomRef,
     onScroll: updateReturnToBottom,
-    contentChanged,
     returnToBottom,
     reset: resetReturnToBottom,
   } = useReturnToBottom({
@@ -280,11 +283,6 @@ export function ConversationView({
     getTrailingContentHeight,
     scrollToBottom: scheduleFollowLatest,
   });
-
-  useEffect(() => {
-    if (!showExecution || !executionStatus.updatedAt) return;
-    contentChanged();
-  }, [contentChanged, executionStatus.updatedAt, showExecution]);
 
   useLayoutEffect(() => {
     if (!active) {
@@ -438,7 +436,6 @@ export function ConversationView({
                         editable={item.message.role === "user"
                           && Boolean(item.message.turnId)
                           && !session?.archived}
-                        editDisabled={executionStatus.active}
                         editing={editingMessageId === item.message.id}
                         onEdit={() => onEditMessage(item.message)}
                         retryable={item.message.deliveryState === "pending"}

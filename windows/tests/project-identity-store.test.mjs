@@ -113,3 +113,42 @@ test("directory exposes project identity metadata and conversation role", async 
   assert.equal(worker.lastActivityAt, "2026-08-10T10:00:00.000Z");
   assert.equal(listing.projects.find((item) => item.kind === "personal").projectId, "project:personal:negus");
 });
+
+test("directory groups Codex conversations under an additional business project", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "negus-business-project-"));
+  const financeRoot = path.join(root, "finance");
+  await fs.mkdir(financeRoot);
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const identity = await createProjectIdentityStore({
+    stateFile: path.join(root, "project-identities.json"),
+    project: "negus",
+    projectRoot: root,
+    registry: { list: () => [] },
+    businessProjects: [{ key: "finance", name: "财务报表管理", root: financeRoot }],
+  });
+  t.after(() => identity.close());
+  const directory = createEmployeeProjectDirectory({
+    project: "negus",
+    projectRoot: root,
+    registry: { list: () => [] },
+    projectIdentity: identity,
+    conversations: {
+      listSessions: async () => [
+        { threadId: "main-thread", title: "Main", cwd: root, updatedAt: "2026-08-12T10:00:00.000Z" },
+        { threadId: "finance-thread", title: "未命名会话", cwd: financeRoot, updatedAt: "2026-08-12T11:00:00.000Z" },
+      ],
+      findSession: async (threadId) => threadId === "finance-thread" ? { title: "完善税务报表" } : null,
+    },
+  });
+
+  const listing = await directory.list();
+  const finance = listing.projects.find((item) => item.kind === "business");
+  assert.equal(listing.projects.filter((item) => item.kind !== "employee").length, 2);
+  assert.equal(finance.name, "财务报表管理");
+  assert.deepEqual(finance.conversations.map((item) => item.threadId), ["finance-thread"]);
+  assert.deepEqual(finance.conversations.map((item) => item.title), ["完善税务报表"]);
+  assert.deepEqual(
+    listing.projects.find((item) => item.kind === "personal").conversations.map((item) => item.threadId),
+    ["main-thread"],
+  );
+});

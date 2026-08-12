@@ -189,7 +189,7 @@ export function useConversationCatalog(
     };
   }, [initial, refreshSessions, selection.loadSession]);
 
-  const createSession = useCallback(async () => {
+  const createSession = useCallback(async (projectRoot = "") => {
     if (creatingRef.current) return false;
     creatingRef.current = true;
     setCreating(true);
@@ -202,7 +202,7 @@ export function useConversationCatalog(
         selection.clearSelection();
         updateArchiveQuery(false);
       }
-      const created = await conversationApi.create(currentModel);
+      const created = await conversationApi.create(currentModel, projectRoot);
       const detail: SessionDetail = { ...created, messages: [] };
       transientSessionsRef.current.set(created.threadId, created);
       selection.setCreatedSession(detail);

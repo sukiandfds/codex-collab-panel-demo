@@ -66,12 +66,17 @@ const promptFromSlashCommand = (text, attachments = []) => {
 };
 
 export const createAppServerConversationStore = ({
-  projectRoot, registerMedia, onProtocolMessage, onSubmitted, onFailed, onHealthState,
+  projectRoot, projectRoots = [projectRoot], registerMedia, onProtocolMessage, onSubmitted, onFailed, onHealthState,
   attachmentContent,
   threadRuntimeOptions = async () => null,
   client = createAppServerClient(),
   supervision = {},
 }) => {
+  const allowedProjectRoots = [...new Set(projectRoots.map((root) => path.resolve(root).toLowerCase()))];
+  const isAllowedProjectRoot = (cwd) => {
+    if (!cwd) return false;
+    try { return allowedProjectRoots.includes(path.resolve(cwd).toLowerCase()); } catch { return false; }
+  };
   const activeRuns = new Map();
   const monitorIntervalMs = supervision.intervalMs ?? 5000;
   const staleAfterMs = supervision.staleAfterMs ?? 30000;
@@ -171,22 +176,24 @@ export const createAppServerConversationStore = ({
 
   const listThreads = async ({ archived = false } = {}) => {
     const threads = [];
-    let cursor = null;
-    do {
-      const params = {
-        cursor,
-        limit: 100,
-        sortKey: "updated_at",
-        sortDirection: "desc",
-        cwd: projectRoot,
-      };
-      // Older app-server versions omit the archived filter and return active threads by default.
-      // Only send the new field when the caller explicitly requests the archive view.
-      if (archived) params.archived = true;
-      const result = await client.request("thread/list", params);
-      threads.push(...result.data);
-      cursor = result.nextCursor;
-    } while (cursor);
+    for (const root of projectRoots) {
+      let cursor = null;
+      do {
+        const params = {
+          cursor,
+          limit: 100,
+          sortKey: "updated_at",
+          sortDirection: "desc",
+          cwd: root,
+        };
+        // Older app-server versions omit the archived filter and return active threads by default.
+        // Only send the new field when the caller explicitly requests the archive view.
+        if (archived) params.archived = true;
+        const result = await client.request("thread/list", params);
+        threads.push(...result.data);
+        cursor = result.nextCursor;
+      } while (cursor);
+    }
     for (const thread of threads) threadCache.set(thread.id, thread);
     return threads;
   };
@@ -207,6 +214,7 @@ export const createAppServerConversationStore = ({
     latestAssistant: "",
     archived,
     forkedFromId: thread.forkedFromId || null,
+    cwd: thread.cwd || null,
   });
 
   const listSessions = async (source = "all", archived = false) => {
@@ -216,8 +224,10 @@ export const createAppServerConversationStore = ({
       .map((thread) => summaryFromThread(thread, archived));
   };
 
-  const createSession = async (model = "") => {
-    const params = { cwd: projectRoot };
+  const createSession = async (model = "", requestedProjectRoot = "") => {
+    const cwd = requestedProjectRoot ? path.resolve(requestedProjectRoot) : projectRoot;
+    if (!isAllowedProjectRoot(cwd)) throw new Error("This project folder is not registered in Negus.");
+    const params = { cwd };
     if (model) params.model = model;
     const result = await client.request("thread/start", params);
     const thread = result.thread;
@@ -343,8 +353,7 @@ export const createAppServerConversationStore = ({
 
   const ensureProjectThread = async (threadId) => {
     const thread = await getThread(threadId);
-    const belongsToProject = thread?.cwd
-      && path.resolve(thread.cwd).toLowerCase() === path.resolve(projectRoot).toLowerCase();
+    const belongsToProject = isAllowedProjectRoot(thread?.cwd);
     const runtimeOptions = belongsToProject ? null : await threadRuntimeOptions(thread);
     if (!belongsToProject && !runtimeOptions) {
       throw new Error("This conversation does not belong to the current project.");
@@ -384,7 +393,7 @@ export const createAppServerConversationStore = ({
   const unarchiveSession = async (threadId) => {
     const result = await client.request("thread/unarchive", { threadId });
     if (!result?.thread) throw new Error("Codex 未返回恢复后的会话");
-    if (result.thread.cwd && path.resolve(result.thread.cwd).toLowerCase() !== path.resolve(projectRoot).toLowerCase()) {
+    if (result.thread.cwd && !isAllowedProjectRoot(result.thread.cwd)) {
       throw new Error("This conversation does not belong to the current project.");
     }
     threadCache.set(result.thread.id, result.thread);

@@ -34,6 +34,7 @@ import { createEmployeeGrowthReviewer } from "../server/employee-growth-reviewer
 import { createEmployeeGrowthService } from "../server/employee-growth-service.mjs";
 import { createAttachmentContentService } from "../server/attachment-content-service.mjs";
 import { loadEmployeeDefinitions } from "../server/employee-definitions.mjs";
+import { loadBusinessProjects } from "../server/business-project-config.mjs";
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -51,6 +52,8 @@ const token = getArg("--token", randomBytes(12).toString("hex"));
 const deviceName = String(getArg("--device-name", os.hostname())).trim() || os.hostname();
 const device = { name: deviceName, startedAt: new Date().toISOString() };
 const sessionRoot = process.env.CODEX_SESSION_DIR || path.join(os.homedir(), ".codex", "sessions");
+const businessProjects = await loadBusinessProjects(path.join(projectRoot, "runtime", "business-projects.json"));
+const projectRoots = [projectRoot, ...businessProjects.map((entry) => entry.root)];
 const attachmentContent = createAttachmentContentService();
 const media = createMediaService({ uploadRoot: path.join(projectRoot, "runtime", "uploads"), attachmentContent });
 await media.restoreUploads();
@@ -73,12 +76,14 @@ let employeeRegistry;
 const jsonlConversations = createJsonlConversationStore({
   sessionRoot,
   projectRoot,
+  projectRoots,
   registerMedia: media.register,
   onChange: realtime.broadcast,
 });
 let agentConversationStore;
 const appServerConversations = createAppServerConversationStore({
   projectRoot,
+  projectRoots,
   attachmentContent,
   registerMedia: media.register,
   onProtocolMessage: (message) => {
@@ -138,6 +143,7 @@ const projectIdentity = await createProjectIdentityStore({
   project,
   projectRoot,
   registry: employeeRegistry,
+  businessProjects,
 });
 const projectIdentities = projectIdentity.list();
 const roomIdForProject = (identity) => identity.kind === "personal"

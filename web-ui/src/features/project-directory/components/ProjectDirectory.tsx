@@ -81,6 +81,7 @@ interface ProjectDirectoryProps {
   navigationOnly?: boolean;
   onProjectOpen?: (project: DirectoryProject) => void | Promise<void>;
   onEmployeeOpen?: (project: DirectoryProject) => void | Promise<void>;
+  onActiveProjectChange?: (project: DirectoryProject) => void;
 }
 
 export function ProjectDirectory({
@@ -105,6 +106,7 @@ export function ProjectDirectory({
   navigationOnly = false,
   onProjectOpen,
   onEmployeeOpen,
+  onActiveProjectChange,
 }: ProjectDirectoryProps) {
   const params = new URLSearchParams(window.location.search);
   const routeEmployeeId = params.get("employeeId") || params.get("agent") || "";
@@ -175,16 +177,17 @@ export function ProjectDirectory({
           const isSelected = entry.id === selectedProjectId;
           const isPersonal = entry.kind === "personal";
           const isEmployee = entry.kind === "employee";
+          const isBusiness = entry.kind === "business";
           const startsSection = index === 0 || isEmployee !== (visibleProjects[index - 1]?.kind === "employee");
           const usesSessionFallback = isPersonal && !entry.conversations?.length;
-          const conversations = isPersonal
-            ? entry.conversations?.length ? entry.conversations : sessions.map((session, index) => ({ id: session.threadId, threadId: session.threadId, title: session.title, main: index === 0, lastActivityAt: session.updatedAt, messageCount: session.messageCount, archived: session.archived }))
+          const conversations = isPersonal || isBusiness
+            ? entry.conversations?.length ? entry.conversations : isPersonal ? sessions.map((session, index) => ({ id: session.threadId, threadId: session.threadId, title: session.title, main: index === 0, lastActivityAt: session.updatedAt, messageCount: session.messageCount, archived: session.archived })) : []
             : employeeConversations(entry);
           const projectSessions = conversations.map((conversation) => toSession(entry, conversation));
           const projectStatus = isCurrent && currentStatus?.threadId
             ? statusByThread[currentStatus.threadId] || currentStatus
             : entry.mainThreadId ? statusByThread[entry.mainThreadId] || entry.status : entry.status;
-          const displayName = isPersonal && projectNameMode === "folder"
+          const displayName = (isPersonal || isBusiness) && projectNameMode === "folder"
             ? folderName(entry.root)
             : isEmployee ? employeeDisplayNames[entry.employeeId || ""] || entry.name.replace(/\s*Agent$/iu, "") : entry.name;
           return (
@@ -214,6 +217,7 @@ export function ProjectDirectory({
                 type="button"
                 aria-expanded={navigationOnly ? undefined : isSelected}
                 onClick={() => {
+                  if (!isEmployee) onActiveProjectChange?.(entry);
                   if (!navigationOnly) {
                     setSelectedProjectId((current) => current === entry.id ? "" : entry.id);
                     return;

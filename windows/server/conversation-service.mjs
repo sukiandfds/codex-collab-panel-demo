@@ -80,6 +80,19 @@ const mergeSupplementalSessions = (sessions = [], supplemental = []) => {
   return [...byId.values()].sort((left, right) => Date.parse(right.updatedAt || "") - Date.parse(left.updatedAt || ""));
 };
 
+const mergeFallbackSessions = (primary = [], fallback = []) => {
+  const byId = new Map(fallback.map((session) => [session.threadId, session]));
+  for (const session of primary) {
+    const fallbackSession = byId.get(session.threadId);
+    byId.set(session.threadId, {
+      ...fallbackSession,
+      ...session,
+      cwd: session.cwd || fallbackSession?.cwd || null,
+    });
+  }
+  return [...byId.values()].sort((left, right) => Date.parse(right.updatedAt || "") - Date.parse(left.updatedAt || ""));
+};
+
 export const createConversationService = ({ primary, fallback, contentVersionStore, supplementalMessages }) => {
   const inFlightFinds = new Map();
   const missingThreadPattern = /(?:thread|conversation|session).*(?:not found|does not exist|unknown)|no persisted turns/iu;
@@ -128,7 +141,15 @@ export const createConversationService = ({ primary, fallback, contentVersionSto
   };
 
   const listSessions = async (...args) => {
-    const sessions = await withFallback("listSessions", ...args);
+    let sessions;
+    try {
+      const primarySessions = await primary.listSessions(...args);
+      const fallbackSessions = await fallback.listSessions(...args);
+      sessions = mergeFallbackSessions(primarySessions, fallbackSessions);
+    } catch (error) {
+      console.warn(`[conversation-service] app-server request failed, using JSONL fallback: ${error.message}`);
+      sessions = await fallback.listSessions(...args);
+    }
     const source = String(args[0] || "all");
     const archived = Boolean(args[1]);
     if (!supplementalMessages?.listSessions || archived || source === "happy") return sessions;

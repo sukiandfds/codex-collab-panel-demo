@@ -53,6 +53,7 @@ negus 是一个围绕真实 Codex 工作过程的 Web 协作工作台。
 | 要修改的模块 | 先读的文档 | 主要代码位置 |
 | --- | --- | --- |
 | 单人 Web 对话、执行、历史 | `docs/feature-development/features/FEAT-001-single-codex-web.md` | `web-ui/src/features/conversations/`、`execution/`、`context-management/`；`windows/server/conversation-service.mjs`、`app-server-conversation-store.mjs`、`execution-tracker.mjs` |
+| 多业务项目与会话归类 | `docs/feature-development/features/FEAT-017-multiple-business-projects.md` | `web-ui/src/features/project-directory/`；`windows/server/business-project-config.mjs`、`project-identity-store.mjs`、`employee-project-directory.mjs` |
 | 项目群聊和多 Agent | `docs/feature-development/features/FEAT-002-group-multi-agent.md` | `web-ui/src/features/group-chat/`；`windows/server/group-room-store.mjs`、`multi-agent-service.mjs` |
 | 附件和内容渲染 | `docs/feature-development/features/FEAT-003-attachments-content-rendering.md` | `web-ui/src/features/attachments/`、`conversations/rendering/`；`windows/server/content-blocks.mjs`、`media-service.mjs` |
 | PWA、设备和移动端入口 | `docs/feature-development/features/FEAT-004-pwa-device-identity.md` | `web-ui/src/pwa/`、`features/device/`、`features/app-update/`；`web-ui/public/`、`windows/server/request-handler.mjs` |

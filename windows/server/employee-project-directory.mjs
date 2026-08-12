@@ -121,6 +121,19 @@ export const createEmployeeProjectDirectory = ({
     try { await projectIdentity?.sync?.(); } catch {}
     const projectIdentities = projectIdentity?.list?.() || [];
     const personalIdentity = projectIdentities.find((item) => item.kind === "personal") || null;
+    const businessIdentities = projectIdentities.filter((item) => item.kind === "personal" || item.kind === "business");
+    if (!businessIdentities.some((item) => item.kind === "personal")) {
+      businessIdentities.unshift({
+        projectId: clean(project, 200) || "project",
+        key: clean(project, 120) || "project",
+        name: clean(project, 160) || "My project",
+        kind: "personal",
+        root: projectRoot,
+        roots: { project: projectRoot },
+        provider: "codex",
+        runtime: { provider: "codex" },
+      });
+    }
     const conversationStatuses = {};
     const employeeProjects = await Promise.all(employees.map(async (employee) => {
       const identity = projectIdentity?.getByKey?.("employee", employee.projectKey)
@@ -179,6 +192,15 @@ export const createEmployeeProjectDirectory = ({
     }));
     let sessions = [];
     try { sessions = await conversations?.listSessions?.("all", false) || []; } catch {}
+    sessions = await Promise.all(sessions.map(async (session) => {
+      if (clean(session?.title, 240) && session.title !== "未命名会话") return session;
+      try {
+        const detail = await conversations?.findSession?.(session.threadId, "all", { limit: 1 });
+        return detail?.title ? { ...session, title: detail.title } : session;
+      } catch {
+        return session;
+      }
+    }));
     const employeeThreadIds = new Set([
       ...employees.map((employee) => clean(employee.mainThreadId, 120)),
       ...(roomDirectory?.threadIds?.() || []),
@@ -193,37 +215,44 @@ export const createEmployeeProjectDirectory = ({
     });
     const activeSessionStatus = sessionStatuses.find((status) => status.indicator === "red")
       || sessionStatuses.find((status) => status.indicator === "green");
-    const own = {
-      id: clean(project, 120) || "project",
-      projectId: clean(personalIdentity?.projectId, 200) || clean(project, 120) || "project",
-      name: clean(project, 160) || "My project",
-      kind: "personal",
-      root: clean(personalIdentity?.root, 400) || projectRoot,
-      roots: personalIdentity?.roots || { project: projectRoot },
-      provider: clean(personalIdentity?.provider, 80) || "codex",
-      runtime: personalIdentity?.runtime || { provider: "codex" },
-      capabilities: personalIdentity?.capabilities || {},
-      memberEmployeeIds: personalIdentity?.memberEmployeeIds || [],
-      agentIds: personalIdentity?.agentIds || [],
-      status: activeSessionStatus
-        || publicStatus(typeof personalStatus === "function" ? personalStatus() : personalStatus),
-      lastActivityAt: latestTimestamp(sessions.map((session) => session?.updatedAt)),
-      conversations: sessions.map((session) => ({
-        id: clean(session?.threadId, 120),
-        threadId: clean(session?.threadId, 120),
-        projectId: clean(personalIdentity?.projectId, 200) || clean(project, 120) || "project",
-        role: "standard",
-        runtimeKind: "codex",
-        runtimeSessionId: clean(session?.threadId, 120),
-        title: clean(session?.title, 240) || "未命名会话",
-        updatedAt: session?.updatedAt || null,
-        lastActivityAt: session?.updatedAt || null,
-        messageCount: Number.isSafeInteger(session?.messageCount) ? session.messageCount : null,
-        archived: session?.archived === true,
-        status: conversationStatuses[clean(session?.threadId, 120)] || idleStatus(),
-      })).filter((conversation) => conversation.threadId),
+    const sameRoot = (left, right) => {
+      try { return clean(left, 800).toLowerCase() === clean(right, 800).toLowerCase(); } catch { return false; }
     };
-    const projects = [own, ...employeeProjects].sort((left, right) => {
+    const businessProjects = businessIdentities.map((identity) => {
+      const projectSessions = sessions.filter((session) => sameRoot(session?.cwd, identity.root));
+      const isPersonal = identity.kind === "personal";
+      return {
+        id: clean(identity.projectId, 200) || clean(identity.key, 120),
+        projectId: clean(identity.projectId, 200) || clean(identity.key, 120),
+        name: clean(identity.name, 160) || (isPersonal ? clean(project, 160) : "Business project"),
+        kind: identity.kind,
+        root: clean(identity.root, 400) || (isPersonal ? projectRoot : ""),
+        roots: identity.roots || { project: identity.root },
+        provider: clean(identity.provider, 80) || "codex",
+        runtime: identity.runtime || { provider: "codex" },
+        capabilities: identity.capabilities || {},
+        memberEmployeeIds: identity.memberEmployeeIds || [],
+        agentIds: identity.agentIds || [],
+        status: (isPersonal ? activeSessionStatus : null)
+          || publicStatus(typeof personalStatus === "function" ? personalStatus() : personalStatus),
+        lastActivityAt: latestTimestamp(projectSessions.map((session) => session?.updatedAt)),
+        conversations: projectSessions.map((session) => ({
+          id: clean(session?.threadId, 120),
+          threadId: clean(session?.threadId, 120),
+          projectId: clean(identity.projectId, 200) || clean(identity.key, 120),
+          role: "standard",
+          runtimeKind: "codex",
+          runtimeSessionId: clean(session?.threadId, 120),
+          title: clean(session?.title, 240) || "未命名会话",
+          updatedAt: session?.updatedAt || null,
+          lastActivityAt: session?.updatedAt || null,
+          messageCount: Number.isSafeInteger(session?.messageCount) ? session.messageCount : null,
+          archived: session?.archived === true,
+          status: conversationStatuses[clean(session?.threadId, 120)] || idleStatus(),
+        })).filter((conversation) => conversation.threadId),
+      };
+    });
+    const projects = [...businessProjects, ...employeeProjects].sort((left, right) => {
       const leftTime = Date.parse(left.lastActivityAt || "");
       const rightTime = Date.parse(right.lastActivityAt || "");
       if (!Number.isFinite(leftTime) && !Number.isFinite(rightTime)) return 0;

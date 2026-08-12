@@ -191,6 +191,28 @@ const personalProject = ({ project, projectRoot }) => ({
   conversation: null,
 });
 
+const businessProject = (definition) => ({
+  kind: "business",
+  key: clean(definition?.key, 160) || slug(definition?.name),
+  name: clean(definition?.name, 240) || clean(definition?.key, 160) || "Business project",
+  memberEmployeeIds: [],
+  agentIds: [],
+  provider: clean(definition?.provider, 80) || "codex",
+  runtime: { provider: clean(definition?.provider, 80) || "codex" },
+  root: clean(definition?.root, 800) || null,
+  roots: { project: clean(definition?.root, 800) || null },
+  capabilities: {
+    identity: { enabled: true, source: "project-directory", key: "projectId" },
+    localHistory: { enabled: true, source: "conversation-store", key: "projectId" },
+    permissions: { enabled: true, source: "execution-tracker", key: "projectId" },
+    status: { enabled: true, source: "execution-tracker", key: "projectId" },
+    groupPublication: { enabled: false, source: null, key: null },
+    subagents: { enabled: true, source: "runtime-adapter", key: "provider" },
+  },
+  metadata: {},
+  conversation: null,
+});
+
 const mergeProject = (existing, incoming) => {
   const base = normalizeProject(existing || incoming);
   const incomingConversation = incoming.conversation || base.conversation;
@@ -220,6 +242,7 @@ export const createProjectIdentityStore = async ({
   project,
   projectRoot,
   registry = null,
+  businessProjects = [],
 }) => {
   if (!stateFile) throw new Error("Project identity state file is required.");
   const stored = await readState(stateFile);
@@ -261,7 +284,10 @@ export const createProjectIdentityStore = async ({
   };
 
   const sync = async () => {
-    const incoming = [personalProject({ project, projectRoot })];
+    const incoming = [
+      personalProject({ project, projectRoot }),
+      ...businessProjects.map(businessProject),
+    ];
     for (const employee of registry?.list?.() || []) incoming.push(employeeProject(employee));
     const before = [...projects.values()];
     const synced = incoming.map(upsert);

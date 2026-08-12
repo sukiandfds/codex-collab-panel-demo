@@ -17,7 +17,7 @@ const walkJsonl = async (directory) => {
 
 const threadIdFromFile = (file) => path.basename(file).match(/[0-9a-f]{8}-[0-9a-f-]{27,}/iu)?.[0] || path.basename(file);
 
-export const createJsonlConversationStore = ({ sessionRoot, projectRoot, registerMedia, onChange }) => {
+export const createJsonlConversationStore = ({ sessionRoot, projectRoot, projectRoots = [projectRoot], registerMedia, onChange }) => {
   const archivedRoot = path.join(path.dirname(sessionRoot), "archived_sessions");
   const headerCache = new Map();
   const projectHeaders = new Map();
@@ -27,7 +27,10 @@ export const createJsonlConversationStore = ({ sessionRoot, projectRoot, registe
 
   const sameProject = (cwd) => {
     if (!cwd) return false;
-    try { return path.resolve(cwd).toLowerCase() === projectRoot.toLowerCase(); } catch { return false; }
+    try {
+      const resolved = path.resolve(cwd).toLowerCase();
+      return projectRoots.some((root) => path.resolve(root).toLowerCase() === resolved);
+    } catch { return false; }
   };
 
   const isArchivedFile = (file) => {
@@ -228,6 +231,7 @@ export const createJsonlConversationStore = ({ sessionRoot, projectRoot, registe
       latestUser: previewText(latestUser, 260),
       latestAssistant: previewText(latestAssistant, 260),
       archived: Boolean(header.archived),
+      cwd: header.cwd || null,
       messages: state.messages,
     };
   };
