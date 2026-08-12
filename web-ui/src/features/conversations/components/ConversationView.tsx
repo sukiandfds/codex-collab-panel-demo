@@ -53,6 +53,9 @@ function Message({
   onRetry,
   shareable = false,
   threadId = "",
+  executionStatus,
+  contextStatus,
+  executionPlaceholder = false,
 }: {
   message: SessionMessage;
   streaming?: boolean;
@@ -69,25 +72,30 @@ function Message({
   onRetry?: () => Promise<boolean>;
   shareable?: boolean;
   threadId?: string;
+  executionStatus?: ExecutionStatus;
+  contextStatus?: ContextStatus;
+  executionPlaceholder?: boolean;
 }) {
   const formattedTime = messageTime(message.createdAt);
   const reserveTimestamp = message.role === "assistant";
   return (
     <article className={`${styles.message} ${message.role === "user" ? styles.user : styles.assistant}`}>
-      {formattedTime || reserveTimestamp ? (
+      {executionStatus && contextStatus ? (
+        <ExecutionTimeline status={executionStatus} contextStatus={contextStatus} timestamp={formattedTime} />
+      ) : formattedTime || reserveTimestamp ? (
         <time className={styles.timestamp} dateTime={message.createdAt} aria-hidden={!formattedTime}>
           {formattedTime || "\u00a0"}
         </time>
       ) : null}
-      <div className={styles.body}>
+      {!executionPlaceholder ? <div className={styles.body}>
         {streaming ? <div className={styles.streamingText}>{message.text}<i className={styles.cursor} /></div> : <ContentRenderer message={message} />}
         {message.deliveryState === "pending" ? (
           <span className={styles.deliveryState} title="正在确认指令是否已送达" aria-label="正在确认指令是否已送达">
             <Clock3 aria-hidden="true" />
           </span>
         ) : null}
-      </div>
-      {!streaming ? (
+      </div> : null}
+      {!streaming && !executionPlaceholder ? (
         <div className={styles.actionRow}>
           <MessageActions
             text={message.text}
@@ -134,8 +142,7 @@ interface ConversationViewProps {
 }
 
 type ConversationItem =
-  | { id: string; type: "message"; message: SessionMessage; streaming: boolean }
-  | { id: string; type: "execution" };
+  { id: string; message: SessionMessage; streaming: boolean; execution: boolean; executionPlaceholder?: boolean };
 
 export function ConversationView({
   active = true,
@@ -184,7 +191,6 @@ export function ConversationView({
   );
   const visibleStreamingText = executionMatchesSession && !finalMessageLoaded ? streamingText : "";
   const isAnswerStreaming = Boolean(visibleStreamingText) && executionStatus.active && !completedExecution;
-  const executionIndex = finalMessageLoaded ? Math.max(0, messages.length - 1) : messages.length;
   const displayMessages = messages.map((message) => (
     !message.createdAt
       && completedExecution
@@ -194,13 +200,31 @@ export function ConversationView({
       ? { ...message, createdAt: executionStatus.updatedAt || executionStatus.startedAt || undefined }
       : message
   ));
+  const executionMessage = finalMessageLoaded
+    ? [...displayMessages].reverse().find((message) => message.role === "assistant" && message.turnId === executionStatus.turnId)
+    : undefined;
   const visibleItems: ConversationItem[] = [
-    ...displayMessages.slice(0, executionIndex).map((message) => ({ id: `message:${message.itemId || message.id}`, type: "message" as const, message, streaming: false })),
-    ...(showExecution ? [{ id: "latest-execution", type: "execution" as const }] : []),
-    ...displayMessages.slice(executionIndex).map((message) => ({ id: `message:${message.itemId || message.id}`, type: "message" as const, message, streaming: false })),
+    ...displayMessages.map((message) => ({
+      id: `message:${message.itemId || message.id}`,
+      message,
+      streaming: false,
+      execution: showExecution && message.id === executionMessage?.id,
+    })),
+    ...(showExecution && !finalMessageLoaded && !visibleStreamingText ? [{
+      id: "message:execution-placeholder",
+      message: {
+        id: "execution-placeholder",
+        role: "assistant" as const,
+        text: "",
+        createdAt: executionStatus.startedAt || undefined,
+        turnId: executionStatus.turnId || undefined,
+      },
+      streaming: false,
+      execution: true,
+      executionPlaceholder: true,
+    }] : []),
     ...(visibleStreamingText ? [{
       id: `message:${executionStatus.streamingItemId || "streaming-assistant"}`,
-      type: "message" as const,
       message: {
         id: "streaming-assistant",
         role: "assistant" as const,
@@ -210,6 +234,7 @@ export function ConversationView({
         itemId: executionStatus.streamingItemId || undefined,
       },
       streaming: executionStatus.active && !completedExecution,
+      execution: showExecution,
     }] : []),
   ];
   const hasVisibleItems = visibleItems.length > 0;
@@ -217,9 +242,7 @@ export function ConversationView({
   const virtualizer = useVirtualizer({
     count: visibleItems.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: (index) => visibleItems[index]?.type === "execution"
-      ? 120
-      : visibleItems[index]?.message.role === "user" ? 84 : 160,
+    estimateSize: (index) => visibleItems[index]?.message.role === "user" ? 84 : 160,
     overscan: 6,
     getItemKey: (index) => visibleItems[index]?.id || index,
     anchorTo: "end",
@@ -246,6 +269,7 @@ export function ConversationView({
     visible: showReturnToBottom,
     stickToBottomRef,
     onScroll: updateReturnToBottom,
+    contentChanged,
     returnToBottom,
     reset: resetReturnToBottom,
   } = useReturnToBottom({
@@ -256,6 +280,11 @@ export function ConversationView({
     getTrailingContentHeight,
     scrollToBottom: scheduleFollowLatest,
   });
+
+  useEffect(() => {
+    if (!showExecution || !executionStatus.updatedAt) return;
+    contentChanged();
+  }, [contentChanged, executionStatus.updatedAt, showExecution]);
 
   useLayoutEffect(() => {
     if (!active) {
@@ -390,17 +419,14 @@ export function ConversationView({
                 <div
                   className={styles.virtualRow}
                   data-index={virtualRow.index}
-                  data-message-id={item.type === "message" ? item.message.id : undefined}
+                    data-message-id={item.message.id}
                   key={virtualRow.key}
                   ref={(element) => {
                     virtualizer.measureElement(element);
                   }}
                   style={{ transform: `translateY(${virtualRow.start}px)` }}
                 >
-                  {item.type === "execution"
-                    ? <ExecutionTimeline status={executionStatus} contextStatus={contextStatus} />
-                    : (
-                      <Message
+                  <Message
                         message={item.message}
                         streaming={item.streaming}
                         forkable={item.message.role === "assistant"
@@ -427,8 +453,10 @@ export function ConversationView({
                           && !(executionStatus.active && executionStatus.turnId === item.message.turnId)
                           && !session?.archived}
                         threadId={session.threadId}
+                        executionStatus={item.execution ? executionStatus : undefined}
+                        contextStatus={item.execution ? contextStatus : undefined}
+                        executionPlaceholder={item.executionPlaceholder}
                       />
-                    )}
                 </div>
               );
             })}

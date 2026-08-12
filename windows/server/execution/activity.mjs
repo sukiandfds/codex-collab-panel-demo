@@ -1,5 +1,4 @@
 export const terminalPhases = new Set(["completed", "failed", "interrupted", "systemError"]);
-export const maxActivities = 4;
 
 const commandDetail = (item) => {
   const actionCommand = Array.isArray(item?.commandActions)
@@ -7,7 +6,7 @@ const commandDetail = (item) => {
     : "";
   const raw = String(actionCommand || item?.command || "").split(/\r?\n/u)[0].trim();
   const wrapped = raw.match(/\s-(?:command|c)\s+(.+)$/iu)?.[1]?.trim() || raw;
-  return wrapped.replace(/^(?:"|')|(?:"|')$/gu, "").replace(/\\"/gu, '"').slice(0, 180);
+  return wrapped.replace(/^(?:"|')|(?:"|')$/gu, "").replace(/\\"/gu, '"');
 };
 
 export const detailFromItem = (item) => {

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { activityFromItem, detailFromItem, maxActivities, stateFromItem, terminalPhases } from "./execution/activity.mjs";
+import { activityFromItem, detailFromItem, stateFromItem, terminalPhases } from "./execution/activity.mjs";
 
 export const createExecutionTracker = ({ broadcast, stateFile = "", onTurnTerminal = () => {} }) => {
   const statuses = new Map();
@@ -126,7 +126,7 @@ export const createExecutionTracker = ({ broadcast, stateFile = "", onTurnTermin
       const index = activities.findIndex((activity) => activity.id === next.activity.id);
       activities = index >= 0
         ? activities.map((activity, activityIndex) => activityIndex === index ? next.activity : activity)
-        : [...activities, next.activity].slice(-maxActivities);
+        : [...activities, next.activity];
     }
     const status = {
       type: "execution_status",
@@ -180,7 +180,7 @@ export const createExecutionTracker = ({ broadcast, stateFile = "", onTurnTermin
     const index = previous.activities.findIndex((value) => value.id === activity.id);
     const activities = index >= 0
       ? previous.activities.map((value, activityIndex) => activityIndex === index ? activity : value)
-      : [...previous.activities, activity].slice(-maxActivities);
+      : [...previous.activities, activity];
     const status = { ...previous, activities, updatedAt: activity.updatedAt, ...nextEventMetadata(threadId) };
     statuses.set(threadId, status);
     schedulePersist();
@@ -199,7 +199,7 @@ export const createExecutionTracker = ({ broadcast, stateFile = "", onTurnTermin
       completed: true,
       updatedAt: now,
     };
-    const activities = [...previous.activities.filter((value) => value.id !== activity.id), activity].slice(-maxActivities);
+    const activities = [...previous.activities.filter((value) => value.id !== activity.id), activity];
     const status = { ...previous, commentary: text, activities, updatedAt: now, ...nextEventMetadata(threadId) };
     statuses.set(threadId, status);
     schedulePersist();

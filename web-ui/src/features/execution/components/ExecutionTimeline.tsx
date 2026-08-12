@@ -18,12 +18,20 @@ const elapsedText = (durationMs: number) => {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 };
 
-export function ExecutionTimeline({ status, contextStatus }: { status: ExecutionStatus; contextStatus: ContextStatus }) {
-  const [expanded, setExpanded] = useState(false);
+export function ExecutionTimeline({
+  status,
+  contextStatus,
+  timestamp = "",
+}: {
+  status: ExecutionStatus;
+  contextStatus: ContextStatus;
+  timestamp?: string;
+}) {
+  const [expanded, setExpanded] = useState(true);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    setExpanded(false);
+    setExpanded(true);
     setNow(Date.now());
   }, [status.startedAt]);
 
@@ -36,7 +44,7 @@ export function ExecutionTimeline({ status, contextStatus }: { status: Execution
   const failed = status.phase === "failed" || status.phase === "systemError";
   const interrupted = status.phase === "interrupted";
   const terminalIssue = failed || interrupted;
-  const activities = (status.activities || []).slice(-4);
+  const activities = status.activities || [];
   const startedAt = Date.parse(status.startedAt || "");
   const liveDurationMs = Number.isFinite(startedAt) ? now - startedAt : 0;
   const elapsed = status.active
@@ -46,8 +54,9 @@ export function ExecutionTimeline({ status, contextStatus }: { status: Execution
   const label = compacting ? "正在压缩上下文" : status.label.replace(/^Codex\s*/u, "");
 
   return (
-    <section className={styles.timeline} aria-label="Codex 工作过程">
+    <section className={`${styles.timeline} ${timestamp ? styles.embedded : ""}`} aria-label="Codex 工作过程">
       <button className={styles.header} type="button" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+        {timestamp ? <time>{timestamp}</time> : null}
         {status.active
           ? <LoaderCircle className={styles.spinner} aria-hidden="true" />
           : terminalIssue
