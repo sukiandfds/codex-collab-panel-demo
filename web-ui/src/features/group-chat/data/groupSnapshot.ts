@@ -24,7 +24,6 @@ const pendingMessageFromWork = (work: NonNullable<GroupSnapshot["activeWorks"]>[
   authorId: work.agentId,
   authorName: work.agentName,
   agentId: work.agentId,
-  mode: work.mode,
   text: "",
   attachments: [],
   artifactIds: [],
@@ -47,16 +46,23 @@ export const reconcileGroupSnapshot = (
   current: GroupSnapshot | null,
   pendingMessages: GroupMessage[] = [],
 ): GroupSnapshot => {
-  const messages = keepUnacknowledgedMessages(incoming.messages, [
-    ...(current?.messages.filter((message) => !(message.pending && message.type === "agent")) || []),
+  const preserveHistory = Boolean(current?.history?.date || current?.history?.hasNewer);
+  const messages = keepUnacknowledgedMessages(
+    preserveHistory ? current?.messages || [] : incoming.messages,
+    [
+    ...(preserveHistory ? [] : current?.messages.filter((message) => !(message.pending && message.type === "agent")) || []),
     ...pendingMessages,
-  ]);
+    ],
+  );
   const completedWorkIds = new Set(messages
     .filter((message) => !message.pending && message.workId)
     .map((message) => message.workId));
   return restoreActiveGroupWorks({
     ...incoming,
     messages,
+    history: current?.history && (current.history.date || current.history.hasNewer)
+      ? current.history
+      : incoming.history,
     activeWorks: (incoming.activeWorks || []).filter((work) => !completedWorkIds.has(work.workId)),
   });
 };
@@ -79,6 +85,7 @@ export const readGroupSnapshot = (roomId = ""): GroupSnapshot | null => {
 
 export const writeGroupSnapshot = (snapshot: GroupSnapshot) => {
   try {
+    if (snapshot.history?.date || snapshot.history?.hasNewer) return;
     const cached: GroupSnapshot = {
       ...snapshot,
       messages: snapshot.messages

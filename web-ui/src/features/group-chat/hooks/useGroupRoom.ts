@@ -3,7 +3,7 @@ import { createMemberId, readStoredMember, writeStoredMember } from "../data/gro
 import { groupApi } from "../data/groupApi";
 import { removePendingMessage, upsertGroupMessage } from "../data/groupMessageState";
 import { readGroupSnapshot, reconcileGroupSnapshot, writeGroupSnapshot } from "../data/groupSnapshot";
-import type { GroupMessage, GroupMode, GroupRoom, GroupSnapshot, StoredMember } from "../model/types";
+import type { GroupMessage, GroupMessagePage, GroupRoom, GroupSnapshot, StoredMember } from "../model/types";
 import { useGroupEvents } from "../realtime/useGroupEvents";
 
 export function useGroupRoom() {
@@ -15,11 +15,15 @@ export function useGroupRoom() {
   const [loading, setLoading] = useState(!initialSnapshot);
   const [initialSyncReady, setInitialSyncReady] = useState(false);
   const [sending, setSending] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyNotice, setHistoryNotice] = useState("");
+  const [historyNavigation, setHistoryNavigation] = useState({ version: 0, align: "bottom" as "top" | "bottom" });
   const [error, setError] = useState("");
   const sendingRef = useRef(false);
   const activeRoomIdRef = useRef(roomId);
   const sendGenerationRef = useRef(0);
   const pendingMessagesRef = useRef(new Map<string, GroupMessage>());
+  const historyLoadingRef = useRef(false);
   activeRoomIdRef.current = roomId;
   const realtime = useGroupEvents(setSnapshot, roomId);
 
@@ -49,6 +53,70 @@ export function useGroupRoom() {
     }
   }, [roomId]);
 
+  const applyHistoryPage = useCallback((page: GroupMessagePage, replace = false) => {
+    setSnapshot((current) => {
+      if (!current) return current;
+      const messages = replace
+        ? page.messages
+        : page.messages.reduce((next, message) => upsertGroupMessage(next, message), current.messages);
+      const { messages: _messages, ...history } = page;
+      const previous = current.history;
+      const oldestSequence = messages[0]?.sequence || history.oldestSequence;
+      const newestSequence = messages.at(-1)?.sequence || history.newestSequence;
+      return {
+        ...current,
+        messages,
+        history: replace ? history : {
+          ...history,
+          oldestSequence,
+          newestSequence,
+          hasOlder: history.oldestSequence <= (previous?.oldestSequence || Number.MAX_SAFE_INTEGER)
+            ? history.hasOlder
+            : Boolean(previous?.hasOlder),
+          hasNewer: history.newestSequence >= (previous?.newestSequence || 0)
+            ? history.hasNewer
+            : Boolean(previous?.hasNewer),
+        },
+      };
+    });
+  }, []);
+
+  const loadHistory = useCallback(async (params: Record<string, string | number | undefined>, replace = false) => {
+    if (historyLoadingRef.current) return false;
+    historyLoadingRef.current = true;
+    setHistoryLoading(true);
+    setError("");
+    try {
+      const page = await groupApi.messages(roomId, params);
+      if (!page.found) {
+        setHistoryNotice("当天无消息");
+        return false;
+      }
+      applyHistoryPage(page, replace);
+      setHistoryNotice("");
+      return page.messages.length > 0;
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+      return false;
+    } finally {
+      historyLoadingRef.current = false;
+      setHistoryLoading(false);
+    }
+  }, [applyHistoryPage, roomId]);
+
+  const loadOlder = useCallback(() => loadHistory({ before: snapshot?.history?.oldestSequence || snapshot?.messages[0]?.sequence }, false), [loadHistory, snapshot?.history?.oldestSequence, snapshot?.messages]);
+  const loadNewer = useCallback(() => loadHistory({ after: snapshot?.history?.newestSequence || snapshot?.messages.at(-1)?.sequence }, false), [loadHistory, snapshot?.history?.newestSequence, snapshot?.messages]);
+  const jumpToDate = useCallback(async (date: string) => {
+    const moved = await loadHistory({ date }, true);
+    if (moved) setHistoryNavigation((current) => ({ version: current.version + 1, align: "top" }));
+    return moved;
+  }, [loadHistory]);
+  const returnToLatest = useCallback(async () => {
+    const moved = await loadHistory({}, true);
+    if (moved) setHistoryNavigation((current) => ({ version: current.version + 1, align: "bottom" }));
+    return moved;
+  }, [loadHistory]);
+
   useEffect(() => {
     const controller = new AbortController();
     void refresh(controller.signal).finally(() => {
@@ -76,6 +144,8 @@ export function useGroupRoom() {
     setSending(false);
     setInitialSyncReady(false);
     setError("");
+    setHistoryNotice("");
+    setHistoryNavigation((current) => ({ version: current.version + 1, align: "bottom" }));
   }, [roomId]);
 
   useEffect(() => {
@@ -97,7 +167,7 @@ export function useGroupRoom() {
     return joined;
   }, [member?.id, roomId]);
 
-  const send = useCallback(async (mode: GroupMode, agentIds: string[], text: string, attachmentIds: string[] = []) => {
+  const send = useCallback(async (agentIds: string[], text: string, attachmentIds: string[] = []) => {
     if (!member || sendingRef.current || (!text.trim() && !attachmentIds.length)) return false;
     sendingRef.current = true;
     setSending(true);
@@ -115,7 +185,6 @@ export function useGroupRoom() {
       authorName: member.name,
       agentId: agentIds[0] || "manager",
       targetAgentIds: agentIds.length ? agentIds : ["manager"],
-      mode,
       text: text.trim(),
       attachments: [],
       artifactIds: [],
@@ -128,7 +197,7 @@ export function useGroupRoom() {
     });
     void (async () => {
       try {
-        const result = await groupApi.send(member, requestRoomId, mode, agentIds, text.trim(), clientMessageId, attachmentIds);
+        const result = await groupApi.send(member, requestRoomId, agentIds, text.trim(), clientMessageId, attachmentIds);
         if (sendGeneration !== sendGenerationRef.current || activeRoomIdRef.current !== requestRoomId) return;
         pendingMessagesRef.current.delete(clientMessageId);
         const confirmedMessage = {
@@ -159,6 +228,7 @@ export function useGroupRoom() {
 
   return {
     snapshot, rooms, roomId, selectRoom, member, loading, initialSyncReady, sending, error, join, send, refresh,
+    historyLoading, historyNotice, historyNavigation, loadOlder, loadNewer, jumpToDate, returnToLatest,
     connected: realtime.connected,
     streaming: realtime.streaming,
     artifactEvent: realtime.artifactEvent,

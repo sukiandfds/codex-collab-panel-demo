@@ -40,7 +40,7 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
     await group.join(name);
   };
   const sendMessage = useCallback(async (text: string, targetAgentIds: string[], attachmentIds: string[] = []) => {
-    const accepted = await group.send("discussion", targetAgentIds, text, attachmentIds);
+    const accepted = await group.send(targetAgentIds, text, attachmentIds);
     if (accepted) setLocalSendVersion((version) => version + 1);
     return accepted;
   }, [group.send]);
@@ -113,12 +113,16 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
             deviceName={device?.name}
             members={members}
             agents={agents}
+            historyNotice={group.historyNotice}
+            onDateSelect={group.jumpToDate}
             onOpenSidebar={() => setSidebarOpen(true)}
             onViewChange={onViewChange}
           />
         }
         conversation={snapshot ? (
           <MessageTimeline
+            active={active}
+            roomId={snapshot.room.id}
             messages={snapshot.messages}
             agents={agents}
             members={members}
@@ -132,6 +136,12 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
             onReviewArtifact={artifactState.review}
             onOpenProfile={setProfile}
             localSendVersion={localSendVersion}
+            history={snapshot.history}
+            historyLoading={group.historyLoading}
+            historyNavigation={group.historyNavigation}
+            onLoadOlder={group.loadOlder}
+            onLoadNewer={group.loadNewer}
+            onReturnToLatest={group.returnToLatest}
           />
         ) : group.error ? (
           <main className={styles.loading}>

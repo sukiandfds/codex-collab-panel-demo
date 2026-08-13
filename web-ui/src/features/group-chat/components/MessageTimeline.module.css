@@ -4,6 +4,7 @@
 .timeline::-webkit-scrollbar-thumb { border: 3px solid #101010; border-radius: 8px; background: #3b3b3b; }
 .jumpToLatest { position: absolute; z-index: 7; right: 50%; bottom: 10px; transform: translateX(50%); }
 .dateDivider { display: flex; align-items: center; gap: 10px; margin: 0 0 22px; color: #707070; font-size: 10px; }
+.historyMarker { margin: 0 0 18px; color: #707070; font-size: 10px; text-align: center; }
 .dateDivider::before, .dateDivider::after { height: 1px; flex: 1; background: #272727; content: ""; }
 .dateDivider span { flex: 0 0 auto; }
 .emptyRoom { display: grid; min-height: 100%; place-content: center; justify-items: center; gap: 8px; color: #747474; text-align: center; }

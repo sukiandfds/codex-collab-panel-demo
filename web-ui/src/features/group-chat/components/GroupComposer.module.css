@@ -14,8 +14,7 @@
 .commandButton:disabled { opacity: .4; cursor: default; }
 .commandButton svg { width: var(--control-icon-size); height: var(--control-icon-size); stroke-width: 1.8; }
 .settingsControls { gap: 2px; }
-.personnelControl { position: relative; min-width: 0; }
-.personnelMenu { position: absolute; right: max(18px, calc((100% - 760px) / 2)); bottom: calc(100% + 7px); left: max(18px, calc((100% - 760px) / 2)); z-index: 8; border: 1px solid #3b3b3b; border-radius: 8px; padding: 5px; background: #202020; box-shadow: 0 16px 42px rgb(0 0 0 / 48%); }
+.personnelMenu { position: absolute; right: max(18px, calc((100% - 760px) / 2)); bottom: calc(100% + 7px); left: max(18px, calc((100% - 760px) / 2)); z-index: 8; border: 1px solid #3b3b3b; border-radius: 8px; padding: 5px; background: #202020; box-shadow: 0 16px 42px rgb(0 0 0 / 48%); pointer-events: auto; }
 .personnelMenu > div:last-child { position: static; right: auto; bottom: auto; left: auto; max-height: 232px; border: 0; padding: 0; box-shadow: none; }
 .discussionOption { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 9px; margin-bottom: 3px; border-radius: 5px; padding: 7px 8px; background: var(--color-control-hover); color: var(--color-text); }
 .discussionOption > svg { width: 15px; height: 15px; margin: 7px; stroke-width: 1.8; }

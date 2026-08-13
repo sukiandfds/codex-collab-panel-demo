@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, MessagesSquare, Send, Sparkles } from "lucide-react";
+import { AtSign, ChevronDown, MessagesSquare, Send, Sparkles } from "lucide-react";
 import { AttachmentButton, AttachmentPreviews } from "../../attachments/components/AttachmentDraft";
 import { useAttachmentDraft } from "../../attachments/hooks/useAttachmentDraft";
 import { SlashCommandMenu, type SlashCommandOption } from "../../conversations/components/SlashCommandMenu";
 import type { GroupAgent, GroupMember } from "../model/types";
+import { mentionedAgentIds } from "../model/agentMentions";
 import { MentionMenu, type MentionOption } from "./MentionMenu";
 import styles from "./GroupComposer.module.css";
 
@@ -23,12 +24,6 @@ const findMention = (text: string, caret: number): MentionState | null => {
   const atIndex = beforeCaret.lastIndexOf("@");
   return atIndex >= 0 ? { start: atIndex, end: caret, query: match[1].trim() } : null;
 };
-
-const mentionedAgentIds = (text: string, agents: GroupAgent[]) => agents
-  .map((agent) => ({ id: agent.id, index: text.indexOf(`@${agent.name}`) }))
-  .filter((value) => value.index >= 0)
-  .sort((left, right) => left.index - right.index)
-  .map((value) => value.id);
 
 export function GroupComposer({ agents, members, disabled, error, onSend }: {
   agents: GroupAgent[];
@@ -50,6 +45,7 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
   const submittingRef = useRef(false);
   const mentionOptions = useMemo<MentionOption[]>(() => {
     const query = mention?.query.toLocaleLowerCase() || "";
+    // Human mentions are reserved for future multi-user notifications; only Agent mentions route work today.
     const options: MentionOption[] = [
       ...agents.map((agent) => ({ id: `agent:${agent.id}`, name: agent.name, detail: agent.responsibility, kind: "agent" as const, agentId: agent.id })),
       ...members.map((member) => ({ id: `member:${member.id}`, name: member.name, detail: "在线成员", kind: "member" as const })),
@@ -164,9 +160,10 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
         <MentionMenu options={mentionOptions} activeIndex={activeMention} onActiveChange={setActiveMention} onSelect={insertMention} />
       ) : personnelOpen ? (
         <div className={styles.personnelMenu}>
+          {/* Reserved product entry: selected Agents discuss in rounds, then the manager publishes one consolidated result. */}
           <div className={styles.discussionOption}>
             <MessagesSquare aria-hidden="true" />
-            <span><strong>商讨</strong><small>群聊讨论模式</small></span>
+            <span><strong>商讨</strong><small>员工相互讨论，最终由项目经理汇总结论</small></span>
           </div>
           <MentionMenu options={personnelOptions} activeIndex={activeMention} onActiveChange={setActiveMention} onSelect={insertPersonnel} />
         </div>
@@ -262,27 +259,27 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
             >
               <Sparkles aria-hidden="true" />
             </button>
+            <button
+              className={styles.commandButton}
+              type="button"
+              aria-expanded={personnelOpen}
+              aria-haspopup="listbox"
+              aria-label="指定参与商讨的员工"
+              title={selectedAgentIds.length ? `已指定 ${selectedAgentIds.length} 人` : "指定人员"}
+              disabled={disabled}
+              onClick={() => {
+                setMention(null);
+                setCapabilityOpen(false);
+                setActiveMention(0);
+                setPersonnelOpen((value) => !value);
+              }}
+            >
+              <AtSign aria-hidden="true" />
+            </button>
           </div>
           <span className={styles.composerSpacer} />
           <div className={styles.settingsControls}>
-            <div className={styles.personnelControl}>
-              <button
-                className={styles.settingTrigger}
-                type="button"
-                aria-expanded={personnelOpen}
-                aria-haspopup="listbox"
-                title="指定参与商讨的员工"
-                onClick={() => {
-                  setMention(null);
-                  setCapabilityOpen(false);
-                  setActiveMention(0);
-                  setPersonnelOpen((value) => !value);
-                }}
-              >
-                <span>{selectedAgentIds.length ? `已指定 ${selectedAgentIds.length} 人` : "指定人员"}</span>
-                <ChevronDown aria-hidden="true" />
-              </button>
-            </div>
+            {/* Reserved for group context management similar to conversation context compaction. */}
             <button className={styles.settingTrigger} type="button" disabled title="上下文功能暂未启用">
               <span>上下文 --</span>
               <ChevronDown aria-hidden="true" />

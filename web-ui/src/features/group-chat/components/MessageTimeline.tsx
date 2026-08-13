@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Bot } from "lucide-react";
@@ -7,7 +7,7 @@ import { useReturnToBottom } from "../../../components/JumpToLatest/useReturnToB
 import { AttachmentDisplay } from "../../attachments/components/AttachmentDisplay";
 import { ArtifactCollection } from "../../artifacts/components/ArtifactCollection";
 import type { Artifact, ArtifactReviewDecision } from "../../artifacts/model/types";
-import type { GroupAgent, GroupMember, GroupMessage, GroupProfile, GroupStreamingMessage } from "../model/types";
+import type { GroupAgent, GroupMember, GroupMessage, GroupMessageHistory, GroupProfile, GroupStreamingMessage } from "../model/types";
 import styles from "./MessageTimeline.module.css";
 
 const timeText = (value: string) => new Intl.DateTimeFormat("zh-CN", {
@@ -23,6 +23,8 @@ const dayText = (value: string) => {
 };
 
 export function MessageTimeline({
+  active,
+  roomId,
   messages,
   agents,
   members,
@@ -36,7 +38,15 @@ export function MessageTimeline({
   onReviewArtifact,
   onOpenProfile,
   localSendVersion,
+  history,
+  historyLoading,
+  historyNavigation,
+  onLoadOlder,
+  onLoadNewer,
+  onReturnToLatest,
 }: {
+  active: boolean;
+  roomId: string;
   messages: GroupMessage[];
   agents: GroupAgent[];
   members: GroupMember[];
@@ -50,6 +60,12 @@ export function MessageTimeline({
   onReviewArtifact: (artifactId: string, decision: ArtifactReviewDecision, note: string, reviewedBy: string) => Promise<void>;
   onOpenProfile: (profile: GroupProfile) => void;
   localSendVersion: number;
+  history?: GroupMessageHistory;
+  historyLoading: boolean;
+  historyNavigation: { version: number; align: "top" | "bottom" };
+  onLoadOlder: () => Promise<boolean>;
+  onLoadNewer: () => Promise<boolean>;
+  onReturnToLatest: () => Promise<boolean>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const streams = Object.entries(streaming).filter(([, value]) => value.text);
@@ -60,27 +76,67 @@ export function MessageTimeline({
     const root = scrollRef.current;
     if (root) root.scrollTop = root.scrollHeight;
   }, []);
+  const historyPositionRef = useRef(historyNavigation.version);
+  const prependAnchorRef = useRef<{ height: number; top: number } | null>(null);
+  const oldestSequenceRef = useRef(messages[0]?.sequence || 0);
   const {
     visible: showReturnToBottom,
     onScroll: updateReturnToBottom,
     contentChanged,
     returnToBottom,
+    reset: resetReturnToBottom,
   } = useReturnToBottom({
+    active,
     isStreaming: streams.length > 0,
     localSendVersion,
     getScrollElement,
     scrollToBottom,
   });
 
+  useLayoutEffect(() => {
+    if (!active) return;
+    resetReturnToBottom(true);
+    scrollToBottom();
+  }, [active, resetReturnToBottom, roomId, scrollToBottom]);
+
   useEffect(() => {
     contentChanged();
   }, [contentChanged, messages.length, streaming]);
 
+  useLayoutEffect(() => {
+    if (historyNavigation.version === historyPositionRef.current) return;
+    historyPositionRef.current = historyNavigation.version;
+    const root = scrollRef.current;
+    if (!root) return;
+    root.scrollTop = historyNavigation.align === "top" ? 0 : root.scrollHeight;
+    resetReturnToBottom(historyNavigation.align === "bottom");
+  }, [historyNavigation, resetReturnToBottom]);
+
+  useLayoutEffect(() => {
+    const anchor = prependAnchorRef.current;
+    const oldestSequence = messages[0]?.sequence || 0;
+    if (anchor && oldestSequence && oldestSequence < oldestSequenceRef.current) {
+      const root = scrollRef.current;
+      if (root) root.scrollTop = anchor.top + root.scrollHeight - anchor.height;
+    }
+    prependAnchorRef.current = null;
+    oldestSequenceRef.current = oldestSequence;
+  }, [messages]);
+
+  const onTimelineScroll = (root: HTMLDivElement) => {
+    updateReturnToBottom(root);
+    if (historyLoading) return;
+    if (root.scrollTop < 80 && history?.hasOlder) {
+      prependAnchorRef.current = { height: root.scrollHeight, top: root.scrollTop };
+      void onLoadOlder();
+    }
+    if (root.scrollHeight - root.scrollTop - root.clientHeight < 80 && history?.hasNewer) void onLoadNewer();
+  };
+
   return (
     <div className={styles.timelineShell}>
-      <div className={styles.timeline} ref={scrollRef} onScroll={(event) => {
-        updateReturnToBottom(event.currentTarget);
-      }}>
+      <div className={styles.timeline} ref={scrollRef} onScroll={(event) => onTimelineScroll(event.currentTarget)}>
+        {history?.hasOlder ? <div className={styles.historyMarker}>继续向上加载更早消息</div> : null}
         {!messages.length && !streams.length ? (
           <div className={styles.emptyRoom}><Bot /><strong>暂无消息</strong></div>
         ) : null}
@@ -116,7 +172,7 @@ export function MessageTimeline({
                 </button>
               ) : <span className={`${styles.messageAvatar} ${message.type === "agent" ? styles.agentMessageAvatar : ""}`}>{message.type === "agent" ? "AI" : message.type === "system" ? "!" : authorName.slice(0, 1)}</span>}
               <div className={styles.messageContent}>
-                <div className={styles.messageMeta}><strong>{authorName}</strong><span>{pendingAgent ? "..." : timeText(message.createdAt)}</span>{message.mode === "development" ? <em>开发</em> : null}</div>
+                <div className={styles.messageMeta}><strong>{authorName}</strong><span>{pendingAgent ? "..." : timeText(message.createdAt)}</span></div>
                 <div className={`${styles.messageBubble} ${ownMessage ? styles.ownMessageBubble : ""}`}>
                   {message.type === "agent"
                     ? pendingAgent
@@ -155,8 +211,9 @@ export function MessageTimeline({
             </article>
           );
         })}
+        {history?.hasNewer ? <div className={styles.historyMarker}>继续向下加载更新消息</div> : null}
       </div>
-      <JumpToLatest visible={showReturnToBottom} className={styles.jumpToLatest} onClick={returnToBottom} />
+      <JumpToLatest visible={showReturnToBottom} className={styles.jumpToLatest} onClick={() => void onReturnToLatest().then((moved) => { if (!moved) returnToBottom(); })} />
     </div>
   );
 }

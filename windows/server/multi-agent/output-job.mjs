@@ -1,8 +1,8 @@
-export const completeOutputJob = async ({ outputJob, result, agentId, mode, room, webOutputs, setStatus, finishStatus }) => {
+export const completeOutputJob = async ({ outputJob, result, agentId, room, webOutputs, setStatus, finishStatus }) => {
   if (!result.message?.id) {
     webOutputs.abandonJob(outputJob.jobId);
     await room.addMessage({
-      type: "system", authorId: "system", authorName: "系统", agentId, mode,
+      type: "system", authorId: "system", authorName: "系统", agentId,
       text: "网页成果处理失败：Agent 未生成可关联的最终群消息。",
     });
     finishStatus(agentId, { phase: "failed", label: "网页成果处理失败", detail: "缺少最终群消息" });
@@ -19,7 +19,7 @@ export const completeOutputJob = async ({ outputJob, result, agentId, mode, room
     for (const artifact of output.artifacts) await room.attachArtifact(result.message.id, artifact.id);
     if (output.pdfError) {
       await room.addMessage({
-        type: "system", authorId: "system", authorName: "系统", agentId, mode,
+        type: "system", authorId: "system", authorName: "系统", agentId,
         text: `HTML 已保留，PDF 生成失败：${output.pdfError}`,
       });
       finishStatus(agentId, { phase: "failed", label: "HTML 已生成，PDF 失败", detail: output.pdfError });
@@ -29,7 +29,7 @@ export const completeOutputJob = async ({ outputJob, result, agentId, mode, room
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     await room.addMessage({
-      type: "system", authorId: "system", authorName: "系统", agentId, mode,
+      type: "system", authorId: "system", authorName: "系统", agentId,
       text: `网页成果处理失败：${detail}`,
     });
     finishStatus(agentId, { phase: "failed", label: "网页成果处理失败", detail });

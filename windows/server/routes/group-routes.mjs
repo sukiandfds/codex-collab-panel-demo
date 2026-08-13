@@ -11,7 +11,19 @@ export const createGroupRoutes = ({ groupRoom, roomDirectory, media, multiAgent,
     return true;
   }
   if (url.pathname === "/api/group/snapshot") {
-    sendJson(response, resolveRoom().snapshot());
+    const room = resolveRoom();
+    const page = room.getMessagePage();
+    sendJson(response, { ...room.snapshot(), messages: page.messages, history: { ...page, messages: undefined } });
+    return true;
+  }
+  if (url.pathname === "/api/group/messages" && request.method === "GET") {
+    const room = resolveRoom();
+    sendJson(response, room.getMessagePage({
+      beforeSequence: url.searchParams.get("before"),
+      afterSequence: url.searchParams.get("after"),
+      date: url.searchParams.get("date"),
+      limit: url.searchParams.get("limit"),
+    }));
     return true;
   }
   if ((url.pathname === "/api/group/join" || url.pathname === "/api/group/presence") && request.method === "POST") {
@@ -38,7 +50,6 @@ export const createGroupRoutes = ({ groupRoom, roomDirectory, media, multiAgent,
   const body = await readJson(request);
   const room = resolveRoom(body);
   const service = resolveAgentService(room.snapshot().room.id);
-  let mode = body.mode === "development" ? "development" : "discussion";
   const member = room.touchMember(body.memberId, body.authorName);
   const text = String(body.text || "").trim();
   const attachments = media.resolveMany(body.attachmentIds);
@@ -56,7 +67,6 @@ export const createGroupRoutes = ({ groupRoom, roomDirectory, media, multiAgent,
   if (!targetAgentIds.length) targetAgentIds.push("manager");
   if (!explicitAgentIds.length && webOutputs.isRequest(text)) {
     targetAgentIds.splice(0, targetAgentIds.length, "developer");
-    mode = "development";
   }
   const { message, created } = await room.addMessageWithStatus({
     type: "human",
@@ -65,7 +75,6 @@ export const createGroupRoutes = ({ groupRoom, roomDirectory, media, multiAgent,
     clientMessageId: body.clientMessageId,
     agentId: targetAgentIds[0],
     targetAgentIds,
-    mode,
     text,
     attachments: attachments.map(({ id, name, mimeType, url: attachmentUrl }) => ({ id, name, mimeType, url: attachmentUrl })),
   });
@@ -75,7 +84,6 @@ export const createGroupRoutes = ({ groupRoom, roomDirectory, media, multiAgent,
   }
   const execution = await service.enqueueDiscussion({
     agentIds: targetAgentIds,
-    mode,
     requestText: text || "请查看附件并根据内容进行处理。",
     attachments,
     sourceMessageId: message.id,

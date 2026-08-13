@@ -1,17 +1,19 @@
 import { useState } from "react";
-import { MessageSquareText, PanelLeft, Share2 } from "lucide-react";
+import { CalendarDays, MessageSquareText, PanelLeft, Share2 } from "lucide-react";
 import { ViewSwitcher, type ViewSurface } from "../../../components/ViewSwitcher/ViewSwitcher";
 import { ShareConversationDialog } from "../../conversation-sharing/components/ShareConversationDialog";
 import { DeviceStatus } from "../../device/components/DeviceStatus";
 import type { GroupAgent, GroupMember } from "../model/types";
 import styles from "./GroupHeader.module.css";
 
-export function GroupHeader({ roomName, connected, deviceName, members, agents, onOpenSidebar, onViewChange }: {
+export function GroupHeader({ roomName, connected, deviceName, members, agents, historyNotice, onDateSelect, onOpenSidebar, onViewChange }: {
   roomName: string;
   connected: boolean;
   deviceName?: string;
   members: GroupMember[];
   agents: GroupAgent[];
+  historyNotice: string;
+  onDateSelect: (date: string) => Promise<boolean>;
   onOpenSidebar: () => void;
   onViewChange?: (surface: Exclude<ViewSurface, "progress">) => void;
 }) {
@@ -33,6 +35,21 @@ export function GroupHeader({ roomName, connected, deviceName, members, agents, 
           <span className={styles.memberCount}>{members.length} 位用户，{agents.length} 位 Agent</span>
         </div>
         <span className={styles.spacer} />
+        <label className={styles.dateButton} title="按日期查看历史消息" aria-label="按日期查看历史消息">
+          <CalendarDays aria-hidden="true" />
+          <input
+            className={styles.dateInput}
+            type="date"
+            aria-label="选择群聊日期"
+            onChange={(event) => {
+              const input = event.currentTarget;
+              if (!input.value) return;
+              void onDateSelect(input.value).then((moved) => {
+                if (!moved) input.value = "";
+              });
+            }}
+          />
+        </label>
         <button className={styles.iconButton} type="button" aria-label="分享项目群聊" title="分享" onClick={() => setSharing(true)}>
           <Share2 aria-hidden="true" />
         </button>
@@ -41,7 +58,7 @@ export function GroupHeader({ roomName, connected, deviceName, members, agents, 
       <div className={styles.statusbar}>
         <DeviceStatus name={deviceName} connected={connected} />
         <span className={styles.statusDivider} aria-hidden="true">·</span>
-        <span className={styles.activity}>{activityText}</span>
+        <span className={styles.activity}>{historyNotice || activityText}</span>
       </div>
       </header>
       <ShareConversationDialog open={sharing} title={roomName} heading="分享项目群聊" onClose={() => setSharing(false)} />

@@ -65,6 +65,37 @@ test("restores attachment-only group messages", async (t) => {
   await restored.close();
 });
 
+test("keeps full history and returns date and cursor pages", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "negus-group-history-"));
+  const stateFile = path.join(directory, "group-room.json");
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  await fs.writeFile(stateFile, JSON.stringify({
+    messages: [
+      { id: "m1", sequence: 1, createdAt: "2026-08-10T01:00:00.000Z", authorId: "member-1", authorName: "Hans", text: "first" },
+      { id: "m2", sequence: 2, createdAt: "2026-08-11T01:00:00.000Z", authorId: "member-1", authorName: "Hans", text: "second" },
+      { id: "m3", sequence: 3, createdAt: "2026-08-11T02:00:00.000Z", authorId: "member-1", authorName: "Hans", text: "third" },
+      { id: "m4", sequence: 4, createdAt: "2026-08-12T01:00:00.000Z", authorId: "member-1", authorName: "Hans", text: "fourth" },
+    ],
+  }), "utf8");
+  const restored = await createGroupRoomStore({ stateFile, project: "negus", broadcast: () => {} });
+  const datePage = restored.getMessagePage({ date: "2026-08-11", limit: 2 });
+  assert.equal(restored.snapshot().messages.length, 4);
+  assert.deepEqual(datePage.messages.map((message) => message.text), ["second", "third"]);
+  assert.equal(datePage.hasOlder, true);
+  assert.equal(datePage.hasNewer, true);
+  const olderPage = restored.getMessagePage({ beforeSequence: datePage.oldestSequence, limit: 2 });
+  assert.deepEqual(olderPage.messages.map((message) => message.text), ["first"]);
+  const newerPage = restored.getMessagePage({ afterSequence: datePage.newestSequence, limit: 2 });
+  assert.deepEqual(newerPage.messages.map((message) => message.text), ["fourth"]);
+  assert.equal(restored.getMessagePage({ date: "2026-08-13" }).found, false);
+  await restored.addMessage({ authorId: "member-1", authorName: "Hans", text: "latest" });
+  await restored.close();
+  const reloaded = await createGroupRoomStore({ stateFile, project: "negus", broadcast: () => {} });
+  assert.equal(reloaded.getMessagePage({ date: "2026-08-10" }).messages[0].text, "first");
+  assert.equal(reloaded.snapshot().messages.at(-1).text, "latest");
+  await reloaded.close();
+});
+
 test("deduplicates repeated agent completions by work id", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "negus-group-work-"));
   const stateFile = path.join(directory, "group-room.json");
@@ -106,7 +137,6 @@ test("exposes active Agent work in snapshots without persisting it across restar
     workId: "work-active-1",
     agentId: "developer",
     agentName: "开发 Agent",
-    mode: "development",
     startedAt: "2026-08-10T01:02:03.000Z",
   });
 
@@ -114,7 +144,6 @@ test("exposes active Agent work in snapshots without persisting it across restar
     workId: "work-active-1",
     agentId: "developer",
     agentName: "开发 Agent",
-    mode: "development",
     startedAt: "2026-08-10T01:02:03.000Z",
     phase: "working",
   }]);

@@ -45,7 +45,6 @@ test("retries the same group message without enqueueing a second discussion", as
     memberId: "member-1",
     authorName: "Hans",
     clientMessageId: "client-message-1",
-    mode: "discussion",
     agentIds: ["manager"],
     text: "请分析当前问题",
     attachmentIds: [],
@@ -106,7 +105,6 @@ test("an explicit Agent mention is not replaced by the web-output shortcut", asy
       memberId: "member-1",
       authorName: "Hans",
       clientMessageId: "client-mention-1",
-      mode: "discussion",
       agentIds: ["manager"],
       text: "@审查 Agent 请生成一个网页并指出风险",
       attachmentIds: [],
@@ -118,5 +116,57 @@ test("an explicit Agent mention is not replaced by the web-output shortcut", asy
   assert.deepEqual(result.message.targetAgentIds, ["reviewer"]);
   assert.deepEqual(execution.agentIds, ["reviewer"]);
   assert.deepEqual(execution.explicitAgentIds, ["reviewer"]);
-  assert.equal(result.message.mode, "discussion");
+});
+
+test("a historical Agent alias routes to the registered employee", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "negus-group-route-alias-"));
+  const room = await createGroupRoomStore({ stateFile: path.join(directory, "group-room.json"), project: "negus", broadcast: () => {} });
+  let execution = null;
+  const route = createGroupRoutes({
+    groupRoom: room,
+    media: { resolveMany: () => [] },
+    multiAgent: { enqueueDiscussion: async (input) => { execution = input; return { jobId: "job-alias", agentIds: input.agentIds, status: "queued" }; } },
+    webOutputs: { isRequest: () => false },
+  });
+  const server = http.createServer(async (request, response) => {
+    if (!(await route(request, response, new URL(request.url, "http://127.0.0.1")))) { response.writeHead(404); response.end(); }
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { await new Promise((resolve) => server.close(resolve)); await room.close(); await fs.rm(directory, { recursive: true, force: true }); });
+  const { port } = server.address();
+  const response = await fetch(`http://127.0.0.1:${port}/api/group/message`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ memberId: "member-1", authorName: "Hans", clientMessageId: "client-alias-1", agentIds: ["manager"], text: "@审查 请检查", attachmentIds: [] }),
+  });
+  const result = await response.json();
+  assert.equal(response.status, 202);
+  assert.deepEqual(result.message.targetAgentIds, ["reviewer"]);
+  assert.deepEqual(execution.agentIds, ["reviewer"]);
+});
+
+test("reads a date page without running a discussion", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "negus-group-history-route-"));
+  const stateFile = path.join(directory, "group-room.json");
+  await fs.writeFile(stateFile, JSON.stringify({ messages: [
+    { id: "m1", sequence: 1, createdAt: "2026-08-10T01:00:00.000Z", authorId: "member-1", authorName: "Hans", text: "old" },
+    { id: "m2", sequence: 2, createdAt: "2026-08-11T01:00:00.000Z", authorId: "member-1", authorName: "Hans", text: "selected" },
+  ] }), "utf8");
+  const room = await createGroupRoomStore({ stateFile, project: "negus", broadcast: () => {} });
+  const route = createGroupRoutes({
+    groupRoom: room,
+    media: { resolveMany: () => [] },
+    multiAgent: { enqueueDiscussion: async () => { throw new Error("should not run"); } },
+    webOutputs: { isRequest: () => false },
+  });
+  const server = http.createServer(async (request, response) => {
+    if (!(await route(request, response, new URL(request.url, "http://127.0.0.1")))) { response.writeHead(404); response.end(); }
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { await new Promise((resolve) => server.close(resolve)); await room.close(); await fs.rm(directory, { recursive: true, force: true }); });
+  const { port } = server.address();
+  const response = await fetch(`http://127.0.0.1:${port}/api/group/messages?date=2026-08-11`);
+  const page = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(page.found, true);
+  assert.deepEqual(page.messages.map((message) => message.text), ["selected"]);
 });

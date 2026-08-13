@@ -5,6 +5,16 @@ import { loadEmployeeDefinitions } from "./employee-definitions.mjs";
 
 const cleanText = (value, maxLength) => String(value || "").trim().slice(0, maxLength);
 const safeSequence = (value) => Number.isSafeInteger(value) && value >= 0 ? value : 0;
+const pageSize = (value) => Math.max(1, Math.min(100, Number.parseInt(value, 10) || 50));
+const dateKey = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+const validDate = (value) => /^\d{4}-\d{2}-\d{2}$/u.test(String(value || ""));
 
 const initialAgent = (definition, saved = {}) => ({
   ...definition,
@@ -39,7 +49,9 @@ export const createGroupRoomStore = async ({ stateFile, project, projectId = "",
   ]));
   const messages = (Array.isArray(stored.messages) ? stored.messages : [])
     .filter((message) => message?.id && message?.createdAt
-      && (message?.text || (Array.isArray(message?.attachments) && message.attachments.length)))
+      && (message?.text
+        || (Array.isArray(message?.attachments) && message.attachments.length)
+        || (Array.isArray(message?.artifactIds) && message.artifactIds.length)))
     .map((message, index) => ({
       ...message,
       clientMessageId: cleanText(message.clientMessageId, 80) || null,
@@ -47,8 +59,7 @@ export const createGroupRoomStore = async ({ stateFile, project, projectId = "",
       sequence: Number.isSafeInteger(message.sequence) && message.sequence > 0 ? message.sequence : index + 1,
       artifactIds: [...new Set((Array.isArray(message.artifactIds) ? message.artifactIds : [])
         .map((id) => cleanText(id, 80)).filter(Boolean))],
-    }))
-    .slice(-300);
+    }));
   const members = new Map();
   const activeWorks = new Map();
   let nextMessageSequence = messages.reduce((latest, message) => Math.max(latest, message.sequence), 0);
@@ -59,7 +70,7 @@ export const createGroupRoomStore = async ({ stateFile, project, projectId = "",
       version: 4,
       projectId: linkedProjectId,
       roomId: linkedRoomId,
-      messages: messages.slice(-300),
+      messages,
       agents: [...agents.values()].map(({ instructions, ...agent }) => agent),
       agentContextSequences: Object.fromEntries(agentContextSequences),
     }, null, 2);
@@ -83,13 +94,66 @@ export const createGroupRoomStore = async ({ stateFile, project, projectId = "",
     project: projectName,
     projectId: linkedProjectId,
     room: { id: linkedRoomId, projectId: linkedProjectId, name: `${projectName} 项目群` },
-    messages: [...messages],
+    messages: messages.slice(-300),
     agents: [...agents.values()].map(publicAgent),
     members: activeMembers(),
     activeWorks: [...activeWorks.values()],
   });
 
-  const beginAgentWork = ({ workId, agentId, agentName, mode, startedAt }) => {
+  const getMessagePage = ({ beforeSequence = 0, afterSequence = 0, date = "", limit = 50 } = {}) => {
+    const size = pageSize(limit);
+    const cleanDate = validDate(date) ? String(date) : "";
+    const before = safeSequence(beforeSequence);
+    const after = safeSequence(afterSequence);
+    let start = Math.max(0, messages.length - size);
+    let found = true;
+
+    if (cleanDate) {
+      start = messages.findIndex((message) => dateKey(message.createdAt) === cleanDate);
+      found = start >= 0;
+      if (!found) {
+        return {
+          messages: [],
+          date: cleanDate,
+          found: false,
+          hasOlder: false,
+          hasNewer: false,
+          oldestSequence: 0,
+          newestSequence: 0,
+        };
+      }
+    } else if (before) {
+      const firstNewerIndex = messages.findIndex((message) => message.sequence >= before);
+      const end = firstNewerIndex < 0 ? messages.length : firstNewerIndex;
+      start = Math.max(0, end - size);
+      const page = messages.slice(start, end);
+      return {
+        messages: page,
+        date: "",
+        found: true,
+        hasOlder: start > 0,
+        hasNewer: end < messages.length,
+        oldestSequence: page[0]?.sequence || 0,
+        newestSequence: page.at(-1)?.sequence || 0,
+      };
+    } else if (after) {
+      start = messages.findIndex((message) => message.sequence > after);
+      if (start < 0) start = messages.length;
+    }
+
+    const page = messages.slice(start, start + size);
+    return {
+      messages: page,
+      date: cleanDate,
+      found,
+      hasOlder: start > 0,
+      hasNewer: start + page.length < messages.length,
+      oldestSequence: page[0]?.sequence || 0,
+      newestSequence: page.at(-1)?.sequence || 0,
+    };
+  };
+
+  const beginAgentWork = ({ workId, agentId, agentName, startedAt }) => {
     const id = cleanText(workId, 160);
     const cleanAgentId = cleanText(agentId, 80);
     const agent = agents.get(cleanAgentId);
@@ -98,7 +162,6 @@ export const createGroupRoomStore = async ({ stateFile, project, projectId = "",
       workId: id,
       agentId: cleanAgentId,
       agentName: cleanText(agentName, 80) || agent.name,
-      mode: mode === "development" ? "development" : "discussion",
       startedAt: cleanText(startedAt, 40) || new Date().toISOString(),
       phase: "working",
     };
@@ -124,7 +187,6 @@ export const createGroupRoomStore = async ({ stateFile, project, projectId = "",
     authorName,
     agentId = null,
     targetAgentIds = [],
-    mode = "discussion",
     text,
     attachments = [],
     clientMessageId = null,
@@ -162,14 +224,12 @@ export const createGroupRoomStore = async ({ stateFile, project, projectId = "",
       authorName: cleanText(authorName, 40),
       agentId: agentId || targets[0] || null,
       targetAgentIds: targets,
-      mode,
       text: content,
       attachments: files,
       artifactIds: [],
       createdAt: new Date().toISOString(),
     };
     messages.push(message);
-    if (messages.length > 300) messages.splice(0, messages.length - 300);
     await persist();
     emit({ type: "group_message_created", message });
     if (message.type === "agent") {
@@ -242,6 +302,7 @@ export const createGroupRoomStore = async ({ stateFile, project, projectId = "",
     addMessageWithStatus,
     getAgent,
     getMessage,
+    getMessagePage,
     getAgentContext,
     advanceAgentContext,
     beginAgentWork,

@@ -1,8 +1,6 @@
 import type { MediaFile } from "../../../shared/model/media";
 import type { ArtifactRealtimeEvent } from "../../artifacts/model/types";
 
-export type GroupMode = "discussion" | "development";
-
 export interface GroupMember {
   id: string;
   name: string;
@@ -13,6 +11,7 @@ export interface GroupAgent {
   id: string;
   name: string;
   shortName: string;
+  aliases?: string[];
   responsibility: string;
   model?: string;
   reasoningEffort?: string;
@@ -35,7 +34,6 @@ export interface GroupMessage {
   authorName: string;
   agentId: string | null;
   targetAgentIds?: string[];
-  mode: GroupMode;
   text: string;
   attachments?: MediaFile[];
   artifactIds?: string[];
@@ -54,7 +52,6 @@ export interface GroupActiveWork {
   workId: string;
   agentId: string;
   agentName: string;
-  mode: GroupMode;
   startedAt: string;
   phase: "working";
 }
@@ -73,7 +70,20 @@ export interface GroupSnapshot {
   agents: GroupAgent[];
   members: GroupMember[];
   activeWorks?: GroupActiveWork[];
+  history?: GroupMessageHistory;
 }
+
+export interface GroupMessagePage {
+  messages: GroupMessage[];
+  date: string;
+  found: boolean;
+  hasOlder: boolean;
+  hasNewer: boolean;
+  oldestSequence: number;
+  newestSequence: number;
+}
+
+export type GroupMessageHistory = Omit<GroupMessagePage, "messages">;
 
 export interface GroupRoomListResponse {
   rooms: GroupRoom[];
@@ -100,6 +110,6 @@ export type GroupEvent =
   | { type: "group_message_updated"; roomId?: string; message: GroupMessage }
   | { type: "group_agent_updated"; roomId?: string; agent: GroupAgent }
   | { type: "group_members_changed"; roomId?: string; members: GroupMember[] }
-  | { type: "group_agent_started"; roomId?: string; agentId: string; agentName: string; workId: string; mode: GroupMode; startedAt: string }
+  | { type: "group_agent_started"; roomId?: string; agentId: string; agentName: string; workId: string; startedAt: string }
   | { type: "group_agent_delta"; roomId?: string; agentId: string; workId?: string; itemId: string; delta: string }
   | ArtifactRealtimeEvent;
