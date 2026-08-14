@@ -148,7 +148,7 @@ export const createGoalService = ({ store, broadcast = () => {}, runtimeAdapter 
     clearTimer(goalId);
     pendingActions.set(goalId, "expired");
     try {
-      await runtimeAdapter.stop?.({ goal, reason: "timeout" });
+      if (goal.status !== "waiting") await runtimeAdapter.stop?.({ goal, reason: "timeout" });
       updateCurrentRecords(goalId, "expired", { detail: "Goal 已超时" });
       const current = store.get(goalId);
       const next = store.updateGoal(goalId, {
@@ -307,13 +307,15 @@ export const createGoalService = ({ store, broadcast = () => {}, runtimeAdapter 
     pendingActions.set(goalId, nextStatus);
     try {
       let runtime = {};
-      if (nextStatus === "paused") {
+      if (nextStatus === "paused" && current.status !== "waiting") {
         runtime = await runtimeAdapter.pause?.({ goal: current, reason: "user" }) || {};
       } else if (nextStatus === "active") {
         runtime = await runtimeAdapter.resume?.({ goal: current }) || {};
-      } else if (nextStatus === "waiting") {
+      } else if (nextStatus === "waiting" && current.status !== "paused") {
         runtime = await runtimeAdapter.pause?.({ goal: current, reason: "waiting" }) || {};
-      } else if (terminalGoalStatuses.has(nextStatus)) {
+      } else if (terminalGoalStatuses.has(nextStatus)
+        && !terminalGoalStatuses.has(current.status)
+        && !["paused", "waiting"].includes(current.status)) {
         runtime = await runtimeAdapter.stop?.({ goal: current, reason: nextStatus }) || {};
       }
 

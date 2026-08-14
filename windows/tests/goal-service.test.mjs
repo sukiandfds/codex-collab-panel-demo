@@ -71,6 +71,73 @@ test("keeps the persisted status unchanged when a runtime action fails", async (
   }
 });
 
+test("clears a paused goal without stopping the runtime twice", async () => {
+  const store = createGoalStore();
+  const calls = [];
+  const service = createGoalService({
+    store,
+    runtimeAdapter: {
+      start: async () => ({ status: "running", externalRef: "turn-paused-clear" }),
+      pause: async () => { calls.push("pause"); },
+      stop: async () => { calls.push("stop"); },
+    },
+  });
+  try {
+    const goal = await service.create({ objective: "clear a paused goal" });
+    const paused = await service.pause(goal.id, {}, goal.version);
+    const cleared = await service.clear(goal.id, {}, paused.version);
+    assert.equal(cleared.status, "cleared");
+    assert.deepEqual(calls, ["pause"]);
+  } finally {
+    await service.close();
+  }
+});
+
+test("moves between paused and waiting without pausing the runtime twice", async () => {
+  const store = createGoalStore();
+  const calls = [];
+  const service = createGoalService({
+    store,
+    runtimeAdapter: {
+      start: async () => ({ status: "running", externalRef: "turn-paused-waiting" }),
+      pause: async () => { calls.push("pause"); },
+    },
+  });
+  try {
+    const goal = await service.create({ objective: "move between stopped states" });
+    const paused = await service.pause(goal.id, {}, goal.version);
+    const waiting = await service.wait(goal.id, {}, paused.version);
+    const pausedAgain = await service.pause(goal.id, {}, waiting.version);
+    assert.equal(pausedAgain.status, "paused");
+    assert.deepEqual(calls, ["pause"]);
+  } finally {
+    await service.close();
+  }
+});
+
+test("expires a waiting goal without stopping the runtime twice", async () => {
+  const store = createGoalStore();
+  const calls = [];
+  const service = createGoalService({
+    store,
+    runtimeAdapter: {
+      start: async () => ({ status: "running", externalRef: "turn-waiting-timeout" }),
+      pause: async () => { calls.push("pause"); },
+      stop: async () => { calls.push("stop"); },
+    },
+  });
+  try {
+    const goal = await service.create({ objective: "expire a waiting goal", timeoutMs: 40 });
+    const waiting = await service.wait(goal.id, {}, goal.version);
+    assert.equal(waiting.status, "waiting");
+    await wait(80);
+    assert.equal(service.get(goal.id).status, "expired");
+    assert.deepEqual(calls, ["pause"]);
+  } finally {
+    await service.close();
+  }
+});
+
 test("writes an exact runtime completion back to the Goal, Task, and Run", async () => {
   const store = createGoalStore();
   const service = createGoalService({
