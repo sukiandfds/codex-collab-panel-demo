@@ -12,6 +12,8 @@ import { ModelSettingsControl } from "../../models/components/ModelSettingsContr
 import type { CodexModel } from "../../models/model/types";
 import type { MediaFile } from "../../../shared/model/media";
 import type { SessionMessage } from "../model/types";
+import { goalCapabilityOptions } from "../../goals/model/capability";
+import { useGoalCapability } from "../../goals/hooks/useGoalCapability";
 import { SlashCommandMenu, type SlashCommandOption } from "./SlashCommandMenu";
 import styles from "./ConversationComposer.module.css";
 
@@ -21,6 +23,7 @@ const slashCommands: SlashCommandOption[] = [
   { id: "compact", command: "/compact", group: "会话", label: "压缩上下文", detail: "整理当前对话上下文" },
   { id: "stop", command: "/stop", group: "会话", label: "停止任务", detail: "停止当前正在运行的任务" },
   { id: "review", command: "/review", group: "Codex", label: "审查当前项目", detail: "调用原生 Codex reviewer" },
+  ...goalCapabilityOptions,
   { id: "file", command: "/file", group: "文件", label: "读取附件", detail: "按问题读取并处理已上传文件" },
   { id: "image", command: "/image", group: "MCP 工具", label: "生成或修改图片", detail: "调用已配置的 Negus image MCP" },
   { id: "skill", command: "/skill", group: "Skills", label: "使用 Skill", detail: "让 Codex 选择并遵循匹配的 Skill" },
@@ -81,6 +84,7 @@ export function ConversationComposer({
   const [slash, setSlash] = useState<SlashState | null>(null);
   const [activeSlash, setActiveSlash] = useState(0);
   const [collapsedSlashGroups, setCollapsedSlashGroups] = useState<Record<string, boolean>>({});
+  const executeGoalCapability = useGoalCapability();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submittingRef = useRef(false);
   const draft = useAttachmentDraft();
@@ -152,6 +156,12 @@ export function ConversationComposer({
     setText("");
     setSlash(null);
     if (!editing && !draft.attachments.length && !inheritedAttachments.length) {
+      const goalResult = await executeGoalCapability(submittedText);
+      if (goalResult.handled) {
+        if (!goalResult.accepted) setText(submittedText);
+        submittingRef.current = false;
+        return;
+      }
       const command = submittedText.trim().toLocaleLowerCase();
       if (command === "/compact" || command === "/stop" || command === "/review") {
         try {

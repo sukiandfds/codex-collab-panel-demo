@@ -1,11 +1,8 @@
 import { useId, useRef } from "react";
 import { FileText, Paperclip, X } from "lucide-react";
+import { formatFileSize } from "../../../shared/format/fileSize";
 import type { DraftAttachment } from "../hooks/useAttachmentDraft";
 import styles from "./AttachmentDraft.module.css";
-
-const sizeText = (bytes: number) => bytes >= 1024 * 1024
-  ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
-  : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 export function AttachmentButton({ disabled, onFiles }: {
   disabled: boolean;
@@ -55,7 +52,7 @@ export function AttachmentPreviews({
               {attachment.previewUrl
                 ? <img src={attachment.previewUrl} alt="" />
                 : <span className={styles.fileIcon}><FileText aria-hidden="true" /></span>}
-              <span className={styles.meta}><strong>{attachment.file.name}</strong><small>{sizeText(attachment.file.size)}</small></span>
+              <span className={styles.meta}><strong>{attachment.file.name}</strong><small>{formatFileSize(attachment.file.size)}</small></span>
               <button type="button" aria-label={`移除 ${attachment.file.name}`} title="移除附件" disabled={uploading} onClick={() => onRemove(attachment.id)}><X aria-hidden="true" /></button>
             </div>
           ))}

@@ -1,0 +1,72 @@
+- generic [active] [ref=e1]:
+  - status "Negus 正在启动" [ref=e2]:
+    - generic [ref=e3]:
+      - paragraph [ref=e4]: 为什么选择
+      - img "Negus" [ref=e5]
+      - paragraph [ref=e6]:
+        - strong [ref=e7]: Negus 只为精英提供真正高效的系统，
+        - text: 让你随时随地掌控 AI。
+  - generic [ref=e11]:
+    - banner "应用菜单栏" [ref=e13]:
+      - generic [ref=e24]:
+        - generic [ref=e25]: 文件
+        - generic [ref=e26]: 编辑
+        - generic [ref=e27]: 视图
+        - generic [ref=e28]: 帮助
+    - complementary "当前项目会话" [ref=e41]:
+      - generic [ref=e42]:
+        - generic [ref=e43]: NEGUS
+        - generic [ref=e45]:
+          - button "新建对话" [ref=e46]
+          - button "刷新会话" [ref=e50]
+          - button "查看已归档对话" [ref=e56]
+      - generic [ref=e60]: 正在读取项目
+      - heading "项目会话" [level=2] [ref=e65]
+      - generic [ref=e70]:
+        - generic [ref=e72]: 原电脑实时连接
+        - generic "支持发送指令和附件" [ref=e73]
+    - generic [ref=e77]:
+      - generic [ref=e78]:
+        - generic [ref=e79]:
+          - heading "正在读取会话" [level=1] [ref=e84]
+          - button "分享当前对话" [ref=e85]
+          - navigation "切换对话模式" [ref=e92]:
+            - link "单人 Codex 对话" [ref=e93] [cursor=pointer]:
+              - /url: /?token=codex-remote-20260807
+              - generic [ref=e97]: 对话
+            - link "项目群聊" [ref=e98] [cursor=pointer]:
+              - /url: /?token=codex-remote-20260807&view=group
+              - generic [ref=e102]: 群聊
+            - link "项目管理" [ref=e103] [cursor=pointer]:
+              - /url: /progress?token=codex-remote-20260807
+              - generic [ref=e107]: 进度
+        - generic [ref=e108]:
+          - generic "原电脑服务，网页已同步" [ref=e109]:
+            - generic [ref=e112]: 原电脑服务
+            - generic [ref=e114]: 网页已同步
+          - generic [ref=e115]: ·
+          - button "今日 -- 倍率 --" [ref=e117]:
+            - generic [ref=e118]:
+              - generic [ref=e119]:
+                - generic [ref=e120]: 今日
+                - strong [ref=e121]: "--"
+              - generic [ref=e123]:
+                - generic [ref=e124]: 倍率
+                - strong [ref=e125]: "--"
+          - button "查看智力效率" [ref=e127] [cursor=pointer]
+      - main [ref=e135]:
+        - region "真实项目对话" [ref=e138]:
+          - generic [ref=e139]: 当前项目暂无可显示对话
+        - generic "Codex 对话输入" [ref=e140]:
+          - generic [ref=e141]: 给 Codex 发送指令
+          - textbox "给 Codex 发送指令" [disabled] [ref=e142]:
+            - /placeholder: 请选择一个对话
+          - generic [ref=e143]:
+            - generic [ref=e144]:
+              - button "添加文件" [disabled] [ref=e145]
+              - generic "添加文件"
+              - generic "Codex 已就绪" [ref=e146]
+            - generic [ref=e151]:
+              - button "读取模型" [ref=e153]
+              - button "上下文 --" [ref=e158]
+            - button "发送" [disabled] [ref=e162]

@@ -1,26 +1,14 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { Bot } from "lucide-react";
 import { JumpToLatest } from "../../../components/JumpToLatest/JumpToLatest";
 import { useReturnToBottom } from "../../../components/JumpToLatest/useReturnToBottom";
 import { AttachmentDisplay } from "../../attachments/components/AttachmentDisplay";
 import { ArtifactCollection } from "../../artifacts/components/ArtifactCollection";
 import type { Artifact, ArtifactReviewDecision } from "../../artifacts/model/types";
+import { MarkdownContent } from "../../conversations/rendering/ContentRenderer";
 import type { GroupAgent, GroupMember, GroupMessage, GroupMessageHistory, GroupProfile, GroupStreamingMessage } from "../model/types";
+import { formatClockTime, formatDayLabel, localDateKey } from "../../../shared/format/dateTime";
 import styles from "./MessageTimeline.module.css";
-
-const timeText = (value: string) => new Intl.DateTimeFormat("zh-CN", {
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-}).format(new Date(value));
-const dayKey = (value: string) => new Date(value).toLocaleDateString("zh-CN");
-const dayText = (value: string) => {
-  const date = new Date(value);
-  if (date.toDateString() === new Date().toDateString()) return "今天";
-  return new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(date);
-};
 
 export function MessageTimeline({
   active,
@@ -157,8 +145,8 @@ export function MessageTimeline({
           const ownMessage = message.type === "human" && Boolean(currentMemberId) && message.authorId === currentMemberId;
           return (
           <Fragment key={message.id}>
-            {index === 0 || dayKey(messages[index - 1].createdAt) !== dayKey(message.createdAt)
-              ? <div className={styles.dateDivider}><span>{dayText(message.createdAt)}</span></div>
+            {index === 0 || localDateKey(messages[index - 1].createdAt) !== localDateKey(message.createdAt)
+              ? <div className={styles.dateDivider}><span>{formatDayLabel(message.createdAt)}</span></div>
               : null}
             <article className={`${styles.message} ${message.type === "system" ? styles.systemMessage : ""}`}>
               {profile ? (
@@ -172,12 +160,12 @@ export function MessageTimeline({
                 </button>
               ) : <span className={`${styles.messageAvatar} ${message.type === "agent" ? styles.agentMessageAvatar : ""}`}>{message.type === "agent" ? "AI" : message.type === "system" ? "!" : authorName.slice(0, 1)}</span>}
               <div className={styles.messageContent}>
-                <div className={styles.messageMeta}><strong>{authorName}</strong><span>{pendingAgent ? "..." : timeText(message.createdAt)}</span></div>
+                <div className={styles.messageMeta}><strong>{authorName}</strong><span>{pendingAgent ? "..." : formatClockTime(message.createdAt)}</span></div>
                 <div className={`${styles.messageBubble} ${ownMessage ? styles.ownMessageBubble : ""}`}>
                   {message.type === "agent"
                     ? pendingAgent
                       ? <p className={styles.streamingText}>{liveStream?.text || message.text}<i className={styles.cursor} /></p>
-                      : <div className={styles.markdown}><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text}</ReactMarkdown></div>
+                      : <MarkdownContent text={message.text} className={styles.markdown} />
                     : message.text ? <p>{message.text}</p> : null}
                   <AttachmentDisplay files={message.attachments || []} />
                   <ArtifactCollection

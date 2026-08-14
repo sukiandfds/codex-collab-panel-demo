@@ -1,7 +1,8 @@
 import { ExternalLink, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { formatRecordedTimestamp as formatProjectManagementTimestamp } from "../../../shared/format/dateTime";
+import { splitParagraphs as splitProjectText } from "../../../shared/format/text";
 import type { ProjectManagementEntry } from "../model/types";
-import { formatProjectManagementTimestamp, splitProjectText } from "../model/format";
 import styles from "../ProjectManagementApp.module.css";
 
 interface EntryDetailPanelProps {

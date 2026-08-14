@@ -4,9 +4,10 @@ const token = new URLSearchParams(window.location.search).get("token") || "";
 // HttpOnly cookie carries access in that case.
 export const hasAccessToken = true;
 
-export const withAccessToken = (pathname: string) => {
+export const withAccessToken = (pathname: string, params: Record<string, string> = {}) => {
   if (/^(?:https?:|data:|blob:)/iu.test(pathname)) return pathname;
-  return `${pathname}${pathname.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`;
+  const query = new URLSearchParams({ ...params, token });
+  return `${pathname}${pathname.includes("?") ? "&" : "?"}${query}`;
 };
 
 export const fetchJson = async <T,>(pathname: string, signal?: AbortSignal): Promise<T> => {
@@ -37,5 +38,18 @@ export const postJson = async <T,>(pathname: string, body: unknown, signal?: Abo
   });
   const payload = await response.json().catch(() => ({})) as { error?: string };
   if (!response.ok) throw new Error(payload.error || `发送失败（${response.status}）`);
+  return payload as T;
+};
+
+export const patchJson = async <T,>(pathname: string, body: unknown, signal?: AbortSignal): Promise<T> => {
+  const response = await fetch(withAccessToken(pathname), {
+    method: "PATCH",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  const payload = await response.json().catch(() => ({})) as { error?: string };
+  if (!response.ok) throw new Error(payload.error || `更新失败（${response.status}）`);
   return payload as T;
 };

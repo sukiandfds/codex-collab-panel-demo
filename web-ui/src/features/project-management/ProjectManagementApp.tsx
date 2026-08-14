@@ -1,11 +1,11 @@
 import { ClipboardList, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ViewSwitcher } from "../../components/ViewSwitcher/ViewSwitcher";
+import { formatRecordedTimestamp as formatProjectManagementTimestamp } from "../../shared/format/dateTime";
 import { fetchProjectManagement, fetchProjectManagementEntry, readProjectManagementCache } from "./data/projectManagementApi";
 import { EntryDetailPanel } from "./components/EntryDetailPanel";
 import { EntrySummaryRow } from "./components/EntrySummaryRow";
 import { UpdateLogPanel } from "./components/UpdateLogPanel";
-import { formatProjectManagementTimestamp } from "./model/format";
 import type { ProjectManagementDocument, ProjectManagementEntry } from "./model/types";
 import styles from "./ProjectManagementApp.module.css";
 

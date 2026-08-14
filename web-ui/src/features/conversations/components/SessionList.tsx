@@ -4,6 +4,7 @@ import type { SessionSummary } from "../model/types";
 import type { ExecutionStatus } from "../../execution/model/types";
 import { ProjectStatusBadge } from "../../project-directory/components/ProjectStatusBadge";
 import type { ProjectRuntimeStatus } from "../../project-directory/model/types";
+import { formatCompactTimestamp as formatUpdatedAt } from "../../../shared/format/dateTime";
 import styles from "./SessionList.module.css";
 
 interface SessionListProps {
@@ -19,15 +20,6 @@ interface SessionListProps {
   currentStatus?: ExecutionStatus;
   statusByThread?: Record<string, ProjectRuntimeStatus>;
 }
-
-const timeFormatter = new Intl.DateTimeFormat("zh-CN", {
-  month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
-});
-
-const formatUpdatedAt = (value: string) => {
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? timeFormatter.format(new Date(timestamp)) : "";
-};
 
 export function SessionList({
   sessions,

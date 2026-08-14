@@ -1,15 +1,6 @@
 import { fetchJson, postJson } from "../../../shared/api/http";
+import { conversationQuery, withConversation } from "../../../shared/api/conversationScope";
 import type { ExecutionStatus } from "../model/types";
-
-const currentConversationId = () => new URLSearchParams(window.location.search).get("conversation") || "";
-const conversationQuery = () => {
-  const conversationId = currentConversationId();
-  return conversationId ? `&conversationId=${encodeURIComponent(conversationId)}` : "";
-};
-const withConversation = <T extends Record<string, unknown>>(body: T) => {
-  const conversationId = currentConversationId();
-  return conversationId ? { ...body, conversationId } : body;
-};
 
 export interface SendMessageResult {
   threadId: string;

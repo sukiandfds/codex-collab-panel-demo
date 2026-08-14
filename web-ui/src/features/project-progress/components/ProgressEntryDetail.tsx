@@ -1,7 +1,8 @@
 import { ExternalLink, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { formatRecordedTimestamp as formatProgressTimestamp } from "../../../shared/format/dateTime";
+import { splitParagraphs as splitDetailParagraphs } from "../../../shared/format/text";
 import type { ProgressEntry } from "../data/progressApi";
-import { formatProgressTimestamp, splitDetailParagraphs } from "../model/format";
 import styles from "../ProjectProgressApp.module.css";
 
 interface ProgressEntryDetailProps {

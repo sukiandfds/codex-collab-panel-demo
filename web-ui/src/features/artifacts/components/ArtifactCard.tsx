@@ -1,15 +1,10 @@
 import { Download, ExternalLink, FileText } from "lucide-react";
 import { withAccessToken } from "../../../shared/api/http";
+import { formatFileSize } from "../../../shared/format/fileSize";
 import type { Artifact, ArtifactReviewDecision } from "../model/types";
 import { ArtifactPreview } from "./ArtifactPreview";
 import { ArtifactReviewActions } from "./ArtifactReviewActions";
 import styles from "./ArtifactCard.module.css";
-
-const sizeText = (bytes: number) => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-};
 
 const statusText = (artifact: Artifact) => {
   if (artifact.reviewDecision === "approve") return "已批准";
@@ -17,7 +12,6 @@ const statusText = (artifact: Artifact) => {
   return "待审核";
 };
 
-const downloadUrl = (source: string) => withAccessToken(`${source}${source.includes("?") ? "&" : "?"}download=1`);
 const htmlOpenUrl = (artifactId: string) => withAccessToken(`/api/artifacts/${encodeURIComponent(artifactId)}/open-html`);
 
 export function ArtifactCard({ artifact, reviewing, reviewerName, onReview }: {
@@ -32,7 +26,7 @@ export function ArtifactCard({ artifact, reviewing, reviewerName, onReview }: {
         <span className={styles.fileIcon}><FileText aria-hidden="true" /></span>
         <div className={styles.title}>
           <strong>{artifact.name}</strong>
-          <span>{artifact.mimeType} · v{artifact.version} · {sizeText(artifact.size)}</span>
+          <span>{artifact.mimeType} · v{artifact.version} · {formatFileSize(artifact.size)}</span>
         </div>
         <span className={styles.status}>{statusText(artifact)}</span>
       </header>
@@ -43,7 +37,7 @@ export function ArtifactCard({ artifact, reviewing, reviewerName, onReview }: {
         <details className={styles.history}>
           <summary>历史版本（{artifact.versions.length}）</summary>
           {artifact.versions.slice().reverse().map((version) => (
-            <a href={downloadUrl(version.sourceUrl)} key={version.version}>v{version.version} · {version.name} · {sizeText(version.size)}</a>
+            <a href={withAccessToken(version.sourceUrl, { download: "1" })} key={version.version}>v{version.version} · {version.name} · {formatFileSize(version.size)}</a>
           ))}
         </details>
       ) : null}
@@ -53,7 +47,7 @@ export function ArtifactCard({ artifact, reviewing, reviewerName, onReview }: {
             <ExternalLink aria-hidden="true" />打开网页
           </a>
         ) : null}
-        <a className={styles.download} href={downloadUrl(artifact.sourceUrl)} title={`下载 ${artifact.name}`}><Download aria-hidden="true" />下载</a>
+        <a className={styles.download} href={withAccessToken(artifact.sourceUrl, { download: "1" })} title={`下载 ${artifact.name}`}><Download aria-hidden="true" />下载</a>
         <ArtifactReviewActions
           artifactId={artifact.id}
           decision={artifact.reviewDecision}

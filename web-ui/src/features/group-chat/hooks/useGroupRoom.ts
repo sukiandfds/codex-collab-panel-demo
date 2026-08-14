@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createClientId } from "../../../shared/id/clientId";
 import { createMemberId, readStoredMember, writeStoredMember } from "../data/groupMemberStorage";
 import { groupApi } from "../data/groupApi";
 import { removePendingMessage, upsertGroupMessage } from "../data/groupMessageState";
@@ -167,13 +168,12 @@ export function useGroupRoom() {
     return joined;
   }, [member?.id, roomId]);
 
-  const send = useCallback(async (agentIds: string[], text: string, attachmentIds: string[] = []) => {
+  const send = useCallback(async (text: string, attachmentIds: string[] = []) => {
     if (!member || sendingRef.current || (!text.trim() && !attachmentIds.length)) return false;
     sendingRef.current = true;
     setSending(true);
     setError("");
-    const clientMessageId = globalThis.crypto?.randomUUID?.()
-      || `group-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    const clientMessageId = createClientId("group");
     const requestRoomId = roomId;
     const sendGeneration = ++sendGenerationRef.current;
     const optimisticMessage: GroupMessage = {
@@ -183,8 +183,8 @@ export function useGroupRoom() {
       type: "human",
       authorId: member.id,
       authorName: member.name,
-      agentId: agentIds[0] || "manager",
-      targetAgentIds: agentIds.length ? agentIds : ["manager"],
+      agentId: null,
+      targetAgentIds: [],
       text: text.trim(),
       attachments: [],
       artifactIds: [],
@@ -197,7 +197,7 @@ export function useGroupRoom() {
     });
     void (async () => {
       try {
-        const result = await groupApi.send(member, requestRoomId, agentIds, text.trim(), clientMessageId, attachmentIds);
+        const result = await groupApi.send(member, requestRoomId, text.trim(), clientMessageId, attachmentIds);
         if (sendGeneration !== sendGenerationRef.current || activeRoomIdRef.current !== requestRoomId) return;
         pendingMessagesRef.current.delete(clientMessageId);
         const confirmedMessage = {

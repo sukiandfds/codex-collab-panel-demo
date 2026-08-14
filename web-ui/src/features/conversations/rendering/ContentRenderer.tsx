@@ -1,19 +1,12 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Download, FileText, ImageOff, X } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ContentBlock, ImageBlock, SessionMessage } from "../model/types";
 import { withAccessToken } from "../../../shared/api/http";
 import styles from "./ContentRenderer.module.css";
 
-const sourceUrl = (source: string) => withAccessToken(source);
-const downloadUrl = (source: string) => withAccessToken(`${source}${source.includes("?") ? "&" : "?"}download=1`);
-const previewUrl = (source: string) => sourceUrl(
-  source.startsWith("/api/media/")
-    ? `${source}${source.includes("?") ? "&" : "?"}preview=1`
-    : source,
-);
 const IMAGE_VIEWER_HISTORY_KEY = "codexImageViewer";
 
 interface ImageDimensions { width: number; height: number }
@@ -58,8 +51,8 @@ function RenderedImage({
   height?: number;
   layout?: ImageLayout;
 }) {
-  const url = sourceUrl(source);
-  const thumbnailUrl = previewUrl(source);
+  const url = withAccessToken(source);
+  const thumbnailUrl = withAccessToken(source, source.startsWith("/api/media/") ? { preview: "1" } : undefined);
   const [dimensions, setDimensions] = useState<ImageDimensions | null>(() => {
     if (validDimension(width) && validDimension(height)) return { width, height };
     return getSourceDimensions(source) || imageDimensionsCache.get(source) || null;
@@ -165,6 +158,15 @@ function RenderedImage({
   );
 }
 
+const markdownComponents: Components = {
+  a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer">{children}</a>,
+  img: ({ src, alt }) => <RenderedImage source={src || ""} alt={alt || ""} />,
+};
+
+export function MarkdownContent({ text, className }: { text: string; className?: string }) {
+  return <div className={className}><ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{text}</ReactMarkdown></div>;
+}
+
 function ImageGallery({ blocks }: { blocks: ImageBlock[] }) {
   const single = blocks.length === 1;
   return (
@@ -185,17 +187,7 @@ function ImageGallery({ blocks }: { blocks: ImageBlock[] }) {
 
 function Block({ block }: { block: ContentBlock }) {
   if (block.type === "markdown") {
-    return (
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer">{children}</a>,
-          img: ({ src, alt }) => <RenderedImage source={src || ""} alt={alt || ""} />,
-        }}
-      >
-        {block.text}
-      </ReactMarkdown>
-    );
+    return <MarkdownContent text={block.text} />;
   }
   if (block.type === "options") {
     return <div className={styles.options}>{block.options.map((option) => <div key={option}>{option}</div>)}</div>;
@@ -210,8 +202,8 @@ function Block({ block }: { block: ContentBlock }) {
       />
     );
   }
-  if (block.type === "audio") return <audio className={styles.audio} controls preload="metadata" src={sourceUrl(block.source)} />;
-  if (block.type === "video") return <video className={styles.video} controls preload="metadata" src={sourceUrl(block.source)} />;
+  if (block.type === "audio") return <audio className={styles.audio} controls preload="metadata" src={withAccessToken(block.source)} />;
+  if (block.type === "video") return <video className={styles.video} controls preload="metadata" src={withAccessToken(block.source)} />;
 
   const name = block.name || block.file?.name || "附件";
   const readStatus = block.file?.readStatus === "ready"
@@ -228,7 +220,7 @@ function Block({ block }: { block: ContentBlock }) {
       <FileText aria-hidden="true" />
       <span>{name}</span>
       {readStatus ? <small className={styles.fileStatus} title={block.file?.readError || readStatus}>{readStatus}</small> : null}
-      <a href={downloadUrl(block.source)} aria-label={`下载 ${name}`} title={`下载 ${name}`}>
+      <a href={withAccessToken(block.source, { download: "1" })} aria-label={`下载 ${name}`} title={`下载 ${name}`}>
         <Download aria-hidden="true" />
       </a>
     </div>

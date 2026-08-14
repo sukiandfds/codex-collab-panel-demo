@@ -1,3 +1,4 @@
+import { createClientId } from "../../../shared/id/clientId";
 import type { StoredMember } from "../model/types";
 
 const memberKey = "negus-group-member";
@@ -9,8 +10,7 @@ const parseStoredMember = (raw: string | null): StoredMember | null => {
   return value?.id && value?.name ? value : null;
 };
 
-export const createMemberId = () => globalThis.crypto?.randomUUID?.()
-  || `member-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+export const createMemberId = () => createClientId("member");
 
 export const readStoredMember = (): StoredMember | null => {
   try {

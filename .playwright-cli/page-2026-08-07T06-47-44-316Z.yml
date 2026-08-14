@@ -1,0 +1,384 @@
+- generic [ref=f1e11]:
+  - banner "应用菜单栏" [ref=f1e13]:
+    - generic [ref=f1e24]:
+      - generic [ref=f1e25]: 文件
+      - generic [ref=f1e26]: 编辑
+      - generic [ref=f1e27]: 视图
+      - generic [ref=f1e28]: 帮助
+  - complementary "当前项目会话" [ref=f1e41]:
+    - generic [ref=f1e42]:
+      - generic [ref=f1e43]: NEGUS
+      - generic [ref=f1e45]:
+        - button "新建对话" [ref=f1e46]
+        - button "刷新会话" [ref=f1e50]
+        - button "查看已归档对话" [ref=f1e56]
+    - generic "D:\\mylittlethings\\codex-collab-panel-demo" [ref=f1e340]: codex-collab-panel-demo
+    - generic [ref=f1e64]:
+      - heading "项目会话" [level=2] [ref=f1e65]
+      - generic [ref=f1e66]:
+        - button "梳理内容加载体验差异 8/7 14:31" [ref=f1e67]:
+          - generic [ref=f1e68]:
+            - generic [ref=f1e69]: 梳理内容加载体验差异
+            - generic [ref=f1e70]: 8/7 14:31
+        - button "归档 梳理内容加载体验差异"
+      - generic [ref=f1e71]:
+        - button "快速了解项目结构 8/7 14:26" [active] [ref=f1e72]:
+          - generic [ref=f1e73]:
+            - generic [ref=f1e74]: 快速了解项目结构
+            - generic [ref=f1e75]: 8/7 14:26
+        - button "归档 快速了解项目结构" [ref=f1e349] [cursor=pointer]
+      - generic [ref=f1e76]:
+        - button "了解项目情况 8/5 18:16" [ref=f1e77]:
+          - generic [ref=f1e78]:
+            - generic [ref=f1e79]: 了解项目情况
+            - generic [ref=f1e80]: 8/5 18:16
+        - button "归档 了解项目情况"
+      - generic [ref=f1e81]:
+        - button "查询即梦 MCP 接口 8/5 10:07" [ref=f1e82]:
+          - generic [ref=f1e83]:
+            - generic [ref=f1e84]: 查询即梦 MCP 接口
+            - generic [ref=f1e85]: 8/5 10:07
+        - button "归档 查询即梦 MCP 接口"
+      - generic [ref=f1e86]:
+        - button "生成一张 1:1、1K 的简洁产品摄影图片，白色背景，一只透明玻璃水杯 8/4 18:30 · 2 条" [ref=f1e87]:
+          - generic [ref=f1e88]:
+            - generic [ref=f1e89]: 生成一张 1:1、1K 的简洁产品摄影图片，白色背景，一只透明玻璃水杯
+            - generic [ref=f1e90]: 8/4 18:30 · 2 条
+        - button "归档 生成一张 1:1、1K 的简洁产品摄影图片，白色背景，一只透明玻璃水杯"
+      - generic [ref=f1e91]:
+        - button "快速了解项目结构 (2) 8/4 16:29" [ref=f1e92]:
+          - generic [ref=f1e93]:
+            - generic [ref=f1e94]: 快速了解项目结构 (2)
+            - generic [ref=f1e95]: 8/4 16:29
+        - button "归档 快速了解项目结构 (2)"
+      - generic [ref=f1e96]:
+        - button "生成中国网红直播图片 8/4 16:27" [ref=f1e97]:
+          - generic [ref=f1e98]:
+            - generic [ref=f1e99]: 生成中国网红直播图片
+            - generic [ref=f1e100]: 8/4 16:27
+        - button "归档 生成中国网红直播图片"
+      - generic [ref=f1e101]:
+        - button "了解项目最新状态 8/3 18:55" [ref=f1e102]:
+          - generic [ref=f1e103]:
+            - generic [ref=f1e104]: 了解项目最新状态
+            - generic [ref=f1e105]: 8/3 18:55
+        - button "归档 了解项目最新状态"
+      - generic [ref=f1e106]:
+        - button "梳理公司三大职能 7/31 11:37" [ref=f1e107]:
+          - generic [ref=f1e108]:
+            - generic [ref=f1e109]: 梳理公司三大职能
+            - generic [ref=f1e110]: 7/31 11:37
+        - button "归档 梳理公司三大职能"
+    - generic [ref=f1e111]:
+      - generic [ref=f1e113]: 原电脑实时连接
+      - generic "支持发送指令和附件" [ref=f1e114]
+  - generic [ref=f1e118]:
+    - generic [ref=f1e119]:
+      - generic [ref=f1e120]:
+        - generic [ref=f1e123]:
+          - generic [ref=f1e124]:
+            - heading "快速了解项目结构" [level=1] [ref=f1e353]
+            - button "重命名对话" [ref=f1e354] [cursor=pointer]
+          - generic [ref=f1e357]: Codex Desktop
+        - button "分享当前对话" [ref=f1e130]
+        - navigation "切换对话模式" [ref=f1e137]:
+          - link "单人 Codex 对话" [ref=f1e138] [cursor=pointer]:
+            - /url: /?token=codex-remote-20260807&thread=019fc743-8b96-72c1-b831-6eb84baf98b9
+            - generic [ref=f1e142]: 对话
+          - link "项目群聊" [ref=f1e143] [cursor=pointer]:
+            - /url: /?token=codex-remote-20260807&thread=019fc743-8b96-72c1-b831-6eb84baf98b9&view=group
+            - generic [ref=f1e147]: 群聊
+          - link "项目管理" [ref=f1e148] [cursor=pointer]:
+            - /url: /progress?token=codex-remote-20260807&thread=019fc743-8b96-72c1-b831-6eb84baf98b9
+            - generic [ref=f1e152]: 进度
+      - generic [ref=f1e153]:
+        - generic "DESKTOP-9148A5，网页已同步" [ref=f1e341]:
+          - generic [ref=f1e157]: DESKTOP-9148A5
+          - generic [ref=f1e159]: 网页已同步
+        - generic [ref=f1e160]: ·
+        - button "今日 -- 倍率 --" [ref=f1e162]:
+          - generic [ref=f1e163]:
+            - generic [ref=f1e164]:
+              - generic [ref=f1e165]: 今日
+              - strong [ref=f1e166]: "--"
+            - generic [ref=f1e168]:
+              - generic [ref=f1e169]: 倍率
+              - strong [ref=f1e170]: "--"
+        - button "查看智力效率" [ref=f1e172] [cursor=pointer]
+    - main [ref=f1e180]:
+      - region "真实项目对话" [ref=f1e183]:
+        - generic [ref=f1e358]:
+          - article [ref=f1e360]:
+            - time [ref=f1e361]: 08-07 14:16
+            - generic [ref=f1e363]:
+              - paragraph [ref=f1e364]:
+                - text: 前面把“等全部内容加载完再显示”说得太绝对了，确实可能造成卡顿。更合适的是：
+                - strong [ref=f1e365]: 首屏等当前会话的可见内容和最新状态稳定，不等整段历史全部加载。
+              - table [ref=f1e366]:
+                - rowgroup [ref=f1e367]:
+                  - row [ref=f1e368]:
+                    - columnheader "问题" [ref=f1e369]
+                    - columnheader "实际建议" [ref=f1e370]
+                - rowgroup [ref=f1e371]:
+                  - row [ref=f1e372]:
+                    - cell "1. 首屏 Logo 和 slogan" [ref=f1e373]
+                    - cell "保留到当前项目、会话列表和当前会话的首屏内容准备好后再淡出。不是等所有历史消息加载完；同时设置最长等待时间，避免一直卡在 Logo。" [ref=f1e374]
+                  - row [ref=f1e375]:
+                    - cell "2. 打开长对话" [ref=f1e376]
+                    - cell "只优先准备最近内容和当前可见区域，旧消息继续按需加载。多个长对话快速切换时，已经加载过的会话直接从内存缓存显示，再后台确认最新内容，不应该每次从头加载。" [ref=f1e377]
+                  - row [ref=f1e378]:
+                    - cell "3. 群聊和单人切换" [ref=f1e379]
+                    - cell "不建议改成每次都重新打开完整网页，那样确实会慢。应保留轻量切换和单人会话缓存，但让群聊和单人各自管理自己的内容，避免一个页面的更新触发另一个页面的重新布局。" [ref=f1e380]
+                  - row [ref=f1e381]:
+                    - cell "4. “单一滚动逻辑”能解决什么" [ref=f1e382]
+                    - cell "现在同一次内容变化可能同时触发“滚到底部”“恢复旧位置”“新消息滚动”“流式内容滚动”“窗口尺寸变化修正”等动作。它们会在不同帧里连续修改滚动位置，所以才会偶尔跳动。所谓单一逻辑，是让一次变化只选择一个动作：首次打开滚到底部、用户上滑后不自动移动、加载旧消息只修正原来的阅读锚点、返回页面只恢复一次位置。" [ref=f1e383]
+                  - row [ref=f1e384]:
+                    - cell "5. 会不会加载很久" [ref=f1e385]
+                    - cell "不设置“无限等待”。正常情况下 Logo 等待内容稳定；如果超过限定时间，就显示当前可用内容和一个很小的加载提示。只有超过更长的失败阈值，才出现之前的“刷新网页”提示。" [ref=f1e386]
+              - paragraph [ref=f1e387]:
+                - text: 所以当前不建议把群聊和单人页面完全拆成每次重新加载的两个网页。更合理的调整是：
+                - strong [ref=f1e388]: 保留缓存和快速切换，只修改首屏就绪条件、滚动动作的优先级，以及群聊更新不要干扰单人页面布局。
+            - generic "消息操作" [ref=f1e390]:
+              - button "复制内容" [ref=f1e391] [cursor=pointer]
+              - button "从这里继续" [ref=f1e395] [cursor=pointer]
+          - article [ref=f1e401]:
+            - time [ref=f1e402]: 08-07 14:18
+            - paragraph [ref=f1e405]: 你真的有弄清楚代码吗？怎么感觉你还是没有任何实质性意见，说的都是乱七八糟的？
+            - generic "消息操作" [ref=f1e407]:
+              - button "复制内容" [ref=f1e408] [cursor=pointer]
+              - button "重新编辑" [ref=f1e412] [cursor=pointer]
+          - article [ref=f1e416]:
+            - time [ref=f1e417]: 08-07 14:19
+            - generic [ref=f1e419]:
+              - paragraph [ref=f1e420]: 您质疑得对。按远程实际代码看，真正有明确结论的不是一大堆，主要是下面 3 处。
+              - table [ref=f1e421]:
+                - rowgroup [ref=f1e422]:
+                  - row [ref=f1e423]:
+                    - columnheader "代码位置" [ref=f1e424]
+                    - columnheader "现在实际做了什么" [ref=f1e425]
+                    - columnheader "明确建议" [ref=f1e426]
+                - rowgroup [ref=f1e427]:
+                  - row [ref=f1e428]:
+                    - cell [ref=f1e429]:
+                      - code [ref=f1e430]: web-ui/src/App.tsx:35-38
+                    - cell [ref=f1e431]:
+                      - text: 只要本地快照读取结束，就发送
+                      - code [ref=f1e432]: negus:app-ready
+                    - cell [ref=f1e433]:
+                      - text: 修改为同时等待
+                      - code [ref=f1e434]: snapshotLoading
+                      - text: 、
+                      - code [ref=f1e435]: loadingList
+                      - text: 、
+                      - code [ref=f1e436]: loadingSession
+                      - text: 都结束
+                  - row [ref=f1e437]:
+                    - cell [ref=f1e438]:
+                      - code [ref=f1e439]: web-ui/src/main.tsx:10-18
+                    - cell "删除了最长等待兜底" [ref=f1e440]
+                    - cell "恢复最长等待时间，避免网络或初始化异常时 Logo 一直不消失" [ref=f1e441]
+                  - row [ref=f1e442]:
+                    - cell [ref=f1e443]:
+                      - code [ref=f1e444]: web-ui/src/features/conversations/components/ConversationView.tsx:214-238
+                    - cell [ref=f1e445]:
+                      - text: 页面重新激活时，先安排滚到底部，又安排恢复旧
+                      - code [ref=f1e446]: scrollTop
+                      - text: ；同时还有消息更新和窗口尺寸变化的滚动逻辑
+                    - cell "回退新增的“保存滚动位置、重新激活后恢复滚动位置”这一整段。保留原有的“加载旧消息时保持锚点”逻辑" [ref=f1e447]
+                  - row [ref=f1e448]:
+                    - cell [ref=f1e449]:
+                      - code [ref=f1e450]: web-ui/src/features/conversations/hooks/useConversationSession.ts:18
+                    - cell [ref=f1e451]:
+                      - text: 有缓存就把
+                      - code [ref=f1e452]: loadingSession
+                      - text: 初始设为
+                      - code [ref=f1e453]: "false"
+                    - cell "改回有选中会话就先处于加载状态，等当前会话请求完成后再结束。缓存仍然可以先用于会话切换，不需要删除缓存" [ref=f1e454]
+              - paragraph [ref=f1e455]:
+                - text: 有两点不建议现在动：
+                - code [ref=f1e456]: useConversationSession.ts
+                - text: 里已有的
+                - code [ref=f1e457]: sessionCache
+                - text: 和按游标加载旧消息，它们正是多个长对话快速切换时避免每次从头加载的代码；群聊自身的消息去重、快照和服务端逻辑也保留。
+                - code [ref=f1e458]: App.tsx
+                - text: 同时保留单人和群聊页面是为了快速切换，暂时不建议改成每次重新打开网页，否则切换确实会变慢。当前最直接的修复范围就是：
+                - strong [ref=f1e459]: 修正首屏就绪判断、恢复 Logo 超时兜底、删除新增的双重滚动恢复逻辑。
+            - generic "消息操作" [ref=f1e461]:
+              - button "复制内容" [ref=f1e462] [cursor=pointer]
+              - button "从这里继续" [ref=f1e466] [cursor=pointer]
+          - article [ref=f1e472]:
+            - time [ref=f1e473]: 08-07 14:23
+            - paragraph [ref=f1e476]: 同时等待 snapshotLoading、loadingList、loadingSession 都结束 不会很久吗？如果你要都等完，还要snapshotLoading做什么？
+            - generic "消息操作" [ref=f1e478]:
+              - button "复制内容" [ref=f1e479] [cursor=pointer]
+              - button "重新编辑" [ref=f1e483] [cursor=pointer]
+          - article [ref=f1e487]:
+            - time [ref=f1e488]: 08-07 14:24
+            - generic [ref=f1e490]:
+              - paragraph [ref=f1e491]:
+                - text: 您指出的是关键问题：
+                - strong [ref=f1e492]: 这三个状态不是同一件事，不能简单地全部等完。
+              - table [ref=f1e493]:
+                - rowgroup [ref=f1e494]:
+                  - row [ref=f1e495]:
+                    - columnheader "状态" [ref=f1e496]
+                    - columnheader "实际作用" [ref=f1e497]
+                    - columnheader "是否应该阻塞首屏" [ref=f1e498]
+                - rowgroup [ref=f1e499]:
+                  - row [ref=f1e500]:
+                    - cell [ref=f1e501]:
+                      - code [ref=f1e502]: snapshotLoading
+                    - cell [ref=f1e503]:
+                      - text: 读取 IndexedDB 中可能比
+                      - code [ref=f1e504]: localStorage
+                      - text: 更完整的本地快照
+                    - cell "首次打开时应该等它，避免先显示短快照再替换" [ref=f1e505]
+                  - row [ref=f1e506]:
+                    - cell [ref=f1e507]:
+                      - code [ref=f1e508]: loadingList
+                    - cell "读取左侧会话列表" [ref=f1e509]
+                    - cell "已经有当前会话时，不必阻塞正文；没有当前会话时才需要等" [ref=f1e510]
+                  - row [ref=f1e511]:
+                    - cell [ref=f1e512]:
+                      - code [ref=f1e513]: loadingSession
+                    - cell "读取当前会话" [ref=f1e514]
+                    - cell "当前会话未知时需要等；已有缓存时应该后台更新，不应该让用户重新等待" [ref=f1e515]
+              - paragraph [ref=f1e516]:
+                - text: 另外，当前远程代码里的
+                - code [ref=f1e517]: loadingSession
+                - text: 本身也不能直接拿来判断“服务器最新内容是否已完成”。因为
+                - code [ref=f1e518]: useConversationSession.ts
+                - text: 中有缓存时会初始化为
+                - code [ref=f1e519]: "false"
+                - text: ，而后台的
+                - code [ref=f1e520]: quiet
+                - text: 请求不会重新把它设为
+                - code [ref=f1e521]: "true"
+                - text: 。所以即使把三个状态写成“全部结束”，也可能仍然过早结束。
+              - paragraph [ref=f1e522]: 正确做法不是“全部等待”，而是分情况：
+              - list [ref=f1e523]:
+                - listitem [ref=f1e524]:
+                  - strong [ref=f1e525]: 有当前会话缓存
+                  - text: ：等待
+                  - code [ref=f1e526]: snapshotLoading
+                  - text: ，先稳定展示本地快照；服务器更新后台进行，不阻塞用户。
+                - listitem [ref=f1e527]:
+                  - strong [ref=f1e528]: 没有当前会话缓存
+                  - text: ：等待当前会话首次读取完成。
+                - listitem [ref=f1e529]:
+                  - strong [ref=f1e530]: 没有选中会话
+                  - text: ：等待会话列表决定显示哪个会话或空状态。
+                - listitem [ref=f1e531]:
+                  - strong [ref=f1e532]: 切换已经加载过的长对话
+                  - text: ：直接显示该会话缓存，后台更新，不重新显示 Logo。
+              - paragraph [ref=f1e533]:
+                - text: 所以
+                - code [ref=f1e534]: snapshotLoading
+                - text: 不是多余的，它负责“本地内容准备好”；但它不代表“服务器最新内容已经准备好”。我刚才建议把三个状态一起等待不准确，应该改成一个单独的“首次可显示状态”，按上述条件判断，而不是直接把三个布尔值相加。
+            - generic "消息操作" [ref=f1e536]:
+              - button "复制内容" [ref=f1e537] [cursor=pointer]
+              - button "从这里继续" [ref=f1e541] [cursor=pointer]
+          - article [ref=f1e547]:
+            - time [ref=f1e548]: 08-07 14:24
+            - paragraph [ref=f1e551]: ？那还不是会有加载完了内容跳变的问题？
+            - generic "消息操作" [ref=f1e553]:
+              - button "复制内容" [ref=f1e554] [cursor=pointer]
+              - button "重新编辑" [ref=f1e558] [cursor=pointer]
+          - article [ref=f1e562]:
+            - time [ref=f1e563]: 08-07 14:25
+            - generic [ref=f1e565]:
+              - paragraph [ref=f1e566]: 是的。**只要先把缓存内容展示出来，再等服务器返回最新内容，就仍然会发生内容跳变。**我前面说“有缓存就先展示、后台更新”不符合您要求的“加载稳定后再展示”，这条应撤回。
+              - paragraph [ref=f1e567]: 当前代码确实存在这个顺序：
+              - list [ref=f1e568]:
+                - listitem [ref=f1e569]:
+                  - code [ref=f1e570]: useConversationSession.ts
+                  - text: 先执行
+                  - code [ref=f1e571]: setSession(cached)
+                  - text: ；
+                - listitem [ref=f1e572]:
+                  - code [ref=f1e573]: App.tsx
+                  - text: 只等待
+                  - code [ref=f1e574]: snapshotLoading
+                  - text: ；
+                - listitem [ref=f1e575]:
+                  - code [ref=f1e576]: main.tsx
+                  - text: 收到
+                  - code [ref=f1e577]: negus:app-ready
+                  - text: 后移除 Logo；
+                - listitem [ref=f1e578]: 服务器会话请求返回后，再用新内容替换缓存内容。
+              - paragraph [ref=f1e579]:
+                - text: 所以现在的实质问题不是要不要等
+                - code [ref=f1e580]: loadingList
+                - text: ，而是：
+                - strong [ref=f1e581]: 首屏不能在当前会话的第一次服务器读取完成前结束加载遮罩。
+              - paragraph [ref=f1e582]: 正确方案应改成：
+              - list [ref=f1e583]:
+                - listitem [ref=f1e584]: 本地快照可以提前读取，但只能藏在 Logo 后面，不能先让用户看到；
+                - listitem [ref=f1e585]: 首屏等待“当前会话第一次读取完成”，不等待整段历史；
+                - listitem [ref=f1e586]: 当前会话第一次返回后，再同时展示稳定内容并移除 Logo；
+                - listitem [ref=f1e587]: 旧消息继续向上滚动时按需加载；
+                - listitem [ref=f1e588]: 已经打开过的会话可以使用内存缓存，但如果要求绝对不跳变，就不能直接把未确认缓存当成最终内容显示。
+              - paragraph [ref=f1e589]:
+                - text: 因此，真正需要修改的是：
+                - strong [ref=f1e590]:
+                  - text: 把
+                  - code [ref=f1e591]: negus:app-ready
+                  - text: 绑定到当前会话首次读取完成，而不是绑定到
+                  - code [ref=f1e592]: snapshotLoading
+                  - text: 完成；同时首屏期间不能显示
+                  - code [ref=f1e593]: setSession(cached)
+                  - text: 的中间结果。
+            - generic "消息操作" [ref=f1e595]:
+              - button "复制内容" [ref=f1e596] [cursor=pointer]
+              - button "从这里继续" [ref=f1e600] [cursor=pointer]
+          - article [ref=f1e606]:
+            - time [ref=f1e607]: 08-07 14:25
+            - paragraph [ref=f1e610]: 现在的实质问题是，你一直在胡说八道
+            - generic "消息操作" [ref=f1e612]:
+              - button "复制内容" [ref=f1e613] [cursor=pointer]
+              - button "重新编辑" [ref=f1e617] [cursor=pointer]
+          - article [ref=f1e621]:
+            - time [ref=f1e622]: 08-07 14:26
+            - generic [ref=f1e624]:
+              - paragraph [ref=f1e625]: 对，前面的问题在我：我把推断当成了代码结论，还混用了本地版本和远程版本，导致一直在围绕错误前提给方案。
+              - paragraph [ref=f1e626]: 目前真正能从远程代码确认的只有：
+              - list [ref=f1e627]:
+                - listitem [ref=f1e628]:
+                  - code [ref=f1e629]: App.tsx
+                  - text: 只根据
+                  - code [ref=f1e630]: snapshotLoading
+                  - text: 触发
+                  - code [ref=f1e631]: negus:app-ready
+                  - text: 。
+                - listitem [ref=f1e632]:
+                  - code [ref=f1e633]: snapshotLoading
+                  - text: 只代表本地快照读取结束，不代表服务器会话内容完成。
+                - listitem [ref=f1e634]:
+                  - code [ref=f1e635]: useConversationSession.ts
+                  - text: 会先把缓存会话放进
+                  - code [ref=f1e636]: session
+                  - text: ，再发起服务器请求。
+                - listitem [ref=f1e637]:
+                  - code [ref=f1e638]: ConversationView.tsx
+                  - text: 同时存在加载后滚动、激活恢复滚动、消息更新滚动、尺寸变化滚动几套滚动写入。
+                - listitem [ref=f1e639]:
+                  - code [ref=f1e640]: group-main.tsx
+                  - text: 已经改成复用
+                  - code [ref=f1e641]: main.tsx
+                  - text: 。
+              - paragraph [ref=f1e642]: 除此之外，哪些代码实际造成您看到的问题，当前没有经过运行时证据确认。我不应该继续从这些代码直接推导用户结果，更不应该先给回退方案。后续需要先严格按“远程版本的实际差异和调用顺序”说明已确认事实，无法确认的明确标为未知。
+            - generic "消息操作" [ref=f1e644]:
+              - button "复制内容" [ref=f1e645] [cursor=pointer]
+              - button "从这里继续" [ref=f1e649] [cursor=pointer]
+      - generic "Codex 对话输入" [ref=f1e654]:
+        - generic [ref=f1e655]: 给 Codex 发送指令
+        - textbox "给 Codex 发送指令" [ref=f1e656]
+        - generic [ref=f1e657]:
+          - generic [ref=f1e658]:
+            - button "添加文件" [ref=f1e659]
+            - generic "添加文件" [ref=f1e660] [cursor=pointer]
+            - generic "Codex 已就绪" [ref=f1e665]
+          - generic [ref=f1e670]:
+            - button "选择模型" [ref=f1e672]
+            - button "上下文 --" [ref=f1e677]
+          - button "发送" [disabled] [ref=f1e681]

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildDiscussionPrompt, mentionedAgentIds, newMentionedAgentIds } from "../server/multi-agent-service.mjs";
+import { resolveAgentRouting } from "../server/multi-agent/agent-routing.mjs";
 
 const agents = [
   { id: "manager", name: "Manager Agent", aliases: ["Manager"], responsibility: "coordination" },
@@ -12,6 +13,16 @@ test("finds every mentioned Agent in message order", () => {
     mentionedAgentIds("Ask @Reviewer Agent, then @Manager Agent", agents),
     ["reviewer", "manager"],
   );
+  assert.deepEqual(mentionedAgentIds("@Reviewer Agent then @Reviewer Agent", agents), ["reviewer"]);
+});
+
+test("an empty explicit Agent list still resolves mentions from text", () => {
+  assert.deepEqual(resolveAgentRouting({
+    text: "Please continue, @Reviewer Agent",
+    requestedAgentIds: ["manager"],
+    explicitAgentIds: [],
+    agents,
+  }).targetAgentIds, ["reviewer"]);
 });
 
 test("matches aliases and ignores incomplete or longer names", () => {

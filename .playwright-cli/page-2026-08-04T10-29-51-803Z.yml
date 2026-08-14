@@ -1,0 +1,112 @@
+- generic [ref=e3]:
+  - banner "应用菜单栏" [ref=e5]:
+    - generic [ref=e16]:
+      - generic [ref=e17]: 文件
+      - generic [ref=e18]: 编辑
+      - generic [ref=e19]: 视图
+      - generic [ref=e20]: 帮助
+  - complementary "当前项目会话" [ref=e33]:
+    - generic [ref=e34]:
+      - generic [ref=e35]: Codex
+      - generic [ref=e39]:
+        - button "新建对话" [ref=e40]
+        - button "刷新会话" [ref=e44]
+        - button "查看已归档对话" [ref=e50]
+    - generic [ref=e54]: negus
+    - generic [ref=e58]:
+      - heading "项目会话" [level=2] [ref=e59]
+      - generic [ref=e402]:
+        - button "未命名会话 Codex · 8/4 18:28" [ref=e403]:
+          - generic [ref=e406]:
+            - generic [ref=e407]: 未命名会话
+            - generic [ref=e408]: Codex · 8/4 18:28
+        - button "归档 未命名会话" [ref=e409] [cursor=pointer]
+      - generic [ref=e149]:
+        - button "快速了解项目结构 Codex · 8/4 18:29" [ref=e444]:
+          - generic [ref=e153]:
+            - generic [ref=e154]: 快速了解项目结构
+            - generic [ref=e155]: Codex · 8/4 18:29
+        - button "归档 快速了解项目结构" [ref=e156] [cursor=pointer]
+      - generic [ref=e160]:
+        - button "快速了解项目结构 (2) Codex · 8/4 16:29" [ref=e161]:
+          - generic [ref=e164]:
+            - generic [ref=e165]: 快速了解项目结构 (2)
+            - generic [ref=e166]: Codex · 8/4 16:29
+        - button "归档 快速了解项目结构 (2)" [ref=e167] [cursor=pointer]
+      - generic [ref=e171]:
+        - button "生成中国网红直播图片 Codex · 8/4 16:27" [ref=e172]:
+          - generic [ref=e175]:
+            - generic [ref=e176]: 生成中国网红直播图片
+            - generic [ref=e177]: Codex · 8/4 16:27
+        - button "归档 生成中国网红直播图片" [ref=e178] [cursor=pointer]
+      - generic [ref=e182]:
+        - button "了解项目最新状态 Codex · 8/3 18:55" [ref=e183]:
+          - generic [ref=e186]:
+            - generic [ref=e187]: 了解项目最新状态
+            - generic [ref=e188]: Codex · 8/3 18:55
+        - button "归档 了解项目最新状态" [ref=e189] [cursor=pointer]
+      - generic [ref=e193]:
+        - button "梳理公司三大职能 Codex · 7/31 11:37" [ref=e194]:
+          - generic [ref=e197]:
+            - generic [ref=e198]: 梳理公司三大职能
+            - generic [ref=e199]: Codex · 7/31 11:37
+        - button "归档 梳理公司三大职能" [ref=e200] [cursor=pointer]
+    - generic [ref=e64]:
+      - generic [ref=e66]: 原电脑实时连接
+      - generic "支持发送指令和附件" [ref=e67]
+  - generic [ref=e71]:
+    - generic [ref=e72]:
+      - generic [ref=e73]:
+        - generic [ref=e76]:
+          - heading "未命名会话" [level=1] [ref=e413]
+          - generic [ref=e205]: Codex Desktop
+        - button "分享当前对话" [ref=e78]
+        - navigation "切换对话模式" [ref=e85]:
+          - link "单人 Codex 对话" [ref=e86] [cursor=pointer]:
+            - /url: /?token=negus-e2e-20260804&thread=019fcc51-61f5-7631-b392-5fd3546c83be
+            - generic [ref=e90]: 对话
+          - link "项目群聊" [ref=e91] [cursor=pointer]:
+            - /url: /group.html?token=negus-e2e-20260804&thread=019fcc51-61f5-7631-b392-5fd3546c83be
+            - generic [ref=e95]: 群聊
+          - link "项目管理" [ref=e96] [cursor=pointer]:
+            - /url: /progress?token=negus-e2e-20260804&thread=019fcc51-61f5-7631-b392-5fd3546c83be
+            - generic [ref=e100]: 进度
+      - generic [ref=e101]:
+        - generic "DESKTOP-9148A5，网页已同步" [ref=e206]:
+          - generic [ref=e105]: DESKTOP-9148A5
+          - generic [ref=e107]: 网页已同步
+        - generic [ref=e108]: ·
+        - button "今日 -- 倍率 --" [ref=e110]:
+          - generic [ref=e111]:
+            - generic [ref=e112]:
+              - generic [ref=e113]: 今日
+              - strong [ref=e114]: "--"
+            - generic [ref=e116]:
+              - generic [ref=e117]: 倍率
+              - strong [ref=e118]: "--"
+    - main [ref=e119]:
+      - region "真实项目对话" [ref=e122]:
+        - generic [ref=e445]: 请求的项目会话不存在
+        - generic [ref=e207]:
+          - article [ref=e447]:
+            - time [ref=e448]: 08-04 18:29
+            - paragraph [ref=e451]: 生成一张 1:1、1K 的简洁产品摄影图片，白色背景，一只透明玻璃水杯
+            - generic "消息操作" [ref=e453]:
+              - button "复制内容" [ref=e454] [cursor=pointer]
+          - region "Codex 工作过程" [ref=e459]:
+            - button "Negus Image 正在生成图片 6s" [ref=e460] [cursor=pointer]:
+              - generic [ref=e463]: Negus Image 正在生成图片
+              - time [ref=e464]: 6s
+      - generic "Codex 对话输入" [ref=e414]:
+        - generic [ref=e415]: 给 Codex 发送指令
+        - textbox "给 Codex 发送指令" [ref=e416]:
+          - /placeholder: 追加指令，引导当前任务
+        - generic [ref=e417]:
+          - generic [ref=e418]:
+            - button "添加文件" [ref=e419]
+            - generic "添加文件" [ref=e420] [cursor=pointer]
+            - generic "1K · 1:1 · 1 张" [ref=e467]: Codex 正在运行
+          - generic [ref=e430]:
+            - button "GPT-5.6-Sol · 超高 (xhigh)" [ref=e432]
+            - button "上下文 --" [ref=e437]
+          - button "停止当前任务" [ref=e471] [cursor=pointer]

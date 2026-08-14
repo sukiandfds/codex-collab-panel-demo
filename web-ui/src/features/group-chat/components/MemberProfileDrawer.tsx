@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, CircleUserRound, X } from "lucide-react";
+import { readModelCatalog, writeModelCatalog } from "../../models/data/modelCatalogCache";
 import { modelApi } from "../../models/data/modelApi";
 import { formatModelDisplayName } from "../../models/model/modelDisplayName";
 import { formatReasoningEffort } from "../../models/model/reasoningEffortLabels";
@@ -17,16 +18,20 @@ export function MemberProfileDrawer({ profile, roomId, onClose, onAgentUpdated }
 }) {
   const agent = profile?.kind === "agent" ? profile.profile : null;
   const agentId = agent?.id || "";
-  const [models, setModels] = useState<CodexModel[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(false);
+  const [initialModels] = useState(readModelCatalog);
+  const [models, setModels] = useState<CodexModel[]>(initialModels);
+  const [modelsLoading, setModelsLoading] = useState(!initialModels.length);
   const [draftModel, setDraftModel] = useState("");
   const [draftEffort, setDraftEffort] = useState("");
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState("");
+  const saveControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    saveControllerRef.current?.abort();
+    saveControllerRef.current = null;
+    setApplying(false);
     if (!agentId) {
-      setModels([]);
       setDraftModel("");
       setDraftEffort("");
       setError("");
@@ -35,18 +40,35 @@ export function MemberProfileDrawer({ profile, roomId, onClose, onAgentUpdated }
     setDraftModel(agent?.model || "");
     setDraftEffort(agent?.reasoningEffort || "");
     setError("");
+  }, [agentId, agent?.model, agent?.reasoningEffort]);
+
+  useEffect(() => {
+    if (!agentId || models.length) {
+      setModelsLoading(false);
+      return;
+    }
     const controller = new AbortController();
+    let active = true;
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
     setModelsLoading(true);
     void modelApi.list(controller.signal)
-      .then(setModels)
+      .then((result) => {
+        if (!active) return;
+        setModels(result);
+        writeModelCatalog(result);
+      })
       .catch((reason) => {
-        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : String(reason));
+        if (active) setError(controller.signal.aborted ? "模型列表读取超时，请关闭后重试" : reason instanceof Error ? reason.message : String(reason));
       })
       .finally(() => {
-        if (!controller.signal.aborted) setModelsLoading(false);
+        if (active) setModelsLoading(false);
       });
-    return () => controller.abort();
-  }, [agentId]);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [agentId, models.length]);
 
   const modelOptions = useMemo(() => {
     if (!agent?.model || models.some((entry) => entry.model === agent.model)) return models;
@@ -75,15 +97,24 @@ export function MemberProfileDrawer({ profile, roomId, onClose, onAgentUpdated }
 
   const saveAgentSettings = async () => {
     if (!agent || !hasChanges || applying || modelsLoading || !draftModel || !draftEffort) return;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
+    saveControllerRef.current?.abort();
+    saveControllerRef.current = controller;
     setApplying(true);
     setError("");
     try {
-      const updated = await groupApi.updateAgentSettings(agent.id, draftModel, draftEffort, roomId);
-      onAgentUpdated(updated);
+      const updated = await groupApi.updateAgentSettings(agent.id, draftModel, draftEffort, roomId, controller.signal);
+      if (!controller.signal.aborted) onAgentUpdated(updated);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : String(reason));
+      else setError("模型设置保存超时，请重试");
     } finally {
-      setApplying(false);
+      window.clearTimeout(timeout);
+      if (saveControllerRef.current === controller) {
+        saveControllerRef.current = null;
+        setApplying(false);
+      }
     }
   };
 

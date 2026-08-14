@@ -10,19 +10,8 @@ import { ContentRenderer } from "../rendering/ContentRenderer";
 import { ExecutionTimeline } from "../../execution/components/ExecutionTimeline";
 import type { ExecutionStatus } from "../../execution/model/types";
 import type { ContextStatus } from "../../context-management/model/types";
+import { formatConversationTimestamp } from "../../../shared/format/dateTime";
 import styles from "./ConversationView.module.css";
-
-const padTimePart = (value: number) => String(value).padStart(2, "0");
-
-const messageTime = (value?: string) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const monthDayTime = `${padTimePart(date.getMonth() + 1)}-${padTimePart(date.getDate())} ${padTimePart(date.getHours())}:${padTimePart(date.getMinutes())}:${padTimePart(date.getSeconds())}`;
-  return date.getFullYear() === new Date().getFullYear()
-    ? monthDayTime
-    : `${date.getFullYear()}-${monthDayTime}`;
-};
 
 const normalizedText = (value: string) => value.replace(/\s+/gu, " ").trim();
 
@@ -80,7 +69,7 @@ function Message({
   contextStatus?: ContextStatus;
   executionPlaceholder?: boolean;
 }) {
-  const formattedTime = messageTime(message.createdAt);
+  const formattedTime = formatConversationTimestamp(message.createdAt);
   const reserveTimestamp = message.role === "assistant";
   return (
     <article className={`${styles.message} ${message.role === "user" ? styles.user : styles.assistant}`}>

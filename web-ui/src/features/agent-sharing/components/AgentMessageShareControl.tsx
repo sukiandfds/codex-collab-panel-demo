@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Share2, X } from "lucide-react";
+import { currentConversationId } from "../../../shared/api/conversationScope";
 import { fetchJson, postJson } from "../../../shared/api/http";
+import { createClientId } from "../../../shared/id/clientId";
 import styles from "./AgentMessageShareControl.module.css";
 
 interface AgentShareRoom { id: string; name: string; }
 interface AgentShareTargets { conversationId: string; agent: { id: string; name: string }; rooms: AgentShareRoom[]; }
 type ShareStatus = "success" | "error" | "";
-const createRequestId = () => globalThis.crypto?.randomUUID?.() || `share-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 export function AgentMessageShareControl({ className, threadId, messageId }: { className: string; threadId: string; messageId: string }) {
   const [open, setOpen] = useState(false);
@@ -28,7 +29,7 @@ export function AgentMessageShareControl({ className, threadId, messageId }: { c
     if (loadingTargets || publishingRoomId) return;
     setOpen(true); setTargets(null); setError(""); setStatus(""); setLoadingTargets(true);
     try {
-      const conversationId = new URLSearchParams(window.location.search).get("conversation") || "";
+      const conversationId = currentConversationId();
       const targetQuery = conversationId ? `conversationId=${encodeURIComponent(conversationId)}` : `threadId=${encodeURIComponent(threadId)}`;
       setTargets(await fetchJson<AgentShareTargets>(`/api/agent-share/targets?${targetQuery}`));
     } catch { setError("发送失败"); }
@@ -39,7 +40,7 @@ export function AgentMessageShareControl({ className, threadId, messageId }: { c
   const publish = async (roomId: string) => {
     if (!targets || publishingRoomId || !roomId) return;
     const requestIds = retryRequestsRef.current;
-    const requestId = requestIds.get(roomId) || createRequestId();
+    const requestId = requestIds.get(roomId) || createClientId("share");
     requestIds.set(roomId, requestId); setPublishingRoomId(roomId);
     try {
       await postJson("/api/agent-share", { requestId, conversationId: targets.conversationId, messageId, roomId });

@@ -1,5 +1,5 @@
+import { formatRecordedTimestamp as formatProgressTimestamp } from "../../../shared/format/dateTime";
 import type { ProgressUpdate } from "../data/progressApi";
-import { formatProgressTimestamp } from "../model/format";
 import styles from "../ProjectProgressApp.module.css";
 
 interface ProgressLogListProps {

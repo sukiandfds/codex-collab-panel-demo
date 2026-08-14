@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createClientId } from "../../../shared/id/clientId";
 import { executionApi } from "../data/executionApi";
 import type { SendMessageAttempt, SubmissionStatusResult } from "../data/executionApi";
 import type { ExecutionStatus, ProjectEvent } from "../model/types";
@@ -10,9 +11,6 @@ const MAX_CACHED_STATUSES = 100;
 const statusCache = new Map<string, ExecutionStatus>();
 
 type RefreshStatus = (signal?: AbortSignal, reconcile?: boolean) => Promise<ExecutionStatus | null>;
-
-const createFallbackSubmissionId = () => globalThis.crypto?.randomUUID?.()
-  || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 const idleStatus = (threadId: string): ExecutionStatus => ({
   type: "execution_status",
@@ -256,7 +254,7 @@ export function useCodexExecution(threadId: string) {
     sendingRef.current = true;
     setSending(true);
     setSendingSlow(false);
-    const acceptedSubmissionId = submissionId || createFallbackSubmissionId();
+    const acceptedSubmissionId = submissionId || createClientId();
     sendingSlowTimer.current = window.setTimeout(() => setSendingSlow(true), SEND_SLOW_NOTICE_MS);
     const steering = status.active;
     const previousTurnId = status.turnId;

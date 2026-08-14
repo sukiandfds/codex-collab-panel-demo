@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { createAppServerClient } from "./app-server-client.mjs";
 import { inputFromAttachments } from "./app-server-conversation-store.mjs";
-import { buildDiscussionPrompt, cleanAgentIds, mentionedAgentIds } from "./multi-agent/discussion-prompt.mjs";
+import { buildDiscussionPrompt } from "./multi-agent/discussion-prompt.mjs";
+import { cleanAgentIds, mentionedAgentIds, resolveAgentRouting } from "./multi-agent/agent-routing.mjs";
 import { completeOutputJob } from "./multi-agent/output-job.mjs";
 import { agentStateFromItem, terminalAgentPhases } from "./multi-agent/protocol-state.mjs";
 
@@ -12,7 +13,8 @@ const missingThreadPattern = /\bthread(?:\s+id)?\s+not\s+found\b/iu;
 
 const isMissingThreadError = (error) => missingThreadPattern.test(String(error?.message || error));
 
-export { buildDiscussionPrompt, mentionedAgentIds } from "./multi-agent/discussion-prompt.mjs";
+export { buildDiscussionPrompt } from "./multi-agent/discussion-prompt.mjs";
+export { mentionedAgentIds } from "./multi-agent/agent-routing.mjs";
 
 export const newMentionedAgentIds = (text, agents, scheduledAgentIds = []) => {
   const scheduled = scheduledAgentIds instanceof Set
@@ -334,20 +336,24 @@ export const createMultiAgentService = ({
     }
   };
 
-  const enqueueDiscussion = async ({ agentIds, requestText, attachments = [], sourceMessageId = "", explicitAgentIds = [] }) => {
+  const enqueueDiscussion = async ({ agentIds, requestText, attachments = [], sourceMessageId = "", explicitAgentIds }) => {
     const agents = room.snapshot().agents;
-    let targets = cleanAgentIds(agentIds, agents);
-    if (!targets.length) throw Object.assign(new Error("请选择一个可用 Agent"), { statusCode: 404 });
-    const explicitTargets = cleanAgentIds(
-      explicitAgentIds.length ? explicitAgentIds : mentionedAgentIds(requestText, agents),
+    const outputRequested = Boolean(webOutputs?.isRequest(requestText));
+    const routing = resolveAgentRouting({
+      text: requestText,
+      requestedAgentIds: agentIds,
+      explicitAgentIds,
       agents,
-    );
-    const canCreateOutputJob = !explicitTargets.length
-      || (explicitTargets.length === 1 && targets.length === 1 && targets[0] === "developer");
-    const outputJob = canCreateOutputJob && webOutputs?.isRequest(requestText)
-      ? await webOutputs.createJob({ sourceMessageId, agentId: "developer" })
+      outputRequested,
+    });
+    const targets = routing.targetAgentIds;
+    if (!targets.length) throw Object.assign(new Error("请选择一个可用 Agent"), { statusCode: 404 });
+    const explicitTargets = routing.explicitAgentIds;
+    const canCreateOutputJob = Boolean(routing.outputAgentId) && (!explicitTargets.length
+      || (explicitTargets.length === 1 && targets.length === 1 && targets[0] === routing.outputAgentId));
+    const outputJob = canCreateOutputJob && outputRequested
+      ? await webOutputs.createJob({ sourceMessageId, agentId: routing.outputAgentId })
       : null;
-    if (outputJob && !explicitTargets.length) targets = ["developer"];
     const jobId = outputJob?.jobId || randomUUID();
     void setStatus(targets[0], { phase: "queued", label: "已加入讨论队列", detail: "", active: true });
     workQueue = workQueue

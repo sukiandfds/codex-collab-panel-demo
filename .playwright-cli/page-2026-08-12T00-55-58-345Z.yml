@@ -1,0 +1,114 @@
+- generic [ref=e517]:
+  - generic [ref=e518]:
+    - banner "应用菜单栏" [ref=e520]:
+      - generic [ref=e531]:
+        - generic [ref=e532]: 文件
+        - generic [ref=e533]: 编辑
+        - generic [ref=e534]: 视图
+        - generic [ref=e535]: 帮助
+    - generic [ref=e548]:
+      - generic [ref=e549]: NEGUS
+      - navigation "项目目录" [ref=e551]:
+        - generic [ref=e552]:
+          - button "当前显示文件夹名，点击切换" [ref=e553] [cursor=pointer]: 文件夹
+          - button [ref=e555] [cursor=pointer]:
+            - strong [ref=e559]: codex-collab-panel-demo
+          - generic [ref=e560]: 员工项目
+          - button [ref=e562] [cursor=pointer]:
+            - strong [ref=e566]: Research Agent
+          - button [ref=e568] [cursor=pointer]:
+            - strong [ref=e572]: Project Manager Agent
+          - button [ref=e574] [cursor=pointer]:
+            - strong [ref=e578]: Developer Director Agent
+    - generic [ref=e579]:
+      - generic [ref=e580]:
+        - generic [ref=e581]:
+          - generic [ref=e584]:
+            - heading "negus 项目群" [level=1] [ref=e586]
+            - generic [ref=e587]: 1 位用户，4 位 Agent
+          - button "分享项目群聊" [ref=e588]
+          - navigation "切换对话模式" [ref=e595]:
+            - link "单人 Codex 对话" [ref=e596] [cursor=pointer]:
+              - /url: /?token=demo123
+              - generic [ref=e600]: 对话
+            - link "项目群聊" [ref=e601] [cursor=pointer]:
+              - /url: /?token=demo123&view=group
+              - generic [ref=e605]: 群聊
+            - link "项目管理" [ref=e606] [cursor=pointer]:
+              - /url: /progress?token=demo123
+              - generic [ref=e610]: 进度
+        - generic [ref=e611]:
+          - generic "DESKTOP-9148A5，网页已同步" [ref=e612]:
+            - generic [ref=e615]: DESKTOP-9148A5
+            - generic [ref=e617]: 网页已同步
+          - generic [ref=e618]: ·
+          - generic [ref=e619]: 1 名成员在线
+      - main [ref=e620]:
+        - generic [ref=e622]:
+          - generic [ref=e623]: 8月11日周二
+          - article [ref=e625]:
+            - button "查看hans的个人信息" [ref=e626] [cursor=pointer]: h
+            - generic [ref=e627]:
+              - generic [ref=e628]:
+                - strong [ref=e629]: hans
+                - generic [ref=e630]: 16:36
+              - paragraph [ref=e631]: hi
+          - article [ref=e632]:
+            - button "查看项目经理 Agent的个人信息" [ref=e633] [cursor=pointer]: AI
+            - generic [ref=e634]:
+              - generic [ref=e635]:
+                - strong [ref=e636]: 项目经理 Agent
+                - generic [ref=e637]: 16:37:21
+              - paragraph [ref=e639]: 你好 @hans，我是项目经理 Agent，负责澄清目标、拆解任务、同步进展和结论。请发项目目标、当前问题或已有材料；我会先确认范围与依赖，再协调 @研究 Agent、@开发 Agent、@审查 Agent。
+          - article [ref=e640]:
+            - button "查看hans的个人信息" [ref=e641] [cursor=pointer]: h
+            - generic [ref=e642]:
+              - generic [ref=e643]:
+                - strong [ref=e644]: hans
+                - generic [ref=e645]: 17:40
+              - paragraph [ref=e646]: 有人吗？
+          - article [ref=e647]:
+            - button "查看项目经理 Agent的个人信息" [ref=e648] [cursor=pointer]: AI
+            - generic [ref=e649]:
+              - generic [ref=e650]:
+                - strong [ref=e651]: 项目经理 Agent
+                - generic [ref=e652]: 17:40:54
+              - paragraph [ref=e654]: 在的，@hans。请直接发送要讨论的项目目标、问题或材料；我会先帮大家明确范围和下一步，再协调对应 Agent 跟进。
+          - article [ref=e655]:
+            - button "查看hans的个人信息" [ref=e656] [cursor=pointer]: h
+            - generic [ref=e657]:
+              - generic [ref=e658]:
+                - strong [ref=e659]: hans
+                - generic [ref=e660]: 18:51
+              - paragraph [ref=e661]: 有人吗 @项目经理 Agent @研究 Agent
+          - article [ref=e662]:
+            - button "查看项目经理 Agent的个人信息" [ref=e663] [cursor=pointer]: AI
+            - generic [ref=e664]:
+              - generic [ref=e665]:
+                - strong [ref=e666]: 项目经理 Agent
+                - generic [ref=e667]: 18:52:06
+              - paragraph [ref=e669]: 在的，@hans。@研究 Agent 也已被点名。请发送具体项目需求、问题或相关材料，我们会先确认目标和范围，再给出下一步安排。
+          - article [ref=e670]:
+            - button "查看研究 Agent的个人信息" [ref=e671] [cursor=pointer]: AI
+            - generic [ref=e672]:
+              - generic [ref=e673]:
+                - strong [ref=e674]: 研究 Agent
+                - generic [ref=e675]: 18:52:19
+              - paragraph [ref=e677]: 在的，@hans。我是研究 Agent，负责只读调研、技术验证、方案比较和证据整理。请发送具体目标、问题、链接或项目范围，我会整理已确认事实、待核实点、风险与建议，供 @项目经理 Agent 和 @开发 Agent 参考。
+        - generic [ref=e679]:
+          - textbox "发送到项目群" [disabled] [ref=e680]
+          - generic [ref=e681]:
+            - generic [ref=e682]:
+              - button "添加文件" [disabled] [ref=e683]
+              - generic "添加文件"
+            - generic [ref=e684]:
+              - generic [ref=e685]:
+                - button "商讨" [ref=e686] [cursor=pointer]
+                - button "开发" [ref=e690] [cursor=pointer]
+              - generic [ref=e694]: 项目经理 Agent
+            - button "发送" [disabled] [ref=e695]
+  - dialog [ref=e698]:
+    - heading "进入项目群" [level=2] [ref=e705]
+    - paragraph [ref=e706]: 设置您在这个浏览器中的成员名称。
+    - textbox "成员名称" [active] [ref=e707]
+    - button "进入项目群" [disabled] [ref=e708]

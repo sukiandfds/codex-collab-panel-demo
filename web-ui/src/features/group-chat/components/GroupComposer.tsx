@@ -3,6 +3,8 @@ import { AtSign, ChevronDown, MessagesSquare, Send, Sparkles } from "lucide-reac
 import { AttachmentButton, AttachmentPreviews } from "../../attachments/components/AttachmentDraft";
 import { useAttachmentDraft } from "../../attachments/hooks/useAttachmentDraft";
 import { SlashCommandMenu, type SlashCommandOption } from "../../conversations/components/SlashCommandMenu";
+import { goalCapabilityOptions } from "../../goals/model/capability";
+import { useGoalCapability } from "../../goals/hooks/useGoalCapability";
 import type { GroupAgent, GroupMember } from "../model/types";
 import { mentionedAgentIds } from "../model/agentMentions";
 import { MentionMenu, type MentionOption } from "./MentionMenu";
@@ -11,6 +13,7 @@ import styles from "./GroupComposer.module.css";
 interface MentionState { start: number; end: number; query: string }
 
 const capabilityOptions: SlashCommandOption[] = [
+  ...goalCapabilityOptions,
   { id: "file", command: "/file", group: "文件", label: "读取附件", detail: "按问题读取并处理已上传文件" },
   { id: "image", command: "/image", group: "MCP 工具", label: "生成或修改图片", detail: "调用已配置的图片能力" },
   { id: "skill", command: "/skill", group: "Skills", label: "使用 Skill", detail: "选择并遵循匹配的 Skill" },
@@ -30,7 +33,7 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
   members: GroupMember[];
   disabled: boolean;
   error: string;
-  onSend: (text: string, targetAgentIds: string[], attachmentIds?: string[]) => Promise<boolean>;
+  onSend: (text: string, attachmentIds?: string[]) => Promise<boolean>;
 }) {
   const [text, setText] = useState("");
   const draft = useAttachmentDraft();
@@ -40,6 +43,7 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
   const [activeMention, setActiveMention] = useState(0);
   const [activeCapability, setActiveCapability] = useState(0);
   const [collapsedCapabilityGroups, setCollapsedCapabilityGroups] = useState<Record<string, boolean>>({});
+  const executeGoalCapability = useGoalCapability();
   const composerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submittingRef = useRef(false);
@@ -114,11 +118,19 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
   const submit = async () => {
     if (submittingRef.current || disabled || draft.uploading || (!text.trim() && !draft.attachments.length)) return;
     submittingRef.current = true;
-    const mentioned = mentionedAgentIds(text, agents);
-    const targetAgentIds = mentioned.length ? mentioned : ["manager"];
     try {
+      if (!draft.attachments.length) {
+        const goalResult = await executeGoalCapability(text);
+        if (goalResult.handled) {
+          if (goalResult.accepted) {
+            setText("");
+            setMention(null);
+          }
+          return;
+        }
+      }
       const uploaded = await draft.uploadAll();
-      if (await onSend(text, targetAgentIds, uploaded.map((attachment) => attachment.id))) {
+      if (await onSend(text, uploaded.map((attachment) => attachment.id))) {
         setText("");
         setMention(null);
         draft.clear();

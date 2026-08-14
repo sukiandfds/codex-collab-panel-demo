@@ -19,12 +19,6 @@ type ProjectNameMode = "folder" | "project";
 const projectNameModeCacheKey = "negus-project-name-mode-v1";
 const isProjectNameMode = (value: unknown): value is ProjectNameMode => value === "folder" || value === "project";
 const folderName = (root?: string) => root?.split(/[\\/]/u).filter(Boolean).slice(-1)[0] || "";
-const employeeDisplayNames: Record<string, string> = {
-  manager: "运营管理",
-  researcher: "产品分析",
-  developer: "技术研发",
-  reviewer: "风控质量",
-};
 
 const employeeConversations = (entry: DirectoryProject): DirectoryConversation[] => {
   if (entry.conversations?.length) return entry.conversations;
@@ -189,7 +183,7 @@ export function ProjectDirectory({
             : entry.mainThreadId ? statusByThread[entry.mainThreadId] || entry.status : entry.status;
           const displayName = (isPersonal || isBusiness) && projectNameMode === "folder"
             ? folderName(entry.root)
-            : isEmployee ? employeeDisplayNames[entry.employeeId || ""] || entry.name.replace(/\s*Agent$/iu, "") : entry.name;
+            : entry.name;
           return (
             <Fragment key={entry.id}>
               {startsSection ? (

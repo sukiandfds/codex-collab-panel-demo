@@ -1,5 +1,5 @@
 import { readJson, sendJson } from "../http/request-utils.mjs";
-import { mentionedAgentIds } from "../multi-agent/discussion-prompt.mjs";
+import { resolveAgentRouting } from "../multi-agent/agent-routing.mjs";
 
 export const createGroupRoutes = ({ groupRoom, roomDirectory, media, multiAgent, multiAgentDirectory, webOutputs }) => async (request, response, url) => {
   const roomIdFrom = (body = {}) => String(body.roomId || url.searchParams.get("roomId") || groupRoom.snapshot().room.id).trim();
@@ -58,16 +58,13 @@ export const createGroupRoutes = ({ groupRoom, roomDirectory, media, multiAgent,
     return true;
   }
   const agents = room.snapshot().agents;
-  const explicitAgentIds = mentionedAgentIds(text, agents);
   const requestedAgentIds = Array.isArray(body.agentIds) ? body.agentIds : [body.agentId];
-  const availableAgentIds = new Set(agents.map((agent) => agent.id));
-  const targetAgentIds = [...new Set((explicitAgentIds.length ? explicitAgentIds : requestedAgentIds)
-    .map((agentId) => String(agentId || "").trim())
-    .filter((agentId) => availableAgentIds.has(agentId)))];
-  if (!targetAgentIds.length) targetAgentIds.push("manager");
-  if (!explicitAgentIds.length && webOutputs.isRequest(text)) {
-    targetAgentIds.splice(0, targetAgentIds.length, "developer");
-  }
+  const { explicitAgentIds, targetAgentIds } = resolveAgentRouting({
+    text,
+    requestedAgentIds,
+    agents,
+    outputRequested: webOutputs.isRequest(text),
+  });
   const { message, created } = await room.addMessageWithStatus({
     type: "human",
     authorId: member.id,

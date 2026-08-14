@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
+import { formatRecordedTimestamp as formatProgressTimestamp } from "../../../shared/format/dateTime";
 import type { ProgressEntry } from "../data/progressApi";
-import { formatProgressTimestamp } from "../model/format";
 import styles from "../ProjectProgressApp.module.css";
 
 interface ProgressEntryRowProps {

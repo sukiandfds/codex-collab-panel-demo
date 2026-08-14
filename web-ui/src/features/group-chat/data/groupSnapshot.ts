@@ -1,4 +1,4 @@
-import { keepUnacknowledgedMessages, upsertGroupMessage } from "./groupMessageState";
+import { createPendingAgentMessage, keepUnacknowledgedMessages, removePendingAgentMessages, upsertGroupMessage } from "./groupMessageState";
 import type { GroupMessage, GroupSnapshot } from "../model/types";
 
 const storageKey = "negus-group-snapshot-v1";
@@ -16,28 +16,14 @@ const validSnapshot = (value: GroupSnapshot | null): value is GroupSnapshot => B
   && Array.isArray(value.members),
 );
 
-const pendingMessageFromWork = (work: NonNullable<GroupSnapshot["activeWorks"]>[number]): GroupMessage => ({
-  id: `pending-${work.workId}`,
-  workId: work.workId,
-  pending: true,
-  type: "agent",
-  authorId: work.agentId,
-  authorName: work.agentName,
-  agentId: work.agentId,
-  text: "",
-  attachments: [],
-  artifactIds: [],
-  createdAt: work.startedAt,
-});
-
 export const restoreActiveGroupWorks = (snapshot: GroupSnapshot): GroupSnapshot => ({
   ...snapshot,
   activeWorks: snapshot.activeWorks || [],
   messages: (snapshot.activeWorks || []).reduce(
     (messages, work) => messages.some((message) => message.workId === work.workId)
       ? messages
-      : upsertGroupMessage(messages, pendingMessageFromWork(work)),
-    snapshot.messages.filter((message) => !(message.pending && message.type === "agent")),
+      : upsertGroupMessage(messages, createPendingAgentMessage(work)),
+    removePendingAgentMessages(snapshot.messages),
   ),
 });
 
@@ -50,7 +36,7 @@ export const reconcileGroupSnapshot = (
   const messages = keepUnacknowledgedMessages(
     preserveHistory ? current?.messages || [] : incoming.messages,
     [
-    ...(preserveHistory ? [] : current?.messages.filter((message) => !(message.pending && message.type === "agent")) || []),
+    ...(preserveHistory ? [] : removePendingAgentMessages(current?.messages || [])),
     ...pendingMessages,
     ],
   );
@@ -73,7 +59,7 @@ export const readGroupSnapshot = (roomId = ""): GroupSnapshot | null => {
     if (!validSnapshot(snapshot)) return null;
     return {
       ...snapshot,
-      messages: snapshot.messages.filter((message) => !(message.pending && message.type === "agent")),
+      messages: removePendingAgentMessages(snapshot.messages),
       agents: snapshot.agents.map((agent) => ({ ...agent, active: false })),
       members: [],
       activeWorks: [],
@@ -88,9 +74,7 @@ export const writeGroupSnapshot = (snapshot: GroupSnapshot) => {
     if (snapshot.history?.date || snapshot.history?.hasNewer) return;
     const cached: GroupSnapshot = {
       ...snapshot,
-      messages: snapshot.messages
-        .filter((message) => !(message.pending && message.type === "agent"))
-        .slice(-messageLimit),
+      messages: removePendingAgentMessages(snapshot.messages).slice(-messageLimit),
       activeWorks: [],
     };
     const serialized = JSON.stringify(cached);

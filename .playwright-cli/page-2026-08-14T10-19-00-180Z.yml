@@ -1,0 +1,56 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - banner "应用菜单栏" [ref=e7]:
+      - generic [ref=e18]:
+        - generic [ref=e19]: 文件
+        - generic [ref=e20]: 编辑
+        - generic [ref=e21]: 视图
+        - generic [ref=e22]: 帮助
+    - generic [ref=e35]:
+      - generic [ref=e36]: NEGUS
+      - navigation "项目目录" [ref=e38]
+    - generic [ref=e39]:
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e44]:
+            - heading "Negus 项目群" [level=1] [ref=e46]
+            - generic [ref=e47]: 0 位用户，0 位 Agent
+          - generic "按日期查看历史消息" [ref=e48] [cursor=pointer]:
+            - textbox "选择群聊日期" [ref=e51]
+          - button "分享项目群聊" [ref=e52]
+          - navigation "切换对话模式" [ref=e59]:
+            - link "单人 Codex 对话" [ref=e60] [cursor=pointer]:
+              - /url: /
+              - generic [ref=e64]: 对话
+            - link "项目群聊" [ref=e65] [cursor=pointer]:
+              - /url: /?view=group
+              - generic [ref=e69]: 群聊
+            - link "项目管理" [ref=e70] [cursor=pointer]:
+              - /url: /progress
+              - generic [ref=e74]: 进度
+        - generic [ref=e75]:
+          - generic "原电脑服务，网页重连中" [ref=e76]:
+            - generic [ref=e79]: 原电脑服务
+            - generic [ref=e81]: 网页重连中
+          - generic [ref=e82]: ·
+          - generic [ref=e83]: 0 名成员在线
+      - region "Goal 控制条" [ref=e85]:
+        - generic [ref=e91]:
+          - generic [ref=e92]: Goal
+          - generic [ref=e93]: 等待连接
+        - textbox "Goal 目标" [ref=e95]:
+          - /placeholder: 输入目标并启动 Goal
+        - button "开始" [disabled] [ref=e96]
+        - generic [ref=e99]: 访问令牌无效，请使用启动命令输出的完整链接
+      - main [ref=e102]:
+        - main [ref=e103]:
+          - alert [ref=e104]:
+            - generic [ref=e105]:
+              - strong [ref=e106]: 项目群暂时未连接
+              - generic [ref=e107]: 连接没有响应，请刷新网页后重试。
+            - button "刷新网页" [ref=e108] [cursor=pointer]
+  - dialog [ref=e110]:
+    - heading "进入项目群" [level=2] [ref=e117]
+    - paragraph [ref=e118]: 设置您在这个浏览器中的成员名称。
+    - textbox "成员名称" [active] [ref=e119]
+    - button "进入项目群" [disabled] [ref=e120]

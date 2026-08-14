@@ -455,6 +455,22 @@ export const createEmployeeRuntimeService = ({
     };
   };
 
+  const interrupt = async (employeeId) => {
+    const employee = registry.require(employeeId);
+    const current = statusFor(employee.id);
+    if (!current.active || !current.turnId) return { employeeId: employee.id, status: "idle" };
+    const { threadId } = await ensureOpen(employee.id);
+    await client.request("turn/interrupt", { threadId, turnId: current.turnId });
+    publishStatus(employee.id, {
+      phase: "interrupted",
+      label: "已中断",
+      detail: "Goal 已暂停或停止当前执行",
+      active: false,
+      turnId: current.turnId,
+    });
+    return { employeeId: employee.id, threadId, turnId: current.turnId, status: "interrupted" };
+  };
+
   const close = () => {
     closed = true;
     unsubscribe();
@@ -466,6 +482,7 @@ export const createEmployeeRuntimeService = ({
     sendMessage,
     confirmModification,
     getStatus,
+    interrupt,
     supportsEmployee: (employeeId) => Boolean(registry.get(employeeId)),
     ownsConversation: (binding) => {
       const employee = registry.get(binding?.agentId);

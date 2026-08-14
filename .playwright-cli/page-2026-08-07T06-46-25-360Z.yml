@@ -1,0 +1,231 @@
+- generic [active] [ref=f1e1]:
+  - status "Negus 正在启动" [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - paragraph [ref=f1e4]: 为什么选择
+      - img "Negus" [ref=f1e5]
+      - paragraph [ref=f1e6]:
+        - strong [ref=f1e7]: Negus 只为精英提供真正高效的系统，
+        - text: 让你随时随地掌控 AI。
+  - generic [ref=f1e11]:
+    - banner "应用菜单栏" [ref=f1e13]:
+      - generic [ref=f1e24]:
+        - generic [ref=f1e25]: 文件
+        - generic [ref=f1e26]: 编辑
+        - generic [ref=f1e27]: 视图
+        - generic [ref=f1e28]: 帮助
+    - complementary "当前项目会话" [ref=f1e41]:
+      - generic [ref=f1e42]:
+        - generic [ref=f1e43]: NEGUS
+        - generic [ref=f1e45]:
+          - button "新建对话" [ref=f1e46]
+          - button "刷新会话" [ref=f1e50]
+          - button "查看已归档对话" [ref=f1e56]
+      - generic [ref=f1e60]: 正在读取项目
+      - generic [ref=f1e64]:
+        - heading "项目会话" [level=2] [ref=f1e65]
+        - generic [ref=f1e66]:
+          - button "梳理内容加载体验差异 8/7 14:31" [ref=f1e67]:
+            - generic [ref=f1e68]:
+              - generic [ref=f1e69]: 梳理内容加载体验差异
+              - generic [ref=f1e70]: 8/7 14:31
+          - button "归档 梳理内容加载体验差异"
+        - generic [ref=f1e71]:
+          - button "快速了解项目结构 8/7 14:26" [ref=f1e72]:
+            - generic [ref=f1e73]:
+              - generic [ref=f1e74]: 快速了解项目结构
+              - generic [ref=f1e75]: 8/7 14:26
+          - button "归档 快速了解项目结构"
+        - generic [ref=f1e76]:
+          - button "了解项目情况 8/5 18:16" [ref=f1e77]:
+            - generic [ref=f1e78]:
+              - generic [ref=f1e79]: 了解项目情况
+              - generic [ref=f1e80]: 8/5 18:16
+          - button "归档 了解项目情况"
+        - generic [ref=f1e81]:
+          - button "查询即梦 MCP 接口 8/5 10:07" [ref=f1e82]:
+            - generic [ref=f1e83]:
+              - generic [ref=f1e84]: 查询即梦 MCP 接口
+              - generic [ref=f1e85]: 8/5 10:07
+          - button "归档 查询即梦 MCP 接口"
+        - generic [ref=f1e86]:
+          - button "生成一张 1:1、1K 的简洁产品摄影图片，白色背景，一只透明玻璃水杯 8/4 18:30 · 2 条" [ref=f1e87]:
+            - generic [ref=f1e88]:
+              - generic [ref=f1e89]: 生成一张 1:1、1K 的简洁产品摄影图片，白色背景，一只透明玻璃水杯
+              - generic [ref=f1e90]: 8/4 18:30 · 2 条
+          - button "归档 生成一张 1:1、1K 的简洁产品摄影图片，白色背景，一只透明玻璃水杯"
+        - generic [ref=f1e91]:
+          - button "快速了解项目结构 (2) 8/4 16:29" [ref=f1e92]:
+            - generic [ref=f1e93]:
+              - generic [ref=f1e94]: 快速了解项目结构 (2)
+              - generic [ref=f1e95]: 8/4 16:29
+          - button "归档 快速了解项目结构 (2)"
+        - generic [ref=f1e96]:
+          - button "生成中国网红直播图片 8/4 16:27" [ref=f1e97]:
+            - generic [ref=f1e98]:
+              - generic [ref=f1e99]: 生成中国网红直播图片
+              - generic [ref=f1e100]: 8/4 16:27
+          - button "归档 生成中国网红直播图片"
+        - generic [ref=f1e101]:
+          - button "了解项目最新状态 8/3 18:55" [ref=f1e102]:
+            - generic [ref=f1e103]:
+              - generic [ref=f1e104]: 了解项目最新状态
+              - generic [ref=f1e105]: 8/3 18:55
+          - button "归档 了解项目最新状态"
+        - generic [ref=f1e106]:
+          - button "梳理公司三大职能 7/31 11:37" [ref=f1e107]:
+            - generic [ref=f1e108]:
+              - generic [ref=f1e109]: 梳理公司三大职能
+              - generic [ref=f1e110]: 7/31 11:37
+          - button "归档 梳理公司三大职能"
+      - generic [ref=f1e111]:
+        - generic [ref=f1e113]: 原电脑实时连接
+        - generic "支持发送指令和附件" [ref=f1e114]
+    - generic [ref=f1e118]:
+      - generic [ref=f1e119]:
+        - generic [ref=f1e120]:
+          - generic [ref=f1e123]:
+            - generic [ref=f1e124]:
+              - heading "梳理内容加载体验差异" [level=1] [ref=f1e125]
+              - button "重命名对话" [ref=f1e126] [cursor=pointer]
+            - generic [ref=f1e129]: Codex Desktop
+          - button "分享当前对话" [ref=f1e130]
+          - navigation "切换对话模式" [ref=f1e137]:
+            - link "单人 Codex 对话" [ref=f1e138] [cursor=pointer]:
+              - /url: /?token=codex-remote-20260807
+              - generic [ref=f1e142]: 对话
+            - link "项目群聊" [ref=f1e143] [cursor=pointer]:
+              - /url: /?token=codex-remote-20260807&view=group
+              - generic [ref=f1e147]: 群聊
+            - link "项目管理" [ref=f1e148] [cursor=pointer]:
+              - /url: /progress?token=codex-remote-20260807
+              - generic [ref=f1e152]: 进度
+        - generic [ref=f1e153]:
+          - generic "原电脑服务，网页已同步" [ref=f1e154]:
+            - generic [ref=f1e157]: 原电脑服务
+            - generic [ref=f1e159]: 网页已同步
+          - generic [ref=f1e160]: ·
+          - button "今日 -- 倍率 --" [ref=f1e162]:
+            - generic [ref=f1e163]:
+              - generic [ref=f1e164]:
+                - generic [ref=f1e165]: 今日
+                - strong [ref=f1e166]: "--"
+              - generic [ref=f1e168]:
+                - generic [ref=f1e169]: 倍率
+                - strong [ref=f1e170]: "--"
+          - button "查看智力效率" [ref=f1e172] [cursor=pointer]
+      - main [ref=f1e180]:
+        - region "真实项目对话" [ref=f1e183]:
+          - generic [ref=f1e184]:
+            - article [ref=f1e186]:
+              - time [ref=f1e187]: 08-07 14:30
+              - paragraph [ref=f1e190]: 了解一下项目github远程最新的提交和本地内容的差异。然后，重点关注内容加载部分。包括内容加载速度、内容是否跳变、翻看旧内容位置稳定性、加载内容顺序逻辑、多个对话来回切换、单人和群聊相互切换等。现在逻辑乱七八糟，需要从产品经理的角度，从用户实际使用体验的角度，来梳理逻辑。你需要列个表格，说清楚，列好序号。用户做什么操作，本地代码是什么体验，远程提交是什么体验，差异是什么，从产品经理的角度，你建议应该是什么体验。重点关注使用体验。比如，是等加载完了内容再打开，还是打开了再加载？而不是直接说代码哪一块是什么样的。请你先理解我的需求。
+              - generic "消息操作" [ref=f1e192]:
+                - button "复制内容" [ref=f1e193] [cursor=pointer]
+                - button "重新编辑" [ref=f1e197] [cursor=pointer]
+            - article [ref=f1e201]:
+              - time [ref=f1e202]: 08-07 14:30
+              - generic [ref=f1e204]:
+                - paragraph [ref=f1e205]: 理解您的需求。您要的不是“代码哪一块做了什么”的技术审查，而是以用户实际使用过程为主线，对比本地代码和 GitHub 远程最新提交在“内容加载体验”上的差异，并判断哪种逻辑更合理、哪里会造成混乱。
+                - paragraph [ref=f1e206]: 我后续会按用户操作顺序整理表格，至少包含：
+                - table [ref=f1e207]:
+                  - rowgroup [ref=f1e208]:
+                    - row [ref=f1e209]:
+                      - columnheader "序号" [ref=f1e210]
+                      - columnheader "用户操作" [ref=f1e211]
+                      - columnheader "本地实际体验" [ref=f1e212]
+                      - columnheader "远程提交实际体验" [ref=f1e213]
+                      - columnheader "差异" [ref=f1e214]
+                      - columnheader "产品经理建议的体验" [ref=f1e215]
+                  - rowgroup [ref=f1e216]:
+                    - row [ref=f1e217]:
+                      - cell "1" [ref=f1e218]
+                      - cell "首次打开对话" [ref=f1e219]
+                      - cell [ref=f1e220]
+                      - cell [ref=f1e221]
+                      - cell [ref=f1e222]
+                      - cell [ref=f1e223]
+                    - row [ref=f1e224]:
+                      - cell "2" [ref=f1e225]
+                      - cell "内容加载过程中查看页面" [ref=f1e226]
+                      - cell [ref=f1e227]
+                      - cell [ref=f1e228]
+                      - cell [ref=f1e229]
+                      - cell [ref=f1e230]
+                    - row [ref=f1e231]:
+                      - cell "3" [ref=f1e232]
+                      - cell "快速滚动或翻看旧内容" [ref=f1e233]
+                      - cell [ref=f1e234]
+                      - cell [ref=f1e235]
+                      - cell [ref=f1e236]
+                      - cell [ref=f1e237]
+                    - row [ref=f1e238]:
+                      - cell "4" [ref=f1e239]
+                      - cell "旧内容加载后当前位置是否稳定" [ref=f1e240]
+                      - cell [ref=f1e241]
+                      - cell [ref=f1e242]
+                      - cell [ref=f1e243]
+                      - cell [ref=f1e244]
+                    - row [ref=f1e245]:
+                      - cell "5" [ref=f1e246]
+                      - cell "新旧内容的加载顺序" [ref=f1e247]
+                      - cell [ref=f1e248]
+                      - cell [ref=f1e249]
+                      - cell [ref=f1e250]
+                      - cell [ref=f1e251]
+                    - row [ref=f1e252]:
+                      - cell "6" [ref=f1e253]
+                      - cell "单人对话之间来回切换" [ref=f1e254]
+                      - cell [ref=f1e255]
+                      - cell [ref=f1e256]
+                      - cell [ref=f1e257]
+                      - cell [ref=f1e258]
+                    - row [ref=f1e259]:
+                      - cell "7" [ref=f1e260]
+                      - cell "单人对话与群聊切换" [ref=f1e261]
+                      - cell [ref=f1e262]
+                      - cell [ref=f1e263]
+                      - cell [ref=f1e264]
+                      - cell [ref=f1e265]
+                    - row [ref=f1e266]:
+                      - cell "8" [ref=f1e267]
+                      - cell "快速连续切换多个对话" [ref=f1e268]
+                      - cell [ref=f1e269]
+                      - cell [ref=f1e270]
+                      - cell [ref=f1e271]
+                      - cell [ref=f1e272]
+                    - row [ref=f1e273]:
+                      - cell "9" [ref=f1e274]
+                      - cell "已加载内容再次进入" [ref=f1e275]
+                      - cell [ref=f1e276]
+                      - cell [ref=f1e277]
+                      - cell [ref=f1e278]
+                      - cell [ref=f1e279]
+                    - row [ref=f1e280]:
+                      - cell "10" [ref=f1e281]
+                      - cell "网络慢、加载失败或请求返回顺序异常" [ref=f1e282]
+                      - cell [ref=f1e283]
+                      - cell [ref=f1e284]
+                      - cell [ref=f1e285]
+                      - cell [ref=f1e286]
+                - paragraph [ref=f1e287]: 重点会回答这些产品问题：内容应当“等全部加载完再打开”，还是“先打开页面再逐步加载”；加载过程中是否应该保留已有内容；旧消息向上补充时如何保持用户视口不跳；不同对话的内容和滚动位置是否应该独立保存；快速切换时是否可能出现上一个对话的内容串到当前对话中；单聊和群聊是否应该采用统一的加载规则。结论会区分“代码实际表现”“用户感知问题”和“建议体验”，并按优先级排序。下一步我会先读取本地状态、远程最新提交和相关变更，再实际运行或检查对应流程后填表。
+              - generic "消息操作" [ref=f1e289]:
+                - button "复制内容" [ref=f1e290] [cursor=pointer]
+                - button "从这里继续" [ref=f1e294] [cursor=pointer]
+            - article [ref=f1e300]:
+              - time [ref=f1e301]: 08-07 14:31
+              - paragraph [ref=f1e304]: 是的。重点关注内容加载、状态更新、、定位漂移导致的几帧的闪屏的问题。请你开始。
+              - generic "消息操作" [ref=f1e306]:
+                - button "复制内容" [ref=f1e307] [cursor=pointer]
+                - button "重新编辑" [ref=f1e311] [cursor=pointer]
+        - generic "Codex 对话输入" [ref=f1e314]:
+          - generic [ref=f1e315]: 给 Codex 发送指令
+          - textbox "给 Codex 发送指令" [disabled] [ref=f1e316]
+          - generic [ref=f1e317]:
+            - generic [ref=f1e318]:
+              - button "添加文件" [disabled] [ref=f1e319]
+              - generic "添加文件"
+              - generic "正在确认任务状态" [ref=f1e320]
+            - generic [ref=f1e325]:
+              - button "读取模型" [ref=f1e327]
+              - button "上下文 --" [ref=f1e332]
+            - button "发送" [disabled] [ref=f1e336]

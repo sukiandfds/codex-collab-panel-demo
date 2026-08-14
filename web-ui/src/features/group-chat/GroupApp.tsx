@@ -39,8 +39,8 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
   const join = async (name: string) => {
     await group.join(name);
   };
-  const sendMessage = useCallback(async (text: string, targetAgentIds: string[], attachmentIds: string[] = []) => {
-    const accepted = await group.send(targetAgentIds, text, attachmentIds);
+  const sendMessage = useCallback(async (text: string, attachmentIds: string[] = []) => {
+    const accepted = await group.send(text, attachmentIds);
     if (accepted) setLocalSendVersion((version) => version + 1);
     return accepted;
   }, [group.send]);

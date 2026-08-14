@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { ArtifactRealtimeEvent } from "../../artifacts/model/types";
 import { groupApi } from "../data/groupApi";
-import { upsertGroupMessage } from "../data/groupMessageState";
+import { createPendingAgentMessage, removePendingAgentMessages, upsertGroupMessage } from "../data/groupMessageState";
 import { reconcileGroupSnapshot } from "../data/groupSnapshot";
 import type { GroupEvent, GroupSnapshot, GroupStreamingMessage } from "../model/types";
 
@@ -104,7 +104,7 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
               : (current.activeWorks || []).filter((work) => work.agentId !== event.agent.id),
             messages: event.agent.active
               ? current.messages
-              : current.messages.filter((item) => !(item.pending && item.type === "agent" && item.agentId === event.agent.id)),
+              : removePendingAgentMessages(current.messages, event.agent.id),
           }));
           if (!event.agent.active) {
             const nextBuffer = Object.fromEntries(Object.entries(streamingBuffer.current)
@@ -115,22 +115,9 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
         } else if (event.type === "group_members_changed") {
           setSnapshot((current) => current && { ...current, members: event.members });
         } else if (event.type === "group_agent_started") {
-          const pendingMessage = {
-            id: `pending-${event.workId}`,
-            workId: event.workId,
-            pending: true,
-            type: "agent" as const,
-            authorId: event.agentId,
-            authorName: event.agentName,
-            agentId: event.agentId,
-            text: "",
-            attachments: [],
-            artifactIds: [],
-            createdAt: event.startedAt,
-          };
           setSnapshot((current) => current && {
             ...current,
-            messages: upsertGroupMessage(current.messages, pendingMessage),
+            messages: upsertGroupMessage(current.messages, createPendingAgentMessage(event)),
             activeWorks: [
               ...(current.activeWorks || []).filter((work) => work.workId !== event.workId),
               {
@@ -169,19 +156,12 @@ export function useGroupEvents(setSnapshot: Dispatch<SetStateAction<GroupSnapsho
             if (!current || current.messages.some((message) => message.workId === workId)) return current;
             return {
               ...current,
-              messages: upsertGroupMessage(current.messages, {
-                id: `pending-${workId}`,
+              messages: upsertGroupMessage(current.messages, createPendingAgentMessage({
                 workId,
-                pending: true,
-                type: "agent",
-                authorId: event.agentId,
-                authorName: event.agentId,
                 agentId: event.agentId,
-                text: "",
-                attachments: [],
-                artifactIds: [],
-                createdAt: value.startedAt,
-              }),
+                agentName: current.agents.find((agent) => agent.id === event.agentId)?.name,
+                startedAt: value.startedAt,
+              })),
             };
           });
           if (!streamingFrame.current) {

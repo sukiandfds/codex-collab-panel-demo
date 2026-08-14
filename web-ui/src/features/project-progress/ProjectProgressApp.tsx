@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { FolderKanban } from "lucide-react";
 import { ViewSwitcher } from "../../components/ViewSwitcher/ViewSwitcher";
+import { formatRecordedTimestamp as formatProgressTimestamp } from "../../shared/format/dateTime";
 import { ProgressEntryDetail } from "./components/ProgressEntryDetail";
 import { ProgressEntryRow } from "./components/ProgressEntryRow";
 import { ProgressLogList } from "./components/ProgressLogList";
 import { fetchProjectProgress, type ProjectProgressDocument } from "./data/progressApi";
-import { formatProgressTimestamp } from "./model/format";
 import styles from "./ProjectProgressApp.module.css";
 
 const readSelectedId = () => new URLSearchParams(window.location.search).get("item");

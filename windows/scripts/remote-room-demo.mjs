@@ -35,6 +35,9 @@ import { createEmployeeGrowthService } from "../server/employee-growth-service.m
 import { createAttachmentContentService } from "../server/attachment-content-service.mjs";
 import { loadEmployeeDefinitions } from "../server/employee-definitions.mjs";
 import { loadBusinessProjects } from "../server/business-project-config.mjs";
+import { createGoalStore } from "../server/goal-store.mjs";
+import { createGoalService } from "../server/goal-service.mjs";
+import { buildGoalPrompt, createGoalRuntimeAdapter } from "../server/goal-runtime-adapter.mjs";
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -237,6 +240,44 @@ const employeeRuntime = createEmployeeRuntimeService({
   growthService: employeeGrowth,
   contextProvider: employeeGrowth.getContext,
 });
+const goalStore = createGoalStore({
+  stateFile: path.join(projectRoot, "runtime", "goals.json"),
+});
+const goalRuntimeAdapter = createGoalRuntimeAdapter({
+  dispatchGoal: async ({ goal }) => {
+    const employeeId = goal.ownerId || "manager";
+    if (!employeeRuntime.supportsEmployee(employeeId)) {
+      realtime.broadcast({ type: "goal_runtime_requested", goalId: goal.id, ownerId: employeeId });
+      return { status: "running", detail: "Goal 已进入系统运行队列，等待负责人适配器" };
+    }
+    const result = await employeeRuntime.sendMessage({
+      employeeId,
+      text: buildGoalPrompt(goal),
+      requestId: `goal:${goal.id}:start`,
+    });
+    return {
+      status: "running",
+      externalRef: result.turnId || result.threadId,
+      detail: "Goal 已发送给负责人运行时",
+    };
+  },
+  pauseGoal: async ({ goal }) => employeeRuntime.interrupt?.(goal.ownerId),
+  resumeGoal: async ({ goal }) => {
+    if (!employeeRuntime.supportsEmployee(goal.ownerId)) return { status: "running" };
+    const result = await employeeRuntime.sendMessage({
+      employeeId: goal.ownerId,
+      text: `${buildGoalPrompt(goal)}\n\n请从上次暂停的位置继续。`,
+      requestId: `goal:${goal.id}:resume:${goal.version}`,
+    });
+    return { status: "running", externalRef: result.turnId || result.threadId, detail: "Goal 已继续" };
+  },
+  stopGoal: async ({ goal }) => employeeRuntime.interrupt?.(goal.ownerId),
+});
+const goals = createGoalService({
+  store: goalStore,
+  runtimeAdapter: goalRuntimeAdapter,
+  broadcast: realtime.broadcast,
+});
 const employeeProjectDirectory = createEmployeeProjectDirectory({
   project,
   projectRoot,
@@ -308,7 +349,7 @@ const requestHandler = createRequestHandler({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime, submissions,
   followUpQueue, contextManagement, groupRoom, roomDirectory: groupRoomDirectory, multiAgent, multiAgentDirectory, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
   agentConversationStore, agentPublicationService, employeeRuntime,
-  employeeProjectDirectory, employeeGrowth,
+  employeeProjectDirectory, employeeGrowth, goals,
 });
 const server = http.createServer(requestHandler);
 
@@ -327,6 +368,7 @@ const close = () => {
   employeeRuntime.close();
   void employeeGrowthStore.close();
   void employeeConversationStore.close();
+  void goals.close();
   void projectIdentity.close();
   void employeeRegistry.close();
   void publicationStore.close();

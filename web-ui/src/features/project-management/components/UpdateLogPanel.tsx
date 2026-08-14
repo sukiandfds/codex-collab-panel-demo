@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
+import { formatRecordedTimestamp as formatProjectManagementTimestamp } from "../../../shared/format/dateTime";
 import type { ProjectManagementEntry, ProjectManagementUpdate } from "../model/types";
-import { formatProjectManagementTimestamp } from "../model/format";
 import styles from "../ProjectManagementApp.module.css";
 
 interface UpdateLogPanelProps {

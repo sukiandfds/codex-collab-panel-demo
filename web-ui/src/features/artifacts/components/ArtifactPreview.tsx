@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { withAccessToken } from "../../../shared/api/http";
+import { MarkdownContent } from "../../conversations/rendering/ContentRenderer";
 import type { Artifact } from "../model/types";
 import styles from "./ArtifactCard.module.css";
 
@@ -32,7 +31,7 @@ export function ArtifactPreview({ artifact }: { artifact: Artifact }) {
 
   if (artifact.previewType === "markdown") {
     if (markdownError) return <p className={styles.previewNotice}>预览暂不可用，请下载原文件。</p>;
-    return <div className={styles.markdownPreview}><ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown></div>;
+    return <MarkdownContent text={markdown} className={styles.markdownPreview} />;
   }
   if (artifact.previewType === "image") {
     return <a className={styles.imagePreview} href={source} target="_blank" rel="noreferrer"><img src={source} alt={artifact.name} loading="lazy" /></a>;

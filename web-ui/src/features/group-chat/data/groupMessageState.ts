@@ -1,5 +1,12 @@
 import type { GroupMessage } from "../model/types";
 
+interface PendingAgentMessageSource {
+  workId: string;
+  agentId: string;
+  agentName?: string;
+  startedAt: string;
+}
+
 const compareMessages = (left: GroupMessage, right: GroupMessage) => {
   const leftSequence = Number.isSafeInteger(left.sequence) ? left.sequence! : Number.MAX_SAFE_INTEGER;
   const rightSequence = Number.isSafeInteger(right.sequence) ? right.sequence! : Number.MAX_SAFE_INTEGER;
@@ -33,6 +40,23 @@ export const keepUnacknowledgedMessages = (messages: GroupMessage[], pending: Gr
   }
   return next.sort(compareMessages);
 };
+
+export const createPendingAgentMessage = ({ workId, agentId, agentName, startedAt }: PendingAgentMessageSource): GroupMessage => ({
+  id: `pending-${workId}`,
+  workId,
+  pending: true,
+  type: "agent",
+  authorId: agentId,
+  authorName: agentName || agentId,
+  agentId,
+  text: "",
+  attachments: [],
+  artifactIds: [],
+  createdAt: startedAt,
+});
+
+export const removePendingAgentMessages = (messages: GroupMessage[], agentId = "") => messages
+  .filter((message) => !(message.pending && message.type === "agent" && (!agentId || message.agentId === agentId)));
 
 export const removePendingMessage = (messages: GroupMessage[], clientMessageId: string) => messages
   .filter((message) => !(message.pending && message.clientMessageId === clientMessageId));

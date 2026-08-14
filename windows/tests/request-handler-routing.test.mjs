@@ -25,7 +25,10 @@ const createFixture = (projectRoot = "C:\\demo") => {
     media: {},
     realtime: {},
     contextManagement: {},
-    groupRoom: { snapshot: () => ({ room: { id: "room" }, messages: [], agents: [], members: [] }) },
+      groupRoom: {
+        snapshot: () => ({ room: { id: "room" }, messages: [], agents: [], members: [] }),
+        getMessagePage: () => ({ messages: [], total: 0 }),
+      },
     multiAgent: {},
     artifacts: { list: () => [{ id: "artifact" }] },
     webOutputs: {},
