@@ -20,3 +20,14 @@
 - Goal 改为复用既有“能力菜单”，在单聊和群聊中统一提供 `/goal`、`/goal pause`、`/goal resume`、`/goal clear` 可调用入口。
 - 保留平台级 Goal Provider、持久化 API 与 SSE 状态复用；本次仅更正入口层，不将 Goal 重新绑定到项目或群聊。
 - 验证：Web UI TypeScript 检查、Vite 生产构建通过。
+
+### 2026-08-14 19:35 +08:00
+
+- 状态：implemented_pending_review
+- 审查修复：生命周期改为运行时成功后落状态；员工中断核对精确 Turn；真实 Turn 终态自动回写 Goal、Task 和 Run。
+- 数据保护：Task/Run 关系字段不能通过通用 PATCH 改写；容量满时保留运行中 Goal；失效的创建幂等映射不再返回空 Goal。
+- 用户体验：多个 Goal 时不再自动选择列表第一项；命令可携带 Goal ID，输入区显示成功、失败和版本冲突。
+- 仓库清理：移除误提交的 Playwright YAML 和截图，并加入忽略规则。
+- 产品提交：`d755cad12e79d2ee11af1b28233dec82ad316297`。
+- 验证：Windows Node 测试 `157/157`、`pnpm build:ui`、相关 MJS 语法检查和 `git diff --check` 通过。
+- 待验收：未重启服务；真实 Goal 长任务、跨入口操作和移动端体验仍待用户验收。

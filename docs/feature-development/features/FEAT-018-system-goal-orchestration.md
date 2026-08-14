@@ -1,9 +1,9 @@
 ---
 feature_id: FEAT-018
 title: 系统级 Goal 持续目标与协调能力
-status: implemented_uncommitted
-version: v0.1.0
-updated_at: 2026-08-14 18:00 +08:00
+status: implemented_pending_review
+version: v0.1.1
+updated_at: 2026-08-14 19:35 +08:00
 product_base_commit: 081787798e211a5b2399d61e8a305261a7594b12
 scope: platform
 ---
@@ -41,9 +41,20 @@ scope: platform
 - `goal-store.test.mjs`：持久化、部分更新、版本冲突、任务/运行关联。
 - `goal-service.test.mjs`：创建幂等、启动、暂停、继续、清除、停止和无轮询超时。
 - `goal-routes.test.mjs`：鉴权、创建、查询、编辑和动作路由。
-- `web-ui` TypeScript 检查通过；生产 UI 构建和完整回归测试待本轮收口。
+- `web-ui` TypeScript 检查、生产 UI 构建和 Windows 全量 Node 回归测试通过。
 
 ## 当前限制
 
 - 初版没有周期性状态扫描器；状态依赖服务事件、SSE 和服务端超时计时器。
 - Goal 的跨上下文 ACL 继续复用现有访问令牌和员工运行时策略；细粒度多用户 ACL 不在本次最小增量中。
+
+## v0.1.1 审查修复
+
+- Goal 暂停、继续、等待、完成和清除改为运行时操作成功后再持久化状态；失败时保留原状态并记录失败事件。
+- Goal 保存并核对精确 `turnId`，不会再中断同一员工正在执行的其他任务；对应 Turn 完成、失败或中断后自动回写 Goal、Task 和 Run。
+- Task/Run 更新接口禁止直接修改父子、归属和反向关系字段；Goal 容量满时不再淘汰运行中记录，失效幂等映射可恢复。
+- 单聊和群聊中的 Goal 动作仅在目标唯一、刚创建后仍被明确选中，或命令携带 Goal ID 时执行；成功、失败和版本冲突会在输入区显示。
+- 清除误提交的 Playwright YAML 与截图并加入忽略规则。
+- 产品修复提交：`d755cad12e79d2ee11af1b28233dec82ad316297`。
+- 已验证：Windows Node 测试 `157/157`、`pnpm build:ui`、相关 MJS 语法检查和 `git diff --check` 均通过。
+- 未验证：未重启当前服务，未进行真实 Goal 长任务、浏览器或移动端体验验收。

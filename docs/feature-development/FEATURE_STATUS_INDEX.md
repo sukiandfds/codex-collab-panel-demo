@@ -29,7 +29,7 @@ AI 助手根据任务定位功能编号，再读取对应功能文件。不要�
 | `FEAT-015` | 自然语言生图与自动化工作台 | `in_progress` | `v0.5.0` | 2026-08-06 | 对话生图核心已经完成并进入真实 Thread/Turn：自然语言触发、2.35:1 4K、连续改图、普通后续对话、旧会话迁移和结果去重已有实现；仍在开发的是专门工作台、Artifact、批量模板、队列和定时任务 | [`FEAT-015-image-generation-and-automation-workbench.md`](./features/FEAT-015-image-generation-and-automation-workbench.md) |
 | `FEAT-016` | 项目统一更名为 negus | `implemented_pending_review` | `v1.0.0` | 2026-08-05 09:28 +08:00 | 界面、PWA、包名和 GitHub 仓库已统一为 negus，浏览器旧数据保留兼容；本地目录将在当前活动 Turn 收口后由独立 Worker 迁移并恢复同一端口 | [`FEAT-016-project-identity-negus.md`](./features/FEAT-016-project-identity-negus.md) |
 | `FEAT-017` | 多业务项目与 Codex 会话归类 | `implemented_pending_review` | `v0.1.0` | 2026-08-12 | 已支持从本机配置登记多个业务项目，并按 Thread 工作目录显示已有会话；当前接入 `negus税务管理`，等待运行服务验收 | [`FEAT-017-multiple-business-projects.md`](./features/FEAT-017-multiple-business-projects.md) |
-| `FEAT-018` | 系统级 Goal 持续目标与协调能力 | `implemented_uncommitted` | `v0.1.0` | 2026-08-14 | Goal 核心、生命周期 API、事件驱动状态、运行适配器和单聊/群聊共用控制条已实现；等待 UI 构建、回归测试和真实服务验收 | [`FEAT-018-system-goal-orchestration.md`](./features/FEAT-018-system-goal-orchestration.md) |
+| `FEAT-018` | 系统级 Goal 持续目标与协调能力 | `implemented_pending_review` | `v0.1.1` | 2026-08-14 | Goal 生命周期、精确 Turn 关联、终态自动回写、关系保护和明确目标操作已完成审查修复；UI 构建及 Windows 157 项测试通过，等待服务重启后的真实长任务和跨入口体验验收 | [`FEAT-018-system-goal-orchestration.md`](./features/FEAT-018-system-goal-orchestration.md) |
 
 `FEAT-010` 曾用于已暂停的 Orca 路线实验，本轮不复用该编号。
 
