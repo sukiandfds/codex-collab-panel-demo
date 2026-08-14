@@ -5,17 +5,17 @@ title: 系统级 Goal 持续目标与协调能力
 category: platform
 priority: P1
 status: implemented_pending_review
-updated_at: 2026-08-14 19:35 +08:00
+updated_at: 2026-08-14 19:44 +08:00
 source: docs/feature-development/features/FEAT-018-system-goal-orchestration.md
 related: [FEAT-001, FEAT-002, FEAT-005, FEAT-017]
 owner: platform_runtime
 product_base_commit: 081787798e211a5b2399d61e8a305261a7594b12
-product_commit: d755cad12e79d2ee11af1b28233dec82ad316297
+product_commit: 964ad4e6297c369b9bf8e856c98bd5e67b13382e
 docs_commit: c55ba8dcc5621288178959b7fb7af93c94acf67f
-audited_product_commit: d755cad12e79d2ee11af1b28233dec82ad316297
+audited_product_commit: 964ad4e6297c369b9bf8e856c98bd5e67b13382e
 sync_status: synced
 next_action: 服务重启后验收真实 Goal 长任务、暂停继续、完成回写以及单聊和群聊命令反馈
-last_user_visible_change: Goal 动作会精确作用于目标 Turn 并显示结果，真实完成状态会自动回写，多个 Goal 时不再隐式操作错误目标
+last_user_visible_change: Goal 动作会精确作用于目标 Turn 并显示结果；暂停或等待后再清除、互转或超时不会因重复中断而卡住
 ---
 
 # 系统级 Goal 持续目标与协调能力

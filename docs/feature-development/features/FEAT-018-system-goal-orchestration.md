@@ -3,7 +3,7 @@ feature_id: FEAT-018
 title: 系统级 Goal 持续目标与协调能力
 status: implemented_pending_review
 version: v0.1.1
-updated_at: 2026-08-14 19:35 +08:00
+updated_at: 2026-08-14 19:44 +08:00
 product_base_commit: 081787798e211a5b2399d61e8a305261a7594b12
 scope: platform
 ---
@@ -54,7 +54,8 @@ scope: platform
 - Goal 保存并核对精确 `turnId`，不会再中断同一员工正在执行的其他任务；对应 Turn 完成、失败或中断后自动回写 Goal、Task 和 Run。
 - Task/Run 更新接口禁止直接修改父子、归属和反向关系字段；Goal 容量满时不再淘汰运行中记录，失效幂等映射可恢复。
 - 单聊和群聊中的 Goal 动作仅在目标唯一、刚创建后仍被明确选中，或命令携带 Goal ID 时执行；成功、失败和版本冲突会在输入区显示。
+- 已暂停或等待的 Goal 在清除、状态互转和超时时不再重复中断同一 Turn，终态操作可以正常完成。
 - 清除误提交的 Playwright YAML 与截图并加入忽略规则。
-- 产品修复提交：`d755cad12e79d2ee11af1b28233dec82ad316297`。
-- 已验证：Windows Node 测试 `157/157`、`pnpm build:ui`、相关 MJS 语法检查和 `git diff --check` 均通过。
+- 产品修复提交：`d755cad12e79d2ee11af1b28233dec82ad316297`；最终边界修复提交：`964ad4e6297c369b9bf8e856c98bd5e67b13382e`。
+- 已验证：Windows Node 测试 `160/160`、`pnpm build:ui`、相关 MJS 语法检查和 `git diff --check` 均通过。
 - 未验证：未重启当前服务，未进行真实 Goal 长任务、浏览器或移动端体验验收。
