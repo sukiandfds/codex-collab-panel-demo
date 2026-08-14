@@ -40,6 +40,7 @@ export const createEmployeeRuntimeService = ({
   growthService = null,
   contextProvider = null,
   execution = null,
+  onTurnCompleted = null,
   client = createAppServerClient(),
 }) => {
   const threadEmployees = new Map();
@@ -274,19 +275,26 @@ export const createEmployeeRuntimeService = ({
     }
     if (method === "turn/completed") {
       const status = String(params.turn?.status || "completed");
+      const turnId = clean(params.turnId || params.turn?.id || statusFor(employeeId).turnId, 160);
+      const error = String(params.turn?.error?.message || "");
       publishStatus(employeeId, {
         phase: status === "failed" ? "failed" : status === "interrupted" ? "interrupted" : "idle",
         label: status === "failed" ? "执行失败" : status === "interrupted" ? "已中断" : "等待任务",
-        detail: String(params.turn?.error?.message || ""),
+        detail: error,
         active: false,
         turnId: "",
       });
-      broadcast({ type: "employee_turn_completed", employeeId, threadId, status });
+      const completion = { employeeId, threadId, turnId, status, error };
+      broadcast({ type: "employee_turn_completed", ...completion });
+      if (typeof onTurnCompleted === "function") {
+        void Promise.resolve(onTurnCompleted(completion))
+          .catch((cause) => console.warn(`[employee-runtime] completion listener failed: ${String(cause?.message || cause)}`));
+      }
       if (status === "completed" && growthService) {
         void growthService.reviewTask({
           employeeId,
           threadId,
-          turnId: clean(params.turnId || params.turn?.id, 160),
+          turnId,
           taskText: turnInputs.get(employeeId) || "",
           replyText: lastAssistantReplies.get(threadId) || "",
         }).catch(() => {});
@@ -455,9 +463,16 @@ export const createEmployeeRuntimeService = ({
     };
   };
 
-  const interrupt = async (employeeId) => {
+  const interrupt = async (employeeId, expectedTurnId = "") => {
     const employee = registry.require(employeeId);
     const current = statusFor(employee.id);
+    const expected = clean(expectedTurnId, 160);
+    if (expected && (!current.active || !current.turnId)) {
+      throw statusError("Goal 对应任务已不在运行，请刷新后重试", 409);
+    }
+    if (expected && current.turnId !== expected) {
+      throw statusError("员工当前任务不属于这个 Goal，已拒绝中断", 409);
+    }
     if (!current.active || !current.turnId) return { employeeId: employee.id, status: "idle" };
     const { threadId } = await ensureOpen(employee.id);
     await client.request("turn/interrupt", { threadId, turnId: current.turnId });

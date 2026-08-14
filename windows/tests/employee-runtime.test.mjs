@@ -6,7 +6,7 @@ import test from "node:test";
 import { createEmployeeProjectRegistry } from "../server/employee-project-registry.mjs";
 import { createEmployeeRuntimeService } from "../server/employee-runtime-service.mjs";
 
-const fixture = async (t, { execution = null } = {}) => {
+const fixture = async (t, { execution = null, onTurnCompleted = null } = {}) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "negus-employee-runtime-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const registry = await createEmployeeProjectRegistry({
@@ -42,6 +42,7 @@ const fixture = async (t, { execution = null } = {}) => {
     client,
     broadcast: (event) => events.push(event),
     execution,
+    onTurnCompleted,
   });
   t.after(async () => {
     runtime.close();
@@ -115,4 +116,38 @@ test("employee runtime mirrors status and message progress to the shared convers
     threadId: "employee-thread",
     event: { type: "sessions_changed", threadId: "employee-thread" },
   });
+});
+
+test("only interrupts the exact Turn owned by the requested Goal", async (t) => {
+  const completions = [];
+  const { runtime, calls, listener } = await fixture(t, {
+    onTurnCompleted: (completion) => completions.push(completion),
+  });
+  await runtime.open("developer");
+  await runtime.sendMessage({ employeeId: "developer", text: "run exact work", requestId: "request-exact-turn" });
+
+  await assert.rejects(
+    () => runtime.interrupt("developer", "another-turn"),
+    /Goal|任务/u,
+  );
+  assert.equal(calls.some((call) => call.method === "turn/interrupt"), false);
+
+  await runtime.interrupt("developer", "employee-turn");
+  assert.deepEqual(calls.at(-1), {
+    method: "turn/interrupt",
+    params: { threadId: "employee-thread", turnId: "employee-turn" },
+  });
+
+  listener({
+    method: "turn/completed",
+    params: { threadId: "employee-thread", turn: { id: "employee-turn", status: "interrupted" } },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(completions, [{
+    employeeId: "developer",
+    threadId: "employee-thread",
+    turnId: "employee-turn",
+    status: "interrupted",
+    error: "",
+  }]);
 });

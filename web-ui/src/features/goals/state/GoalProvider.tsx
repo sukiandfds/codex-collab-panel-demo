@@ -13,13 +13,14 @@ interface GoalContextValue {
   error: string;
   setSelectedGoalId: (goalId: string) => void;
   refresh: () => Promise<void>;
-  create: (objective: string) => Promise<Goal | null>;
-  update: (goalId: string, objective: string) => Promise<Goal | null>;
-  action: (goalId: string, nextAction: GoalAction) => Promise<Goal | null>;
+  create: (objective: string) => Promise<Goal>;
+  update: (goalId: string, objective: string) => Promise<Goal>;
+  action: (goalId: string, nextAction: GoalAction) => Promise<Goal>;
 }
 
 const GoalContext = createContext<GoalContextValue | null>(null);
 const visibleStatuses = new Set<Goal["status"]>(["active", "paused", "waiting", "completed", "expired", "failed"]);
+const actionableStatuses = new Set<Goal["status"]>(["active", "paused", "waiting"]);
 
 const sortGoals = (items: Goal[]) => [...items]
   .filter((goal) => visibleStatuses.has(goal.status))
@@ -48,9 +49,15 @@ export function GoalProvider({ children }: PropsWithChildren) {
     setLoading(true);
     try {
       const response = await goalApi.list();
-      setGoals(sortGoals(response.goals));
-      if (selectedGoalIdRef.current && response.goals.some((goal) => goal.id === selectedGoalIdRef.current)) return;
-      setSelectedGoalId(sortGoals(response.goals)[0]?.id || "");
+      const sorted = sortGoals(response.goals);
+      setGoals(sorted);
+      const selectedStillExists = selectedGoalIdRef.current
+        && sorted.some((goal) => goal.id === selectedGoalIdRef.current);
+      if (!selectedStillExists) {
+        const actionable = sorted.filter((goal) => actionableStatuses.has(goal.status));
+        setSelectedGoalId(actionable.length === 1 ? actionable[0].id : "");
+      }
+      setConnected(true);
       setError("");
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
@@ -92,8 +99,9 @@ export function GoalProvider({ children }: PropsWithChildren) {
       setError("");
       return goal;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-      return null;
+      const message = cause instanceof Error ? cause.message : String(cause);
+      setError(message);
+      throw cause instanceof Error ? cause : new Error(message);
     } finally {
       setBusy(false);
     }
@@ -113,10 +121,7 @@ export function GoalProvider({ children }: PropsWithChildren) {
     return run(() => goalApi.action(goalId, nextAction, current?.version));
   }, [goals, run]);
 
-  const selectedGoal = useMemo(() => goals.find((goal) => goal.id === selectedGoalId)
-    || goals.find((goal) => goal.status === "active")
-    || goals[0]
-    || null, [goals, selectedGoalId]);
+  const selectedGoal = useMemo(() => goals.find((goal) => goal.id === selectedGoalId) || null, [goals, selectedGoalId]);
 
   const value = useMemo<GoalContextValue>(() => ({
     goals,

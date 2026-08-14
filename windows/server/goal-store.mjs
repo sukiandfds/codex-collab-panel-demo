@@ -12,6 +12,7 @@ const MAX_GOALS = 200;
 const MAX_TASKS_PER_GOAL = 500;
 const MAX_RUNS_PER_GOAL = 1000;
 const MAX_EVENTS_PER_GOAL = 1000;
+const TERMINAL_GOAL_STATUSES = new Set(["completed", "cleared", "expired", "failed"]);
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const clean = (value, limit = 240) => String(value || "").trim().slice(0, limit);
@@ -219,6 +220,15 @@ export const createGoalStore = ({ stateFile = "" } = {}) => {
   };
 
   const createGoal = (input = {}) => {
+    while (goals.size >= MAX_GOALS) {
+      const removable = [...goals.values()]
+        .filter((goal) => TERMINAL_GOAL_STATUSES.has(goal.status))
+        .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))[0];
+      if (!removable) {
+        throw Object.assign(new Error("运行中的 Goal 数量已达到上限，请先结束现有 Goal"), { statusCode: 413 });
+      }
+      goals.delete(removable.id);
+    }
     const createdAt = nowIso();
     const goal = normalizeGoal({
       ...input,
@@ -234,7 +244,6 @@ export const createGoalStore = ({ stateFile = "" } = {}) => {
       events: [],
     });
     goals.set(goal.id, goal);
-    while (goals.size > MAX_GOALS) goals.delete(goals.keys().next().value);
     schedulePersist();
     return clone(goal);
   };

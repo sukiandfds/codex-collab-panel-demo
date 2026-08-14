@@ -36,6 +36,7 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
   onSend: (text: string, attachmentIds?: string[]) => Promise<boolean>;
 }) {
   const [text, setText] = useState("");
+  const [goalFeedback, setGoalFeedback] = useState<{ accepted: boolean; message: string } | null>(null);
   const draft = useAttachmentDraft();
   const [mention, setMention] = useState<MentionState | null>(null);
   const [personnelOpen, setPersonnelOpen] = useState(false);
@@ -122,12 +123,14 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
       if (!draft.attachments.length) {
         const goalResult = await executeGoalCapability(text);
         if (goalResult.handled) {
+          setGoalFeedback(goalResult.feedback ? { accepted: goalResult.accepted, message: goalResult.feedback } : null);
           if (goalResult.accepted) {
             setText("");
             setMention(null);
           }
           return;
         }
+        setGoalFeedback(null);
       }
       const uploaded = await draft.uploadAll();
       if (await onSend(text, uploaded.map((attachment) => attachment.id))) {
@@ -167,7 +170,15 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
   }, [capabilityOpen, personnelOpen]);
   return (
     <div className={styles.composerArea} ref={composerRef}>
-      {error ? <div className={styles.errorText}>{error}</div> : null}
+      {error ? <div className={styles.errorText} role="alert">{error}</div> : null}
+      {goalFeedback ? (
+        <div
+          className={goalFeedback.accepted ? styles.goalFeedback : styles.errorText}
+          role={goalFeedback.accepted ? "status" : "alert"}
+        >
+          {goalFeedback.message}
+        </div>
+      ) : null}
       {mention ? (
         <MentionMenu options={mentionOptions} activeIndex={activeMention} onActiveChange={setActiveMention} onSelect={insertMention} />
       ) : personnelOpen ? (
@@ -216,6 +227,7 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
           placeholder="发送到项目群"
           onChange={(event) => {
             setText(event.target.value);
+            setGoalFeedback(null);
             setPersonnelOpen(false);
             setCapabilityOpen(false);
             updateMention(event.target.value, event.target.selectionStart);

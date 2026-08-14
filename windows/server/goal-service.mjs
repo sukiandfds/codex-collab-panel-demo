@@ -2,10 +2,20 @@ import { GOAL_STATUSES, RUN_STATUSES, TASK_STATUSES } from "./goal-store.mjs";
 
 const DEFAULT_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 const MAX_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000;
-  const terminalGoalStatuses = new Set(["completed", "cleared", "expired", "failed"]);
+const MAX_CREATE_REQUESTS = 1000;
+const terminalGoalStatuses = new Set(["completed", "cleared", "expired", "failed"]);
+const terminalTaskStatuses = new Set(["completed", "failed", "canceled", "expired"]);
+const terminalRunStatuses = new Set(["completed", "failed", "canceled", "expired", "interrupted"]);
+const taskPatchFields = ["title", "objective", "assigneeId", "assigneeName", "status", "detail", "result", "evidence", "completedAt", "error"];
+const runPatchFields = ["status", "source", "externalRef", "detail", "startedAt", "endedAt", "error"];
+const protectedTaskFields = ["id", "goalId", "parentTaskId", "childTaskIds", "runIds", "version"];
+const protectedRunFields = ["id", "goalId", "taskId", "attempt"];
 
 const clean = (value, limit = 240) => String(value || "").trim().slice(0, limit);
 const statusError = (message, statusCode = 400) => Object.assign(new Error(message), { statusCode });
+const pickDefined = (source, fields) => Object.fromEntries(
+  fields.filter((field) => source[field] !== undefined).map((field) => [field, source[field]]),
+);
 const clampTimeout = (value) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_TIMEOUT_MS;
@@ -16,6 +26,7 @@ export const createGoalService = ({ store, broadcast = () => {}, runtimeAdapter 
   if (!store) throw new Error("Goal store is required");
   const timers = new Map();
   const createRequests = new Map();
+  const pendingActions = new Map();
   let closed = false;
 
   const publish = (type, goal, extra = {}) => {
@@ -41,19 +52,128 @@ export const createGoalService = ({ store, broadcast = () => {}, runtimeAdapter 
     timers.delete(goalId);
   };
 
+  const runtimeState = (goal, nextStatus, result = {}, fallbackDetail = "") => ({
+    status: nextStatus === "active" ? clean(result?.status, 80) || "running" : nextStatus,
+    externalRef: clean(result?.externalRef || result?.jobId || result?.turnId, 240) || goal.runtime?.externalRef || "",
+    detail: result?.detail !== undefined
+      ? clean(result.detail, 2000)
+      : clean(fallbackDetail || goal.runtime?.detail, 2000),
+    updatedAt: new Date().toISOString(),
+  });
+
+  const activeRun = (goal, externalRef = "") => {
+    const reference = clean(externalRef || goal.runtime?.externalRef, 240);
+    return [...goal.runs].reverse().find((run) => reference && run.externalRef === reference)
+      || [...goal.runs].reverse().find((run) => !terminalRunStatuses.has(run.status))
+      || null;
+  };
+
+  const updateCurrentRecords = (goalId, nextStatus, { externalRef = "", detail = "", error = "" } = {}) => {
+    const goal = store.get(goalId);
+    if (!goal) return;
+    const run = activeRun(goal, externalRef);
+    const runStatus = {
+      paused: "interrupted",
+      waiting: "waiting",
+      completed: "completed",
+      cleared: "canceled",
+      expired: "expired",
+      failed: "failed",
+    }[nextStatus];
+    const taskStatus = {
+      paused: "paused",
+      waiting: "waiting",
+      completed: "completed",
+      cleared: "canceled",
+      expired: "expired",
+      failed: "failed",
+    }[nextStatus];
+    const endedAt = terminalGoalStatuses.has(nextStatus) || nextStatus === "paused"
+      ? new Date().toISOString()
+      : "";
+    if (run && runStatus) {
+      store.updateRun(goalId, run.id, {
+        status: runStatus,
+        detail: clean(detail, 2000),
+        error: clean(error, 2000),
+        endedAt,
+      });
+    }
+    const taskId = run?.taskId || goal.tasks.find((task) => !terminalTaskStatuses.has(task.status))?.id;
+    const task = goal.tasks.find((item) => item.id === taskId);
+    if (task && taskStatus) {
+      store.updateTask(goalId, task.id, {
+        status: taskStatus,
+        detail: clean(detail || task.detail, 2000),
+        error: clean(error, 2000),
+        completedAt: terminalGoalStatuses.has(nextStatus) ? endedAt : "",
+      });
+    }
+  };
+
+  const startResumeRun = (goalId, runtime = {}) => {
+    const goal = store.get(goalId);
+    if (!goal) return null;
+    const task = goal.tasks.find((item) => !terminalTaskStatuses.has(item.status)) || goal.tasks[0];
+    if (!task) return null;
+    store.updateTask(goalId, task.id, { status: "running", completedAt: "", error: "" });
+    return store.createRun(goalId, task.id, {
+      status: "running",
+      source: "goal-resume",
+      externalRef: clean(runtime?.externalRef || runtime?.jobId || runtime?.turnId, 240),
+      detail: clean(runtime?.detail, 2000),
+      startedAt: new Date().toISOString(),
+    });
+  };
+
+  const finalizeRuntimeEvent = (goal, { status = "completed", turnId = "", error = "" } = {}) => {
+    const nextStatus = status === "failed" ? "failed" : status === "interrupted" ? "paused" : "completed";
+    const detail = error || (nextStatus === "completed" ? "Goal 对应运行已完成" : "Goal 对应运行已结束");
+    clearTimer(goal.id);
+    updateCurrentRecords(goal.id, nextStatus, { externalRef: turnId, detail, error });
+    const current = store.get(goal.id);
+    const next = store.updateGoal(goal.id, {
+      status: nextStatus,
+      endedAt: terminalGoalStatuses.has(nextStatus) ? new Date().toISOString() : "",
+      runtime: runtimeState(current, nextStatus, { externalRef: turnId, detail }, detail),
+    }, { expectedVersion: current.version });
+    event(goal.id, `runtime_${nextStatus}`, { turnId, status, error });
+    publish("goal_updated", next);
+    return next;
+  };
+
   const expire = async (goalId) => {
     const goal = store.get(goalId);
-    if (!goal || terminalGoalStatuses.has(goal.status) || goal.status === "paused") return goal;
-    const next = store.updateGoal(goalId, {
-      status: "expired",
-      endedAt: new Date().toISOString(),
-      runtime: { ...goal.runtime, status: "expired", detail: "Goal 已超时", updatedAt: new Date().toISOString() },
-    });
+    if (!goal || terminalGoalStatuses.has(goal.status) || goal.status === "paused" || pendingActions.has(goalId)) return goal;
     clearTimer(goalId);
-    event(goalId, "expired", { reason: "timeout" });
-    publish("goal_updated", next);
-    await runtimeAdapter.stop?.({ goal: next, reason: "timeout" });
-    return next;
+    pendingActions.set(goalId, "expired");
+    try {
+      await runtimeAdapter.stop?.({ goal, reason: "timeout" });
+      updateCurrentRecords(goalId, "expired", { detail: "Goal 已超时" });
+      const current = store.get(goalId);
+      const next = store.updateGoal(goalId, {
+        status: "expired",
+        endedAt: new Date().toISOString(),
+        runtime: runtimeState(current, "expired", {}, "Goal 已超时"),
+      }, { expectedVersion: current.version });
+      event(goalId, "expired", { reason: "timeout" });
+      publish("goal_updated", next);
+      return next;
+    } catch (error) {
+      const message = `Goal 已超时，但停止运行失败：${String(error?.message || error)}`;
+      updateCurrentRecords(goalId, "failed", { detail: message, error: message });
+      const current = store.get(goalId);
+      const failed = store.updateGoal(goalId, {
+        status: "failed",
+        endedAt: new Date().toISOString(),
+        runtime: runtimeState(current, "failed", {}, message),
+      }, { expectedVersion: current.version });
+      event(goalId, "expiration_stop_failed", { reason: "timeout", error: message });
+      publish("goal_updated", failed);
+      return failed;
+    } finally {
+      pendingActions.delete(goalId);
+    }
   };
 
   const scheduleTimeout = (goal) => {
@@ -61,10 +181,12 @@ export const createGoalService = ({ store, broadcast = () => {}, runtimeAdapter 
     if (!goal.timeoutAt || terminalGoalStatuses.has(goal.status) || goal.status === "paused") return;
     const delay = new Date(goal.timeoutAt).getTime() - Date.now();
     if (delay <= 0) {
-      void expire(goal.id);
+      void expire(goal.id).catch((error) => console.warn(`[goal-service] expiration failed: ${error.message}`));
       return;
     }
-    const timer = setTimeout(() => void expire(goal.id), delay);
+    const timer = setTimeout(() => {
+      void expire(goal.id).catch((error) => console.warn(`[goal-service] expiration failed: ${error.message}`));
+    }, delay);
     timer.unref?.();
     timers.set(goal.id, timer);
   };
@@ -84,7 +206,11 @@ export const createGoalService = ({ store, broadcast = () => {}, runtimeAdapter 
     const objective = clean(input.objective, 32000);
     if (!objective) throw statusError("Goal 目标不能为空");
     const requestId = clean(input.requestId, 160);
-    if (requestId && createRequests.has(requestId)) return store.get(createRequests.get(requestId));
+    if (requestId && createRequests.has(requestId)) {
+      const existing = store.get(createRequests.get(requestId));
+      if (existing) return existing;
+      createRequests.delete(requestId);
+    }
     const timeoutMs = clampTimeout(input.timeoutMs);
     const timeoutAt = new Date(Date.now() + timeoutMs).toISOString();
     const goal = store.createGoal({
@@ -105,7 +231,10 @@ export const createGoalService = ({ store, broadcast = () => {}, runtimeAdapter 
     });
     const run = store.createRun(goal.id, task.id, { status: "running", source: "goal-start", startedAt: new Date().toISOString() });
     const prepared = store.get(goal.id);
-    if (requestId) createRequests.set(requestId, goal.id);
+    if (requestId) {
+      createRequests.set(requestId, goal.id);
+      while (createRequests.size > MAX_CREATE_REQUESTS) createRequests.delete(createRequests.keys().next().value);
+    }
     event(goal.id, "created", { taskId: task.id, runId: run.id }, actor);
     publish("goal_created", prepared);
     try {
@@ -172,28 +301,53 @@ export const createGoalService = ({ store, broadcast = () => {}, runtimeAdapter 
       throw statusError("已结束的 Goal 不能继续运行", 409);
     }
     if (current.status === nextStatus) return current;
-    const endedAt = terminalGoalStatuses.has(nextStatus) ? new Date().toISOString() : "";
-    const next = store.updateGoal(goalId, {
-      status: nextStatus,
-      endedAt,
-      runtime: { ...current.runtime, status: nextStatus, updatedAt: new Date().toISOString() },
-    }, { expectedVersion: current.version });
-    if (nextStatus === "paused") {
-      clearTimer(goalId);
-      await runtimeAdapter.pause?.({ goal: next, reason: "user" });
-    } else if (nextStatus === "active") {
-      scheduleTimeout(next);
-      await runtimeAdapter.resume?.({ goal: next });
-    } else if (nextStatus === "waiting") {
-      scheduleTimeout(next);
-      await runtimeAdapter.pause?.({ goal: next, reason: "waiting" });
-    } else if (terminalGoalStatuses.has(nextStatus)) {
-      clearTimer(goalId);
-      await runtimeAdapter.stop?.({ goal: next, reason: nextStatus });
+    if (pendingActions.has(goalId)) throw statusError("Goal 正在处理上一项操作，请稍后重试", 409);
+
+    clearTimer(goalId);
+    pendingActions.set(goalId, nextStatus);
+    try {
+      let runtime = {};
+      if (nextStatus === "paused") {
+        runtime = await runtimeAdapter.pause?.({ goal: current, reason: "user" }) || {};
+      } else if (nextStatus === "active") {
+        runtime = await runtimeAdapter.resume?.({ goal: current }) || {};
+      } else if (nextStatus === "waiting") {
+        runtime = await runtimeAdapter.pause?.({ goal: current, reason: "waiting" }) || {};
+      } else if (terminalGoalStatuses.has(nextStatus)) {
+        runtime = await runtimeAdapter.stop?.({ goal: current, reason: nextStatus }) || {};
+      }
+
+      if (nextStatus === "active") {
+        startResumeRun(goalId, runtime);
+      } else {
+        updateCurrentRecords(goalId, nextStatus, {
+          externalRef: current.runtime?.externalRef,
+          detail: clean(runtime?.detail, 2000),
+        });
+      }
+      const latest = get(goalId);
+      if (latest.status !== current.status) throw statusError("Goal 状态已变化，请刷新后重试", 409);
+      const next = store.updateGoal(goalId, {
+        status: nextStatus,
+        endedAt: terminalGoalStatuses.has(nextStatus) ? new Date().toISOString() : "",
+        runtime: runtimeState(latest, nextStatus, runtime),
+      }, { expectedVersion: latest.version });
+      if (["active", "waiting"].includes(nextStatus)) scheduleTimeout(next);
+      event(goalId, `status_${nextStatus}`, { previousStatus: current.status, status: nextStatus }, actor);
+      publish("goal_updated", next);
+      return next;
+    } catch (error) {
+      const latest = store.get(goalId);
+      if (latest && !terminalGoalStatuses.has(latest.status) && latest.status !== "paused") scheduleTimeout(latest);
+      event(goalId, "status_action_failed", {
+        previousStatus: current.status,
+        requestedStatus: nextStatus,
+        error: String(error?.message || error),
+      }, actor);
+      throw error;
+    } finally {
+      pendingActions.delete(goalId);
     }
-    event(goalId, `status_${nextStatus}`, { previousStatus: current.status, status: nextStatus }, actor);
-    publish("goal_updated", next);
-    return next;
   };
 
   const addTask = (goalId, input = {}, actor = {}) => {
@@ -213,8 +367,11 @@ export const createGoalService = ({ store, broadcast = () => {}, runtimeAdapter 
     const goal = get(goalId);
     const task = goal.tasks.find((item) => item.id === clean(taskId, 160));
     if (!task) throw statusError("任务不存在", 404);
+    const protectedFields = protectedTaskFields.filter((field) => changes[field] !== undefined);
+    if (protectedFields.length) throw statusError(`任务关系字段不能直接修改：${protectedFields.join(", ")}`);
     if (changes.status !== undefined && !TASK_STATUSES.has(changes.status)) throw statusError("任务状态无效");
-    const nextTask = store.updateTask(goalId, taskId, changes, { expectedVersion: changes.expectedVersion });
+    const allowed = pickDefined(changes, taskPatchFields);
+    const nextTask = store.updateTask(goalId, taskId, allowed, { expectedVersion: changes.expectedVersion });
     const next = store.touchGoal(goalId);
     event(goalId, "task_updated", { taskId, status: nextTask.status }, actor);
     publish("goal_task_updated", next, { task: nextTask });
@@ -236,12 +393,30 @@ export const createGoalService = ({ store, broadcast = () => {}, runtimeAdapter 
     const goal = get(goalId);
     const run = goal.runs.find((item) => item.id === clean(runId, 160));
     if (!run) throw statusError("运行记录不存在", 404);
+    const protectedFields = protectedRunFields.filter((field) => changes[field] !== undefined);
+    if (protectedFields.length) throw statusError(`运行关系字段不能直接修改：${protectedFields.join(", ")}`);
     if (changes.status !== undefined && !RUN_STATUSES.has(changes.status)) throw statusError("运行状态无效");
-    const nextRun = store.updateRun(goalId, runId, changes);
+    const nextRun = store.updateRun(goalId, runId, pickDefined(changes, runPatchFields));
     const next = store.touchGoal(goalId);
     event(goalId, "run_updated", { taskId: nextRun.taskId, runId }, actor);
     publish("goal_run_updated", next, { run: nextRun });
     return { goal: next, run: nextRun };
+  };
+
+  const handleRuntimeEvent = async ({ employeeId = "", turnId = "", status = "completed", error = "" } = {}) => {
+    const cleanTurnId = clean(turnId, 240);
+    if (!cleanTurnId) return [];
+    const matches = store.list().filter((goal) => (
+      !terminalGoalStatuses.has(goal.status)
+      && (!employeeId || goal.ownerId === clean(employeeId, 160))
+      && goal.runtime?.externalRef === cleanTurnId
+      && !pendingActions.has(goal.id)
+    ));
+    return matches.map((goal) => finalizeRuntimeEvent(goal, {
+      status: clean(status, 80) || "completed",
+      turnId: cleanTurnId,
+      error: clean(error, 2000),
+    }));
   };
 
   const close = async () => {
@@ -268,6 +443,7 @@ export const createGoalService = ({ store, broadcast = () => {}, runtimeAdapter 
     updateTask,
     addRun,
     updateRun,
+    handleRuntimeEvent,
     close,
   };
 };

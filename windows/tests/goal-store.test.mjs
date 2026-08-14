@@ -43,3 +43,21 @@ test("keeps task and run records linked to the platform goal", () => {
   assert.deepEqual(snapshot.tasks.find((task) => task.id === parent.id).childTaskIds, [child.id]);
   assert.deepEqual(snapshot.tasks.find((task) => task.id === child.id).runIds, [run.id]);
 });
+
+test("never evicts active Goals when the capacity limit is reached", async () => {
+  const store = createGoalStore();
+  try {
+    const first = store.createGoal({ objective: "first active Goal" });
+    for (let index = 1; index < 200; index += 1) {
+      store.createGoal({ objective: `active Goal ${index}` });
+    }
+    assert.throws(
+      () => store.createGoal({ objective: "one Goal too many" }),
+      /limit|上限/u,
+    );
+    assert.equal(store.snapshot().goals.length, 200);
+    assert.ok(store.get(first.id));
+  } finally {
+    await store.close();
+  }
+});

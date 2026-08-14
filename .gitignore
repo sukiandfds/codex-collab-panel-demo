@@ -22,6 +22,8 @@ TASK_PROGRESS.md
 .pnpm-store/
 node_modules/
 .playwright-mcp/
+.playwright-cli/
+output/playwright/
 web-ui/node_modules/
 web-ui/dist/
 web-ui/*.tsbuildinfo

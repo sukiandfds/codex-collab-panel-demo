@@ -9,7 +9,7 @@ export const goalCapabilityOptions = [
 
 export type ParsedGoalCapability =
   | { type: "start"; objective: string }
-  | { type: "action"; action: GoalAction }
+  | { type: "action"; action: GoalAction; target: string }
   | { type: "incomplete" };
 
 const goalActions: Record<string, GoalAction> = {
@@ -23,6 +23,9 @@ export const parseGoalCapability = (text: string): ParsedGoalCapability | null =
   if (!match) return null;
   const argument = (match[1] || "").trim();
   if (!argument) return { type: "incomplete" };
-  const action = goalActions[argument.toLocaleLowerCase()];
-  return action ? { type: "action", action } : { type: "start", objective: argument };
+  const [verb = "", ...targetParts] = argument.split(/\s+/u);
+  const action = goalActions[verb.toLocaleLowerCase()];
+  return action
+    ? { type: "action", action, target: targetParts.join(" ").trim() }
+    : { type: "start", objective: argument };
 };

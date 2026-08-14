@@ -81,6 +81,7 @@ export function ConversationComposer({
   onReasoningEffortChange,
 }: ConversationComposerProps) {
   const [text, setText] = useState("");
+  const [goalFeedback, setGoalFeedback] = useState<{ accepted: boolean; message: string } | null>(null);
   const [slash, setSlash] = useState<SlashState | null>(null);
   const [activeSlash, setActiveSlash] = useState(0);
   const [collapsedSlashGroups, setCollapsedSlashGroups] = useState<Record<string, boolean>>({});
@@ -158,10 +159,12 @@ export function ConversationComposer({
     if (!editing && !draft.attachments.length && !inheritedAttachments.length) {
       const goalResult = await executeGoalCapability(submittedText);
       if (goalResult.handled) {
+        setGoalFeedback(goalResult.feedback ? { accepted: goalResult.accepted, message: goalResult.feedback } : null);
         if (!goalResult.accepted) setText(submittedText);
         submittingRef.current = false;
         return;
       }
+      setGoalFeedback(null);
       const command = submittedText.trim().toLocaleLowerCase();
       if (command === "/compact" || command === "/stop" || command === "/review") {
         try {
@@ -213,6 +216,15 @@ export function ConversationComposer({
         onRetry={onRetryQueueItem}
         onSendNow={onSendQueueItem}
       />
+      {goalFeedback ? (
+        <div
+          className={styles.goalFeedback}
+          data-state={goalFeedback.accepted ? "success" : "error"}
+          role={goalFeedback.accepted ? "status" : "alert"}
+        >
+          {goalFeedback.message}
+        </div>
+      ) : null}
       <div
         className={styles.composer}
         aria-label="Codex 对话输入"
@@ -256,6 +268,7 @@ export function ConversationComposer({
           disabled={inputDisabled}
           onChange={(event) => {
             setText(event.target.value);
+            setGoalFeedback(null);
             updateSlash(event.target.value, event.target.selectionStart);
           }}
           onPaste={(event) => {

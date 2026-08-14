@@ -232,6 +232,7 @@ const employeeGrowth = createEmployeeGrowthService({
   conversationStore: employeeConversationStore,
   broadcast: realtime.broadcast,
 });
+let goals = null;
 const employeeRuntime = createEmployeeRuntimeService({
   registry: employeeRegistry,
   conversationStore: employeeConversationStore,
@@ -239,6 +240,7 @@ const employeeRuntime = createEmployeeRuntimeService({
   broadcast: realtime.broadcast,
   growthService: employeeGrowth,
   contextProvider: employeeGrowth.getContext,
+  onTurnCompleted: (completion) => goals?.handleRuntimeEvent(completion),
 });
 const goalStore = createGoalStore({
   stateFile: path.join(projectRoot, "runtime", "goals.json"),
@@ -261,7 +263,13 @@ const goalRuntimeAdapter = createGoalRuntimeAdapter({
       detail: "Goal 已发送给负责人运行时",
     };
   },
-  pauseGoal: async ({ goal }) => employeeRuntime.interrupt?.(goal.ownerId),
+  pauseGoal: async ({ goal }) => {
+    if (!employeeRuntime.supportsEmployee(goal.ownerId)) {
+      realtime.broadcast({ type: "goal_runtime_pause_requested", goalId: goal.id, ownerId: goal.ownerId });
+      return { status: "paused", detail: "已向外部运行适配器请求暂停" };
+    }
+    return employeeRuntime.interrupt?.(goal.ownerId, goal.runtime?.externalRef);
+  },
   resumeGoal: async ({ goal }) => {
     if (!employeeRuntime.supportsEmployee(goal.ownerId)) return { status: "running" };
     const result = await employeeRuntime.sendMessage({
@@ -271,9 +279,15 @@ const goalRuntimeAdapter = createGoalRuntimeAdapter({
     });
     return { status: "running", externalRef: result.turnId || result.threadId, detail: "Goal 已继续" };
   },
-  stopGoal: async ({ goal }) => employeeRuntime.interrupt?.(goal.ownerId),
+  stopGoal: async ({ goal }) => {
+    if (!employeeRuntime.supportsEmployee(goal.ownerId)) {
+      realtime.broadcast({ type: "goal_runtime_stop_requested", goalId: goal.id, ownerId: goal.ownerId });
+      return { status: "stop_requested", detail: "已向外部运行适配器请求停止" };
+    }
+    return employeeRuntime.interrupt?.(goal.ownerId, goal.runtime?.externalRef);
+  },
 });
-const goals = createGoalService({
+goals = createGoalService({
   store: goalStore,
   runtimeAdapter: goalRuntimeAdapter,
   broadcast: realtime.broadcast,
