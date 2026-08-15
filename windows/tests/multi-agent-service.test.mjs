@@ -172,3 +172,62 @@ test("interrupts the active group Turn and cancels the remaining employees", asy
   assert.equal(messages.some((message) => message.text === "您终止了本次任务。"), true);
   assert.deepEqual(deliveredContexts[0].messages.map((message) => message.text), ["检查问题"]);
 });
+
+test("a new group Agent Thread uses its provider and rejects a later cross-provider switch", async () => {
+  const currentRequests = [];
+  const grokRequests = [];
+  const client = (requests, threadId) => ({
+    subscribe: () => () => {},
+    close: () => {},
+    request: async (method, params) => {
+      requests.push({ method, params });
+      if (method === "thread/start") return { thread: { id: threadId } };
+      if (method === "thread/resume") return { thread: { id: params.threadId } };
+      return {};
+    },
+  });
+  const currentClient = client(currentRequests, "group-current-thread");
+  const grokClient = client(grokRequests, "group-grok-thread");
+  let agent = {
+    ...agents[0],
+    threadId: null,
+    instructions: "stable employee rules",
+    modelProviderId: "fusheng-grok",
+    model: "grok-4.6",
+    reasoningEffort: "",
+  };
+  const room = {
+    snapshot: () => ({ agents: [agent] }),
+    getAgent: () => agent,
+    updateAgent: async (_agentId, patch) => { agent = { ...agent, ...patch }; return agent; },
+  };
+  const modelProviders = {
+    resolveRoute: ({ modelProviderId = "", model = "" }) => ({
+      modelProviderId: modelProviderId || (model === "grok-4.6" ? "fusheng-grok" : "current"),
+      model,
+    }),
+    getClient: async (route) => route.modelProviderId === "fusheng-grok" ? grokClient : currentClient,
+  };
+  const service = createMultiAgentService({
+    projectRoot: "D:\\project",
+    employeeWorkRoots: { manager: "D:\\employees\\manager" },
+    room,
+    broadcast: () => {},
+    appServerClient: currentClient,
+    modelProviders,
+  });
+
+  assert.equal(await service.ensureAgentThread("manager"), "group-grok-thread");
+  assert.equal(currentRequests.some((request) => request.method === "thread/start"), false);
+  assert.equal(grokRequests.find((request) => request.method === "thread/start").params.model, "grok-4.6");
+  await assert.rejects(
+    () => service.updateAgentSettings("manager", {
+      modelProviderId: "current",
+      model: "gpt-5.6-terra",
+      reasoningEffort: "low",
+    }),
+    /跨供应商/u,
+  );
+  assert.equal(agent.modelProviderId, "fusheng-grok");
+  service.close();
+});

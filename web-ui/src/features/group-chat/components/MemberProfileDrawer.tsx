@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, CircleUserRound, X } from "lucide-react";
-import { readModelCatalog, writeModelCatalog } from "../../models/data/modelCatalogCache";
 import { modelApi } from "../../models/data/modelApi";
 import { formatModelDisplayName } from "../../models/model/modelDisplayName";
 import { formatReasoningEffort } from "../../models/model/reasoningEffortLabels";
@@ -18,9 +17,9 @@ export function MemberProfileDrawer({ profile, roomId, onClose, onAgentUpdated }
 }) {
   const agent = profile?.kind === "agent" ? profile.profile : null;
   const agentId = agent?.id || "";
-  const [initialModels] = useState(readModelCatalog);
-  const [models, setModels] = useState<CodexModel[]>(initialModels);
-  const [modelsLoading, setModelsLoading] = useState(!initialModels.length);
+  const [models, setModels] = useState<CodexModel[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [draftProviderId, setDraftProviderId] = useState("current");
   const [draftModel, setDraftModel] = useState("");
   const [draftEffort, setDraftEffort] = useState("");
   const [applying, setApplying] = useState(false);
@@ -32,18 +31,20 @@ export function MemberProfileDrawer({ profile, roomId, onClose, onAgentUpdated }
     saveControllerRef.current = null;
     setApplying(false);
     if (!agentId) {
+      setDraftProviderId("current");
       setDraftModel("");
       setDraftEffort("");
       setError("");
       return;
     }
+    setDraftProviderId(agent?.modelProviderId || "current");
     setDraftModel(agent?.model || "");
     setDraftEffort(agent?.reasoningEffort || "");
     setError("");
-  }, [agentId, agent?.model, agent?.reasoningEffort]);
+  }, [agentId, agent?.modelProviderId, agent?.model, agent?.reasoningEffort]);
 
   useEffect(() => {
-    if (!agentId || models.length) {
+    if (!agentId) {
       setModelsLoading(false);
       return;
     }
@@ -51,11 +52,10 @@ export function MemberProfileDrawer({ profile, roomId, onClose, onAgentUpdated }
     let active = true;
     const timeout = window.setTimeout(() => controller.abort(), 10000);
     setModelsLoading(true);
-    void modelApi.list(controller.signal)
+    void modelApi.listForAgents(controller.signal)
       .then((result) => {
         if (!active) return;
         setModels(result);
-        writeModelCatalog(result);
       })
       .catch((reason) => {
         if (active) setError(controller.signal.aborted ? "模型列表读取超时，请关闭后重试" : reason instanceof Error ? reason.message : String(reason));
@@ -68,25 +68,36 @@ export function MemberProfileDrawer({ profile, roomId, onClose, onAgentUpdated }
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [agentId, models.length]);
+  }, [agentId]);
 
   const modelOptions = useMemo(() => {
-    if (!agent?.model || models.some((entry) => entry.model === agent.model)) return models;
+    const availableModels = models.filter((entry) => entry.available !== false);
+    const agentProviderId = agent?.modelProviderId || "current";
+    if (!agent?.model || availableModels.some((entry) => (
+      entry.model === agent.model && (entry.modelProviderId || "current") === agentProviderId
+    ))) return availableModels;
     return [{
       id: agent.model,
       model: agent.model,
+      modelProviderId: agentProviderId,
       displayName: agent.model,
       description: "当前配置",
       isDefault: false,
       supportedReasoningEfforts: [],
-    }, ...models];
-  }, [agent?.model, models]);
-  const selectedModel = modelOptions.find((entry) => entry.model === draftModel);
+    }, ...availableModels];
+  }, [agent?.modelProviderId, agent?.model, models]);
+  const selectedModel = modelOptions.find((entry) => (
+    entry.model === draftModel && (entry.modelProviderId || "current") === draftProviderId
+  ));
   const effortOptions = selectedModel?.supportedReasoningEfforts || [];
   const displayEffortOptions = draftEffort && !effortOptions.some((entry) => entry.reasoningEffort === draftEffort)
     ? [{ reasoningEffort: draftEffort, description: "当前配置" }, ...effortOptions]
     : effortOptions;
-  const hasChanges = Boolean(agent && (draftModel !== (agent.model || "") || draftEffort !== (agent.reasoningEffort || "")));
+  const hasChanges = Boolean(agent && (
+    draftProviderId !== (agent.modelProviderId || "current")
+    || draftModel !== (agent.model || "")
+    || draftEffort !== (agent.reasoningEffort || "")
+  ));
 
   if (!profile) return null;
 
@@ -96,7 +107,7 @@ export function MemberProfileDrawer({ profile, roomId, onClose, onAgentUpdated }
   const subtitle = isAgent ? "Agent" : "在线用户";
 
   const saveAgentSettings = async () => {
-    if (!agent || !hasChanges || applying || modelsLoading || !draftModel || !draftEffort) return;
+    if (!agent || !hasChanges || applying || modelsLoading || !draftModel) return;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 10000);
     saveControllerRef.current?.abort();
@@ -104,7 +115,7 @@ export function MemberProfileDrawer({ profile, roomId, onClose, onAgentUpdated }
     setApplying(true);
     setError("");
     try {
-      const updated = await groupApi.updateAgentSettings(agent.id, draftModel, draftEffort, roomId, controller.signal);
+      const updated = await groupApi.updateAgentSettings(agent.id, draftProviderId, draftModel, draftEffort, roomId, controller.signal);
       if (!controller.signal.aborted) onAgentUpdated(updated);
     } catch (reason) {
       if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : String(reason));
@@ -144,20 +155,27 @@ export function MemberProfileDrawer({ profile, roomId, onClose, onAgentUpdated }
                 <dt>推理模型</dt>
                 <dd>
                   <select
-                    value={draftModel}
+                    value={draftModel ? `${draftProviderId}:${draftModel}` : ""}
                     disabled={modelsLoading || applying}
                     aria-label="选择 Agent 推理模型"
                     onChange={(event) => {
-                      const nextModel = event.target.value;
-                      const nextEntry = models.find((entry) => entry.model === nextModel);
-                      setDraftModel(nextModel);
+                      const nextEntry = modelOptions.find((entry) => (
+                        `${entry.modelProviderId || "current"}:${entry.model}` === event.target.value
+                      ));
+                      if (!nextEntry) return;
+                      setDraftProviderId(nextEntry.modelProviderId || "current");
+                      setDraftModel(nextEntry.model);
                       if (draftEffort && nextEntry && !nextEntry.supportedReasoningEfforts.some((entry) => entry.reasoningEffort === draftEffort)) {
                         setDraftEffort("");
                       }
                     }}
                   >
                     {!draftModel ? <option value="">{modelsLoading ? "读取模型" : "选择模型"}</option> : null}
-                    {modelOptions.map((entry) => <option key={entry.id} value={entry.model}>{formatModelDisplayName(entry.model, entry.displayName)}</option>)}
+                    {modelOptions.map((entry) => (
+                      <option key={`${entry.modelProviderId || "current"}:${entry.id}`} value={`${entry.modelProviderId || "current"}:${entry.model}`}>
+                        {formatModelDisplayName(entry.model, entry.displayName)}{entry.providerDisplayName ? ` · ${entry.providerDisplayName}` : ""}
+                      </option>
+                    ))}
                   </select>
                 </dd>
               </div>
@@ -179,7 +197,7 @@ export function MemberProfileDrawer({ profile, roomId, onClose, onAgentUpdated }
             {error ? <p className={styles.error} role="alert">{error}</p> : null}
             <div className={styles.actions}>
               <button className={styles.cancelButton} type="button" disabled={applying} onClick={onClose}>取消</button>
-              <button className={styles.confirmButton} type="button" disabled={!hasChanges || applying || modelsLoading || !draftModel || !draftEffort} onClick={() => void saveAgentSettings()}>
+              <button className={styles.confirmButton} type="button" disabled={!hasChanges || applying || modelsLoading || !draftModel} onClick={() => void saveAgentSettings()}>
                 {applying ? "正在应用" : "确认"}
               </button>
             </div>

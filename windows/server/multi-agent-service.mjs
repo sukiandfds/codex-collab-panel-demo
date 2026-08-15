@@ -6,6 +6,7 @@ import { buildDiscussionPrompt } from "./multi-agent/discussion-prompt.mjs";
 import { cleanAgentIds, mentionedAgentIds, resolveAgentRouting } from "./multi-agent/agent-routing.mjs";
 import { completeOutputJob } from "./multi-agent/output-job.mjs";
 import { agentStateFromItem, terminalAgentPhases } from "./multi-agent/protocol-state.mjs";
+import { CURRENT_MODEL_PROVIDER_ID } from "./model-provider-service.mjs";
 
 const missingThreadPattern = /\bthread(?:\s+id)?\s+not\s+found\b/iu;
 
@@ -35,13 +36,37 @@ export const createMultiAgentService = ({
   resolveArtifacts = () => [],
   onContextDelivered = async () => {},
   appServerClient = null,
+  modelProviders = null,
 }) => {
-  const client = appServerClient || createAppServerClient();
+  const defaultClient = appServerClient || createAppServerClient();
+  const ownsDefaultClient = !appServerClient;
   const threadAgents = new Map();
+  const threadClients = new Map();
+  const clientSubscriptions = new Map();
   const discussions = new Map();
   let currentRun = null;
   let workQueue = Promise.resolve();
   let closed = false;
+
+  const subscribeClient = (runtimeClient) => {
+    if (!runtimeClient || clientSubscriptions.has(runtimeClient)) return;
+    clientSubscriptions.set(runtimeClient, runtimeClient.subscribe(handleProtocolMessage));
+  };
+
+  const routeForAgent = (agent) => modelProviders?.resolveRoute({
+    modelProviderId: agent?.modelProviderId || CURRENT_MODEL_PROVIDER_ID,
+    model: agent?.model || "",
+  }) || {
+    modelProviderId: CURRENT_MODEL_PROVIDER_ID,
+    model: String(agent?.model || "").trim().slice(0, 120),
+  };
+
+  const clientForAgent = async (agent) => {
+    if (!modelProviders) return defaultClient;
+    const runtimeClient = await modelProviders.getClient(routeForAgent(agent));
+    subscribeClient(runtimeClient);
+    return runtimeClient;
+  };
 
   for (const agent of room.snapshot().agents) {
     if (agent.threadId) threadAgents.set(agent.threadId, agent.id);
@@ -73,6 +98,7 @@ export const createMultiAgentService = ({
     const threadId = agent?.threadId;
     if (!threadId) return room.getAgent(agent?.id) || agent;
     threadAgents.delete(threadId);
+    threadClients.delete(threadId);
     const current = room.getAgent(agent.id);
     if (!current || current.threadId !== threadId) return current || agent;
     return room.updateAgent(agent.id, {
@@ -84,11 +110,12 @@ export const createMultiAgentService = ({
     });
   };
 
-  const applyAgentSettings = async (agent) => {
+  const applyAgentSettings = async (agent, providedClient = null) => {
     if (!agent.threadId) return true;
+    const runtimeClient = providedClient || await clientForAgent(agent);
     try {
-      if (agent.model) await client.request("thread/settings/update", { threadId: agent.threadId, model: agent.model });
-      if (agent.reasoningEffort) await client.request("thread/settings/update", { threadId: agent.threadId, effort: agent.reasoningEffort });
+      if (agent.model) await runtimeClient.request("thread/settings/update", { threadId: agent.threadId, model: agent.model });
+      if (agent.reasoningEffort) await runtimeClient.request("thread/settings/update", { threadId: agent.threadId, effort: agent.reasoningEffort });
       return true;
     } catch (error) {
       if (!isMissingThreadError(error)) throw error;
@@ -176,13 +203,14 @@ export const createMultiAgentService = ({
     }
   };
 
-  const unsubscribe = client.subscribe(handleProtocolMessage);
+  subscribeClient(defaultClient);
 
   async function interruptRun(run) {
     if (!run?.threadId || !run.turnId || run.interruptSent) return false;
     run.interruptSent = true;
     try {
-      await client.request("turn/interrupt", { threadId: run.threadId, turnId: run.turnId });
+      const runtimeClient = run.client || threadClients.get(run.threadId) || defaultClient;
+      await runtimeClient.request("turn/interrupt", { threadId: run.threadId, turnId: run.turnId });
       return true;
     } catch (error) {
       run.interruptSent = false;
@@ -193,33 +221,38 @@ export const createMultiAgentService = ({
   const ensureThread = async (agent) => {
     let currentAgent = agent;
     for (let attempt = 0; attempt < 2; attempt += 1) {
+      const runtimeClient = await clientForAgent(currentAgent);
       if (currentAgent.threadId) {
         try {
-          await client.request("thread/resume", { threadId: currentAgent.threadId, persistExtendedHistory: true });
+          await runtimeClient.request("thread/resume", { threadId: currentAgent.threadId, persistExtendedHistory: true });
         } catch (error) {
           if (!isMissingThreadError(error)) throw error;
           currentAgent = await clearAgentThread(currentAgent);
           continue;
         }
-        if (await applyAgentSettings(currentAgent)) {
+        if (await applyAgentSettings(currentAgent, runtimeClient)) {
           threadAgents.set(currentAgent.threadId, currentAgent.id);
+          threadClients.set(currentAgent.threadId, runtimeClient);
           return currentAgent.threadId;
         }
         currentAgent = room.getAgent(currentAgent.id) || { ...currentAgent, threadId: null };
         continue;
       }
 
-      const result = await client.request("thread/start", {
+      const route = routeForAgent(currentAgent);
+      const result = await runtimeClient.request("thread/start", {
         cwd: employeeWorkRoots[agent.id] || projectRoot,
         developerInstructions: employeeTurnInstructions(currentAgent.instructions),
         ephemeral: false,
         serviceName: "negus",
+        ...(route.model ? { model: route.model } : {}),
       });
       const threadId = result.thread.id;
       threadAgents.set(threadId, currentAgent.id);
-      await client.request("thread/name/set", { threadId, name: `${currentAgent.name} · ${currentAgent.responsibility}` });
+      threadClients.set(threadId, runtimeClient);
+      await runtimeClient.request("thread/name/set", { threadId, name: `${currentAgent.name} · ${currentAgent.responsibility}` });
       const nextAgent = await room.updateAgent(currentAgent.id, { threadId, phase: "idle", label: "等待任务", detail: "", active: false });
-      if (await applyAgentSettings(nextAgent)) return threadId;
+      if (await applyAgentSettings(nextAgent, runtimeClient)) return threadId;
       currentAgent = room.getAgent(currentAgent.id) || { ...nextAgent, threadId: null };
     }
     throw new Error("无法建立 Agent Thread");
@@ -228,15 +261,38 @@ export const createMultiAgentService = ({
   const updateAgentSettings = async (agentId, settings) => {
     const agent = room.getAgent(agentId);
     if (!agent) throw Object.assign(new Error("Agent 不存在"), { statusCode: 404 });
-    const nextSettings = {
+    const requestedProviderId = String(settings.modelProviderId || agent.modelProviderId || CURRENT_MODEL_PROVIDER_ID)
+      .trim()
+      .slice(0, 80);
+    if (!modelProviders && requestedProviderId !== CURRENT_MODEL_PROVIDER_ID) {
+      throw Object.assign(new Error("当前群聊运行时未启用外部模型供应商"), { statusCode: 503 });
+    }
+    const requestedRoute = modelProviders?.resolveRoute({
+      modelProviderId: requestedProviderId,
       model: String(settings.model || "").trim().slice(0, 120),
+    }) || {
+      modelProviderId: CURRENT_MODEL_PROVIDER_ID,
+      model: String(settings.model || "").trim().slice(0, 120),
+    };
+    const nextSettings = {
+      modelProviderId: requestedRoute.modelProviderId,
+      model: requestedRoute.model,
       reasoningEffort: String(settings.reasoningEffort || "").trim().slice(0, 40),
     };
-    if (!nextSettings.model || !nextSettings.reasoningEffort) {
-      throw Object.assign(new Error("模型和推理强度不能为空"), { statusCode: 400 });
+    if (!nextSettings.model) {
+      throw Object.assign(new Error("模型不能为空"), { statusCode: 400 });
     }
+    const currentRoute = routeForAgent(agent);
+    if (agent.threadId && currentRoute.modelProviderId !== requestedRoute.modelProviderId) {
+      throw Object.assign(new Error("现有 Agent Thread 暂不支持跨供应商切换；请为新 Thread 选择该模型"), { statusCode: 409 });
+    }
+    const runtimeClient = modelProviders
+      ? await modelProviders.getClient(requestedRoute)
+      : defaultClient;
+    subscribeClient(runtimeClient);
     if (!currentRun || currentRun.agentId !== agentId) {
-      await applyAgentSettings({ ...agent, ...nextSettings });
+      if (agent.threadId) threadClients.set(agent.threadId, runtimeClient);
+      await applyAgentSettings({ ...agent, ...nextSettings }, runtimeClient);
     }
     return room.updateAgent(agentId, nextSettings);
   };
@@ -254,6 +310,7 @@ export const createMultiAgentService = ({
 
     await setStatus(agentId, { phase: "submitted", label: "已接收群聊任务", detail: "正在连接 Codex", active: true });
     const threadId = await ensureThread(agent);
+    const runtimeClient = threadClients.get(threadId) || await clientForAgent(room.getAgent(agentId) || agent);
     if (discussion.cancelled) {
       finishStatus(agentId, { phase: "interrupted", label: "任务已中断", detail: "" });
       return { status: "interrupted", text: "", message: null };
@@ -300,6 +357,7 @@ export const createMultiAgentService = ({
     currentRun = {
       agentId,
       threadId,
+      client: runtimeClient,
       resolve: resolveRun,
       timer,
       finalText: "",
@@ -314,7 +372,7 @@ export const createMultiAgentService = ({
     };
 
     try {
-      const started = await client.request("turn/start", {
+      const started = await runtimeClient.request("turn/start", {
         threadId,
         input: await inputFromAttachments(prompt, inputAttachments, attachmentContent),
         cwd: projectRoot,
@@ -456,8 +514,9 @@ export const createMultiAgentService = ({
       currentRun.resolve({ status: "interrupted", text: currentRun.finalText });
       currentRun = null;
     }
-    unsubscribe();
-    client.close();
+    for (const unsubscribe of clientSubscriptions.values()) unsubscribe?.();
+    clientSubscriptions.clear();
+    if (ownsDefaultClient) defaultClient.close();
   };
 
   return { enqueueDiscussion, interruptDiscussion, updateAgentSettings, ensureAgentThread, close };

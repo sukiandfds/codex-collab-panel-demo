@@ -57,6 +57,10 @@ test("employee registry keeps identity state private from API-shaped values", as
   assert.equal(employee.id, "developer");
   assert.equal("instructions" in employee, false);
   assert.equal(registry.require("developer").instructions.includes("Legacy policy marker"), false);
+  const grok = registry.get("grok");
+  assert.equal(grok.modelProviderId, "fusheng-grok");
+  assert.equal(grok.model, "grok-4.6");
+  assert.equal(grok.mainThreadId, null);
 });
 
 test("employee runtime binds one main thread and gates workspace writes", async (t) => {
@@ -153,4 +157,65 @@ test("only interrupts the exact Turn owned by the requested Goal", async (t) => 
     status: "interrupted",
     error: "",
   }]);
+});
+
+test("a new direct employee Thread uses the selected provider without migrating providers later", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "negus-employee-provider-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const registry = await createEmployeeProjectRegistry({
+    stateFile: path.join(root, "employee-projects.json"),
+    workspaceRoot: "D:\\project",
+  });
+  const currentCalls = [];
+  const grokCalls = [];
+  const client = (calls, threadId) => ({
+    subscribe: () => () => {},
+    close: () => {},
+    async request(method, params) {
+      calls.push({ method, params });
+      if (method === "thread/start") return { thread: { id: threadId } };
+      if (method === "thread/read") return { thread: { id: params.threadId, turns: [] } };
+      if (method === "thread/resume") return { thread: { id: params.threadId }, model: params.threadId === threadId ? "grok-4.6" : "" };
+      if (method === "turn/start") return { turn: { id: "grok-turn", status: "inProgress" } };
+      return {};
+    },
+  });
+  const currentClient = client(currentCalls, "current-thread");
+  const grokClient = client(grokCalls, "grok-thread");
+  const modelProviders = {
+    resolveRoute: ({ modelProviderId = "", model = "" }) => {
+      const external = modelProviderId === "fusheng-grok" || (!modelProviderId && model === "grok-4.6");
+      return {
+        modelProviderId: external ? "fusheng-grok" : "current",
+        model: model || (external ? "grok-4.6" : ""),
+      };
+    },
+    getClient: async (route) => route.modelProviderId === "fusheng-grok" ? grokClient : currentClient,
+  };
+  const conversationStore = {
+    async bindRuntime(value) { return { conversationId: "employee-grok-conversation", ...value }; },
+    async readMessages() { return []; },
+    async recordRuntimeEvent() {},
+  };
+  const runtime = createEmployeeRuntimeService({
+    registry,
+    conversationStore,
+    projectRoot: "D:\\project",
+    client: currentClient,
+    modelProviders,
+  });
+  t.after(async () => { runtime.close(); await registry.close(); });
+
+  await runtime.updateModelSettings("researcher", { model: "grok-4.6" });
+  const opened = await runtime.open("researcher");
+  assert.equal(opened.conversation.threadId, "grok-thread");
+  assert.equal(currentCalls.some((call) => call.method === "thread/start"), false);
+  assert.equal(grokCalls.find((call) => call.method === "thread/start").params.model, "grok-4.6");
+  await assert.rejects(
+    () => runtime.updateModelSettings("researcher", { model: "gpt-5.6-terra" }),
+    /跨供应商/u,
+  );
+  assert.equal(registry.get("researcher").modelProviderId, "fusheng-grok");
+  await runtime.sendMessage({ employeeId: "researcher", text: "identify your model" });
+  assert.equal(grokCalls.some((call) => call.method === "turn/start"), true);
 });

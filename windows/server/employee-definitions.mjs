@@ -30,6 +30,9 @@ const normalize = (value, workRoot) => {
     responsibility: clean(value.responsibility, 500),
     projectKey: clean(value.projectKey, 120) || `employee-${id}`,
     runtimeKind: clean(value.runtimeKind, 80) || "codex",
+    modelProviderId: clean(value.modelProviderId, 80),
+    model: clean(value.model, 120),
+    reasoningEffort: clean(value.reasoningEffort, 40),
     instructions: clean(value.instructions, 8000),
     workRoot: path.join(workRoot, id),
   };

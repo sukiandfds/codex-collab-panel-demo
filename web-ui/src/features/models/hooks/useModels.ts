@@ -15,8 +15,9 @@ export function useModels(threadId: string, onChanged: () => void) {
     setLoading(true);
     void modelApi.list(controller.signal)
       .then((result) => {
-        setModels(result);
-        writeModelCatalog(result);
+        const availableModels = result.filter((entry) => entry.available !== false);
+        setModels(availableModels);
+        writeModelCatalog(availableModels);
         setError("");
       })
       .catch((reason) => {
@@ -26,7 +27,7 @@ export function useModels(threadId: string, onChanged: () => void) {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, []);
+  }, [threadId]);
 
   const change = useCallback(async (model: string) => {
     if (!threadId || !model || changing) return false;

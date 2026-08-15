@@ -16,7 +16,7 @@ export const createRequestHandler = ({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime, submissions,
   followUpQueue, contextManagement, groupRoom, roomDirectory, multiAgent, multiAgentDirectory, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
   agentConversationStore, agentPublicationService,
-  employeeRuntime, employeeProjectDirectory, employeeGrowth,
+  employeeRuntime, employeeProjectDirectory, employeeGrowth, modelProviders,
 }) => {
   const routes = [
     createVersionRoutes({ readWebVersion }),
@@ -38,6 +38,7 @@ export const createRequestHandler = ({
       agentConversationStore,
       employeeRuntime,
       roomDirectory,
+      modelProviders,
     }),
     createUsageRoutes({ fushengUsage }),
     createSystemRoutes({ token, project, projectRoot, device, observerPort, media, realtime }),

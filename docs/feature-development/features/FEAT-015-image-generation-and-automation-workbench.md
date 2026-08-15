@@ -233,7 +233,7 @@ Luna 5.6 识别为图片生成任务，调用正式生图能力。页面显示�
 ### 2026-08-04 17:16 +08:00 | v0.3.1 | in_progress
 
 - 将项目级生图 MCP 从 `lynn_image` 正式命名为 `negus_image`（Negus Image），同步更新 MCP 自报名称、Skill 引用和测试断言。
-- 保留现有 `LYNN_IMAGE_*` 环境变量作为底层兼容接口，不要求重新配置密钥或 Provider 参数。
+- 使用 `NEGUS_IMAGE_*` 作为当前配置名称，并继续兼容旧的 `LYNN_IMAGE_*` 环境变量，避免重新配置现有密钥或 Provider 参数。
 - 已通过 Negus Image MCP 完成一次 16:9、2K（2560×1440）真实生图验证；现有网页 UI 未改变。
 
 ### 2026-08-04 18:39 +08:00 | v0.4.0 | in_progress

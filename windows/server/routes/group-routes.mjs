@@ -36,13 +36,14 @@ export const createGroupRoutes = ({ groupRoom, roomDirectory, media, multiAgent,
     const room = resolveRoom(body);
     const service = resolveAgentService(room.snapshot().room.id);
     const agentId = String(body.agentId || "").trim();
+    const modelProviderId = String(body.modelProviderId || "current").trim();
     const model = String(body.model || "").trim();
     const reasoningEffort = String(body.reasoningEffort || "").trim();
-    if (!agentId || !model || !reasoningEffort) {
-      sendJson(response, { error: "Agent、模型和推理强度不能为空" }, 400);
+    if (!agentId || !modelProviderId || !model) {
+      sendJson(response, { error: "Agent、模型供应商和模型不能为空" }, 400);
       return true;
     }
-    sendJson(response, await service.updateAgentSettings(agentId, { model, reasoningEffort }));
+    sendJson(response, await service.updateAgentSettings(agentId, { modelProviderId, model, reasoningEffort }));
     return true;
   }
   if (url.pathname === "/api/group/interrupt" && request.method === "POST") {

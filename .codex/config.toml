@@ -6,6 +6,13 @@ enabled = true
 required = false
 enabled_tools = ["generate_image", "edit_image"]
 env_vars = [
+  "NEGUS_IMAGE_API_KEY",
+  "NEGUS_IMAGE_BASE_URL",
+  "NEGUS_IMAGE_MODEL",
+  "NEGUS_IMAGE_DEFAULT_SIZE",
+  "NEGUS_IMAGE_OUTPUT_DIR",
+  "NEGUS_IMAGE_TIMEOUT_MS",
+  "NEGUS_IMAGE_POLL_INTERVAL_MS",
   "LYNN_IMAGE_API_KEY",
   "LYNN_IMAGE_BASE_URL",
   "LYNN_IMAGE_MODEL",

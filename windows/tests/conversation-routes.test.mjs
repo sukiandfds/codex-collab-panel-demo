@@ -276,6 +276,83 @@ test("routes direct employee text through employee runtime", async () => {
   assert.equal(events[0].type, "user_message_submitted");
 });
 
+test("reads an external-provider employee session through employee runtime", async () => {
+  const binding = {
+    conversationId: "employee-grok-conversation",
+    agentId: "researcher",
+    runtimeKind: "codex",
+    runtimeSessionId: "employee-grok-thread",
+    conversationKind: "direct",
+  };
+  let genericReads = 0;
+  const route = createConversationRoutes({
+    conversations: {
+      findSession: async () => { genericReads += 1; throw new Error("generic path used"); },
+    },
+    execution: { getStatus: () => ({ active: false, turnId: "" }) },
+    contextManagement: {},
+    media: { resolveMany: () => [] },
+    agentConversationStore: {
+      findByRuntimeSession: () => binding,
+      resolve: async () => binding,
+    },
+    employeeRuntime: {
+      supportsEmployee: () => true,
+      ownsConversation: (value) => value === binding,
+      readSession: async () => ({
+        threadId: binding.runtimeSessionId,
+        source: "codex",
+        title: "Researcher · Main",
+        archived: false,
+        messages: [{ id: "message-1", role: "assistant", text: "grok reply" }],
+      }),
+    },
+  });
+
+  const call = invokeGet(route, "/api/session?threadId=employee-grok-thread&conversationId=employee-grok-conversation");
+  await call.promise;
+
+  assert.equal(call.response.status, 200);
+  assert.equal(genericReads, 0);
+  assert.equal(JSON.parse(call.response.body).messages[0].text, "grok reply");
+});
+
+test("adds external models only for an owned employee conversation", async () => {
+  const binding = {
+    conversationId: "employee-conversation",
+    agentId: "developer",
+    runtimeSessionId: "employee-thread",
+    conversationKind: "direct",
+  };
+  const route = createConversationRoutes({
+    conversations: {
+      listModels: async () => [{ id: "gpt", model: "gpt-5.6-terra" }],
+    },
+    execution: { getStatus: () => ({ active: false, turnId: "" }) },
+    contextManagement: {},
+    media: { resolveMany: () => [] },
+    agentConversationStore: { resolve: async () => binding },
+    employeeRuntime: {
+      supportsEmployee: () => true,
+      ownsConversation: (value) => value === binding,
+    },
+    modelProviders: {
+      listModels: async (current) => [...current, {
+        id: "grok",
+        model: "grok-4.6",
+        modelProviderId: "fusheng-grok",
+        available: true,
+      }],
+    },
+  });
+
+  const call = invokeGet(route, "/api/models?conversationId=employee-conversation");
+  await call.promise;
+
+  assert.equal(call.response.status, 200);
+  assert.deepEqual(JSON.parse(call.response.body).map((model) => model.model), ["gpt-5.6-terra", "grok-4.6"]);
+});
+
 test("rejects employee attachments instead of bypassing employee runtime", async () => {
   const binding = {
     conversationId: "employee-conversation",

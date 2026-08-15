@@ -151,6 +151,12 @@ function ConversationApp({ active, onViewChange }: { active: boolean; onViewChan
           onCancelEdit={conversations.cancelEditMessage}
           onInterrupt={conversations.interrupt}
           onReview={conversations.review}
+          goal={conversations.goal}
+          goalBusy={conversations.goalBusy}
+          goalError={conversations.goalError}
+          onStartGoal={conversations.startGoal}
+          onChangeGoalStatus={conversations.changeGoalStatus}
+          onClearGoal={conversations.clearGoal}
           onCompactContext={conversations.compactContext}
           onAutoCompactThresholdChange={conversations.setAutoCompactThreshold}
           onModelChange={conversations.changeModel}

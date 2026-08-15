@@ -49,7 +49,10 @@ const valueFrom = (object, keys) => {
 
 const localPathFrom = (value) => {
   if (!value || /^https?:\/\//iu.test(value) || /^data:/iu.test(value)) return "";
-  return value.startsWith("file://") ? decodeURIComponent(new URL(value).pathname.replace(/^\/(?:[A-Za-z]:)/u, (match) => match.slice(1))) : value;
+  if (value.startsWith("file://")) {
+    return decodeURIComponent(new URL(value).pathname.replace(/^\/(?:[A-Za-z]:)/u, (match) => match.slice(1)));
+  }
+  return /^\/[A-Za-z]:[\\/]/u.test(value) ? value.slice(1) : value;
 };
 
 const registerMarkdownMedia = (text, registerMedia) => text.replace(/!\[([^\]]*)\]\((<[^>]+>|[^)\n]+)\)/gu, (match, alt, rawSource) => {

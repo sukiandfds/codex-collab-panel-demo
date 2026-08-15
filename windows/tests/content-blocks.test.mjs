@@ -4,6 +4,17 @@ import { blocksFromContent, messageFromThreadItem } from "../server/content-bloc
 
 const registerMedia = () => null;
 
+test("normalizes slash-prefixed Windows drive paths in markdown images", () => {
+  const registered = [];
+  const blocks = blocksFromContent("![preview](/D:/project/images/01.jpg)", (file) => {
+    registered.push(file);
+    return { url: "/api/media/image-01" };
+  });
+
+  assert.deepEqual(registered, ["D:/project/images/01.jpg"]);
+  assert.equal(blocks[0].text, "![preview](/api/media/image-01)");
+});
+
 test("removes standalone Codex UI directives from visible message text", () => {
   const blocks = blocksFromContent([
     "提交已经推送。",

@@ -13,6 +13,7 @@ export interface GroupAgent {
   shortName: string;
   aliases?: string[];
   responsibility: string;
+  modelProviderId?: string;
   model?: string;
   reasoningEffort?: string;
   threadId: string | null;

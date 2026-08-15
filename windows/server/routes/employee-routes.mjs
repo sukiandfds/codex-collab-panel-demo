@@ -32,5 +32,14 @@ export const createEmployeeRoutes = ({ employeeRuntime }) => async (request, res
     sendJson(response, await employeeRuntime.getStatus(employeeIdFrom(url)));
     return true;
   }
+  if (url.pathname === "/api/employee/model-settings" && request.method === "POST") {
+    const body = await readJson(request);
+    const settings = {};
+    if (Object.prototype.hasOwnProperty.call(body, "modelProviderId")) settings.modelProviderId = body.modelProviderId;
+    if (Object.prototype.hasOwnProperty.call(body, "model")) settings.model = body.model;
+    if (Object.prototype.hasOwnProperty.call(body, "reasoningEffort")) settings.reasoningEffort = body.reasoningEffort;
+    sendJson(response, await employeeRuntime.updateModelSettings(employeeIdFrom(url, body), settings));
+    return true;
+  }
   return false;
 };

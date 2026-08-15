@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { builtInEmployeesRoot, loadEmployeeDefinitions } from "./employee-definitions.mjs";
+import { CURRENT_MODEL_PROVIDER_ID } from "./model-provider-service.mjs";
 
 const clean = (value, maxLength = 200) => String(value || "").trim().slice(0, maxLength);
 
@@ -17,6 +18,9 @@ const normalize = (definition, saved = {}, workspaceRoot) => ({
   ...definition,
   projectRoot: clean(definition.workRoot, 400) || path.join(workspaceRoot, "employees", definition.id),
   contextRoot: clean(saved.contextRoot, 400) || path.join(workspaceRoot, "runtime", "employee-contexts", definition.id),
+  modelProviderId: clean(saved.modelProviderId, 80) || clean(definition.modelProviderId, 80) || CURRENT_MODEL_PROVIDER_ID,
+  model: clean(saved.model, 120) || clean(definition.model, 120) || "",
+  reasoningEffort: clean(saved.reasoningEffort, 40) || clean(definition.reasoningEffort, 40) || "",
   mainThreadId: clean(saved.mainThreadId, 120) || null,
   conversationId: clean(saved.conversationId, 120) || null,
   modificationConfirmed: saved.modificationConfirmed === true,
@@ -73,6 +77,11 @@ export const createEmployeeProjectRegistry = async ({ stateFile, workspaceRoot, 
     listRuntimeProfiles: () => [...employees.values()].map(clone),
     bindMainThread: (employeeId, mainThreadId) => update(employeeId, { mainThreadId: clean(mainThreadId, 120) || null }),
     bindConversation: (employeeId, conversationId) => update(employeeId, { conversationId: clean(conversationId, 120) || null }),
+    setModelSettings: (employeeId, settings) => update(employeeId, {
+      modelProviderId: clean(settings?.modelProviderId, 80) || CURRENT_MODEL_PROVIDER_ID,
+      model: clean(settings?.model, 120),
+      reasoningEffort: clean(settings?.reasoningEffort, 40),
+    }),
     setModificationConfirmed: (employeeId, confirmed) => update(employeeId, { modificationConfirmed: Boolean(confirmed) }),
     close: () => writeQueue,
   };

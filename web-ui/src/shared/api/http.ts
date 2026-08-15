@@ -53,3 +53,16 @@ export const patchJson = async <T,>(pathname: string, body: unknown, signal?: Ab
   if (!response.ok) throw new Error(payload.error || `更新失败（${response.status}）`);
   return payload as T;
 };
+
+export const deleteJson = async <T,>(pathname: string, body: unknown, signal?: AbortSignal): Promise<T> => {
+  const response = await fetch(withAccessToken(pathname), {
+    method: "DELETE",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  const payload = await response.json().catch(() => ({})) as { error?: string };
+  if (!response.ok) throw new Error(payload.error || `Delete failed (${response.status})`);
+  return payload as T;
+};

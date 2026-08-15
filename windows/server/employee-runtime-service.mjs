@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createAppServerClient } from "./app-server-client.mjs";
 import { messagesFromTurns } from "./codex-thread-history.mjs";
 import { employeeTurnInstructions } from "./employee-definitions.mjs";
+import { CURRENT_MODEL_PROVIDER_ID } from "./model-provider-service.mjs";
 
 const clean = (value, maxLength = 200) => String(value || "").trim().slice(0, maxLength);
 const statusError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
@@ -42,15 +43,48 @@ export const createEmployeeRuntimeService = ({
   contextProvider = null,
   execution = null,
   onTurnCompleted = null,
-  client = createAppServerClient(),
+  client = null,
+  modelProviders = null,
 }) => {
+  const defaultClient = client || createAppServerClient();
+  const ownsDefaultClient = !client;
   const threadEmployees = new Map();
+  const threadClients = new Map();
+  const clientSubscriptions = new Map();
   const statuses = new Map();
   const openPromises = new Map();
   const sendLocks = new Map();
   const turnInputs = new Map();
   const lastAssistantReplies = new Map();
   let closed = false;
+
+  const subscribeClient = (runtimeClient) => {
+    if (!runtimeClient || clientSubscriptions.has(runtimeClient)) return;
+    clientSubscriptions.set(runtimeClient, runtimeClient.subscribe(handleProtocolMessage));
+  };
+
+  const routeForEmployee = (employee) => modelProviders?.resolveRoute({
+    modelProviderId: employee?.modelProviderId || CURRENT_MODEL_PROVIDER_ID,
+    model: employee?.model || "",
+  }) || {
+    modelProviderId: CURRENT_MODEL_PROVIDER_ID,
+    model: clean(employee?.model, 120),
+  };
+
+  const clientForEmployee = async (employee) => {
+    if (!modelProviders) return defaultClient;
+    const runtimeClient = await modelProviders.getClient(routeForEmployee(employee));
+    subscribeClient(runtimeClient);
+    return runtimeClient;
+  };
+
+  const clientForThread = async (threadId, employee) => {
+    const existing = threadClients.get(threadId);
+    if (existing) return existing;
+    const runtimeClient = await clientForEmployee(employee);
+    threadClients.set(threadId, runtimeClient);
+    return runtimeClient;
+  };
 
   for (const employee of registry.list()) {
     rememberInitialThread(employee);
@@ -130,15 +164,19 @@ export const createEmployeeRuntimeService = ({
     return binding;
   };
 
-  const resumeThread = async (threadId, employee) => client.request("thread/resume", {
-    threadId,
-    persistExtendedHistory: true,
-    ...policyFor(employee),
-  });
+  const resumeThread = async (threadId, employee) => {
+    const runtimeClient = await clientForThread(threadId, employee);
+    return runtimeClient.request("thread/resume", {
+      threadId,
+      persistExtendedHistory: true,
+      ...policyFor(employee),
+    });
+  };
 
-  const readAuthoritativeStatus = async (threadId) => {
+  const readAuthoritativeStatus = async (threadId, employee) => {
     try {
-      const result = await client.request("thread/read", { threadId, includeTurns: false });
+      const runtimeClient = await clientForThread(threadId, employee);
+      const result = await runtimeClient.request("thread/read", { threadId, includeTurns: false });
       const thread = result?.thread || result || {};
       const rawStatus = thread.status || thread.state;
       const active = thread.active === true
@@ -154,18 +192,22 @@ export const createEmployeeRuntimeService = ({
   };
 
   const startThread = async (employee) => {
-    const result = await client.request("thread/start", {
+    const runtimeClient = await clientForEmployee(employee);
+    const route = routeForEmployee(employee);
+    const result = await runtimeClient.request("thread/start", {
       cwd: clean(employee.projectRoot, 400) || projectRoot,
       developerInstructions: employeeTurnInstructions(employee.instructions),
       ephemeral: false,
       serviceName: `negus-${employee.projectKey}`,
+      ...(route.model ? { model: route.model } : {}),
       ...policyFor(employee),
     });
     const threadId = clean(result?.thread?.id, 120);
     if (!threadId) throw new Error("Codex 未返回员工主对话");
     rememberThread(employee.id, threadId);
+    threadClients.set(threadId, runtimeClient);
     try {
-      await client.request("thread/name/set", {
+      await runtimeClient.request("thread/name/set", {
         threadId,
         name: `${employee.name} · 长期主对话`,
       });
@@ -206,7 +248,7 @@ export const createEmployeeRuntimeService = ({
         turnId: "",
       });
       if (hadExistingThread) {
-        const authoritative = await readAuthoritativeStatus(threadId);
+        const authoritative = await readAuthoritativeStatus(threadId, registry.require(employee.id));
         if (authoritative.known && authoritative.active) {
           publishStatus(employee.id, { phase: "working", label: "正在处理", detail: "", active: true, turnId: "" });
         }
@@ -221,8 +263,9 @@ export const createEmployeeRuntimeService = ({
     }
   };
 
-  const readNativeMessages = async (threadId) => {
-    const result = await client.request("thread/read", { threadId, includeTurns: true });
+  const readNativeMessages = async (threadId, employee) => {
+    const runtimeClient = await clientForThread(threadId, employee);
+    const result = await runtimeClient.request("thread/read", { threadId, includeTurns: true });
     return messagesFromTurns(result?.thread?.turns, () => null)
       .filter((message) => message.role === "user" || message.role === "assistant")
       .map((message) => publicMessage(message));
@@ -233,7 +276,7 @@ export const createEmployeeRuntimeService = ({
     let messages = await conversationStore.readMessages(binding.conversationId);
     if (!messages.length) {
       try {
-        messages = await readNativeMessages(threadId);
+        messages = await readNativeMessages(threadId, registry.require(employeeId));
       } catch {
         messages = [];
       }
@@ -254,6 +297,31 @@ export const createEmployeeRuntimeService = ({
       },
       status: statusFor(employee.id),
       messages: messages.map(publicMessage),
+    };
+  };
+
+  const readSession = async (employeeId, pagination = {}) => {
+    const session = await sessionFor(employeeId);
+    const allMessages = session.messages;
+    const end = Math.min(Number.isSafeInteger(pagination.before) ? pagination.before : allMessages.length, allMessages.length);
+    const start = pagination.limit ? Math.max(0, end - pagination.limit) : 0;
+    const messages = allMessages.slice(start, end);
+    const latest = allMessages.at(-1);
+    return {
+      threadId: session.conversation.threadId,
+      source: "codex",
+      title: `${session.employee.name} · 主对话`,
+      updatedAt: latest?.createdAt || session.employee.updatedAt || "",
+      messageCount: allMessages.length,
+      latestUser: [...allMessages].reverse().find((message) => message.role === "user")?.text || "",
+      latestAssistant: [...allMessages].reverse().find((message) => message.role === "assistant")?.text || "",
+      archived: false,
+      conversationKind: "direct",
+      messages,
+      hasMore: start > 0,
+      nextBefore: start || null,
+      nextCursor: null,
+      conversationId: session.conversation.id,
     };
   };
 
@@ -364,7 +432,7 @@ export const createEmployeeRuntimeService = ({
     }
   };
 
-  const unsubscribe = client.subscribe(handleProtocolMessage);
+  subscribeClient(defaultClient);
 
   const sendMessage = async ({ employeeId, text, requestId = "" }) => {
     const employee = registry.require(employeeId);
@@ -386,13 +454,14 @@ export const createEmployeeRuntimeService = ({
       try {
         await resumeThread(threadId, registry.require(employee.id));
         const context = await contextProvider?.(employee.id);
-        const result = await client.request("turn/start", {
+        const runtimeClient = await clientForThread(threadId, registry.require(employee.id));
+        const result = await runtimeClient.request("turn/start", {
           threadId,
           input: [{ type: "text", text: cleanText, text_elements: [] }],
           cwd: clean(employee.projectRoot, 400) || projectRoot,
           developerInstructions: employeeTurnInstructions(
             employee.instructions,
-            context && client.turnDeveloperInstructions === true ? context : "",
+            context && runtimeClient.turnDeveloperInstructions === true ? context : "",
           ),
         });
         const currentStatus = statusFor(employee.id);
@@ -436,7 +505,8 @@ export const createEmployeeRuntimeService = ({
     const employee = registry.require(employeeId);
     const { threadId } = await ensureOpen(employee.id);
     if (statusFor(employee.id).active) throw statusError("员工正在处理消息，请完成后再确认", 409);
-    await client.request("thread/resume", {
+    const runtimeClient = await clientForThread(threadId, employee);
+    await runtimeClient.request("thread/resume", {
       threadId,
       persistExtendedHistory: true,
       sandbox: "workspace-write",
@@ -465,6 +535,101 @@ export const createEmployeeRuntimeService = ({
     };
   };
 
+  const updateModelSettings = async (employeeId, settings = {}) => {
+    const employee = registry.require(employeeId);
+    if (statusFor(employee.id).active) throw statusError("员工正在处理消息，不能修改模型", 409);
+    const requestedModel = Object.prototype.hasOwnProperty.call(settings, "model")
+      ? clean(settings.model, 120)
+      : clean(employee.model, 120);
+    const explicitProviderId = clean(settings.modelProviderId, 80);
+    const requestedProviderId = requestedModel && modelProviders && !explicitProviderId
+      ? ""
+      : explicitProviderId || clean(employee.modelProviderId, 80) || CURRENT_MODEL_PROVIDER_ID;
+    if (!modelProviders && requestedProviderId !== CURRENT_MODEL_PROVIDER_ID) {
+      throw statusError("当前员工运行时未启用外部模型供应商", 503);
+    }
+    const requestedRoute = modelProviders?.resolveRoute({
+      modelProviderId: requestedProviderId,
+      model: requestedModel,
+    }) || {
+      modelProviderId: CURRENT_MODEL_PROVIDER_ID,
+      model: clean(settings.model, 120),
+    };
+    const currentRoute = routeForEmployee(employee);
+    if (employee.mainThreadId && currentRoute.modelProviderId !== requestedRoute.modelProviderId) {
+      throw statusError("现有员工 Thread 暂不支持跨供应商切换；请为新 Thread 选择该模型", 409);
+    }
+    const runtimeClient = modelProviders
+      ? await modelProviders.getClient(requestedRoute)
+      : defaultClient;
+    subscribeClient(runtimeClient);
+    const reasoningEffort = Object.prototype.hasOwnProperty.call(settings, "reasoningEffort")
+      ? clean(settings.reasoningEffort, 40)
+      : clean(employee.reasoningEffort, 40);
+    if (employee.mainThreadId) {
+      threadClients.set(employee.mainThreadId, runtimeClient);
+      await resumeThread(employee.mainThreadId, employee);
+      if (requestedRoute.model && requestedRoute.model !== currentRoute.model) {
+        await runtimeClient.request("thread/settings/update", {
+          threadId: employee.mainThreadId,
+          model: requestedRoute.model,
+        });
+      }
+      if (reasoningEffort && reasoningEffort !== clean(employee.reasoningEffort, 40)) {
+        await runtimeClient.request("thread/settings/update", {
+          threadId: employee.mainThreadId,
+          effort: reasoningEffort,
+        });
+      }
+    }
+    const updated = await registry.setModelSettings(employee.id, {
+      modelProviderId: requestedRoute.modelProviderId,
+      model: requestedRoute.model,
+      reasoningEffort,
+    });
+    return { employee: updated, status: statusFor(employee.id) };
+  };
+
+  const runtimeContextForThread = async (threadId) => {
+    const cleanThreadId = clean(threadId, 120);
+    const employeeId = threadEmployees.get(cleanThreadId);
+    if (!employeeId) throw statusError("员工 Thread 不存在", 404);
+    const employee = registry.require(employeeId);
+    const runtimeClient = await clientForThread(cleanThreadId, employee);
+    const result = await runtimeClient.request("thread/resume", {
+      threadId: cleanThreadId,
+      persistExtendedHistory: true,
+      ...policyFor(employee),
+    });
+    return {
+      model: result?.model || employee.model || "",
+      modelProvider: result?.modelProvider || employee.modelProviderId || CURRENT_MODEL_PROVIDER_ID,
+      reasoningEffort: result?.reasoningEffort || employee.reasoningEffort || "",
+    };
+  };
+
+  const threadStatus = async (threadId) => {
+    const cleanThreadId = clean(threadId, 120);
+    const employeeId = threadEmployees.get(cleanThreadId);
+    if (!employeeId) throw statusError("员工 Thread 不存在", 404);
+    const runtimeClient = await clientForThread(cleanThreadId, registry.require(employeeId));
+    const request = runtimeClient.probe?.bind(runtimeClient) || runtimeClient.request.bind(runtimeClient);
+    const result = await request("thread/read", { threadId: cleanThreadId, includeTurns: false }, {
+      timeoutMs: 5000,
+      threadId: cleanThreadId,
+    });
+    return result?.thread?.status || null;
+  };
+
+  const compactContext = async (threadId) => {
+    const cleanThreadId = clean(threadId, 120);
+    const employeeId = threadEmployees.get(cleanThreadId);
+    if (!employeeId) throw statusError("员工 Thread 不存在", 404);
+    const runtimeClient = await clientForThread(cleanThreadId, registry.require(employeeId));
+    await resumeThread(cleanThreadId, registry.require(employeeId));
+    return runtimeClient.request("thread/compact/start", { threadId: cleanThreadId });
+  };
+
   const interrupt = async (employeeId, expectedTurnId = "") => {
     const employee = registry.require(employeeId);
     const current = statusFor(employee.id);
@@ -477,7 +642,8 @@ export const createEmployeeRuntimeService = ({
     }
     if (!current.active || !current.turnId) return { employeeId: employee.id, status: "idle" };
     const { threadId } = await ensureOpen(employee.id);
-    await client.request("turn/interrupt", { threadId, turnId: current.turnId });
+    const runtimeClient = await clientForThread(threadId, employee);
+    await runtimeClient.request("turn/interrupt", { threadId, turnId: current.turnId });
     publishStatus(employee.id, {
       phase: "interrupted",
       label: "已中断",
@@ -490,15 +656,21 @@ export const createEmployeeRuntimeService = ({
 
   const close = () => {
     closed = true;
-    unsubscribe();
-    client.close();
+    for (const unsubscribe of clientSubscriptions.values()) unsubscribe?.();
+    clientSubscriptions.clear();
+    if (ownsDefaultClient) defaultClient.close();
   };
 
   return {
     open: sessionFor,
+    readSession,
     sendMessage,
     confirmModification,
     getStatus,
+    updateModelSettings,
+    getRuntimeContext: runtimeContextForThread,
+    getThreadStatus: threadStatus,
+    compactContext,
     interrupt,
     supportsEmployee: (employeeId) => Boolean(registry.get(employeeId)),
     ownsConversation: (binding) => {

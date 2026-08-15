@@ -700,3 +700,45 @@ test("keeps newer turn supervision after an older turn completes late", async ()
 
   assert.equal(probeCalls.length >= 1, true);
 });
+
+test("uses the native Codex thread goal protocol", async () => {
+  const calls = [];
+  const thread = { id: "thread-1", cwd: "D:\\project" };
+  const goal = { threadId: thread.id, objective: "Ship the Goal control", status: "active" };
+  const client = {
+    subscribe: () => () => {},
+    close: () => {},
+    request: async (method, params) => {
+      calls.push({ method, params });
+      if (method === "thread/read") return { thread };
+      if (method === "thread/goal/set") return { goal };
+      if (method === "thread/goal/get") return { goal };
+      if (method === "thread/goal/clear") return {};
+      throw new Error(`Unexpected request: ${method}`);
+    },
+  };
+  const store = createAppServerConversationStore({
+    projectRoot: "D:\\project",
+    registerMedia: () => null,
+    client,
+  });
+
+  assert.deepEqual(await store.setGoal(thread.id, {
+    objective: goal.objective,
+    status: "active",
+    tokenBudget: 1000,
+  }), { goal });
+  assert.deepEqual(await store.getGoal(thread.id), { goal });
+  assert.deepEqual(await store.clearGoal(thread.id), {});
+  store.close();
+
+  assert.deepEqual(calls, [
+    { method: "thread/read", params: { threadId: thread.id, includeTurns: false } },
+    {
+      method: "thread/goal/set",
+      params: { threadId: thread.id, objective: goal.objective, status: "active", tokenBudget: 1000 },
+    },
+    { method: "thread/goal/get", params: { threadId: thread.id } },
+    { method: "thread/goal/clear", params: { threadId: thread.id } },
+  ]);
+});

@@ -603,6 +603,25 @@ export const createAppServerConversationStore = ({
     return client.request("review/start", { threadId });
   };
 
+  const getGoal = async (threadId) => {
+    await ensureProjectThread(threadId);
+    return client.request("thread/goal/get", { threadId });
+  };
+
+  const setGoal = async (threadId, patch = {}) => {
+    await ensureProjectThread(threadId);
+    const params = { threadId };
+    if (patch.objective !== undefined) params.objective = patch.objective;
+    if (patch.status !== undefined) params.status = patch.status;
+    if (patch.tokenBudget !== undefined) params.tokenBudget = patch.tokenBudget;
+    return client.request("thread/goal/set", params);
+  };
+
+  const clearGoal = async (threadId) => {
+    await ensureProjectThread(threadId);
+    return client.request("thread/goal/clear", { threadId });
+  };
+
   const updateModel = async (threadId, model) => {
     const runtime = await resumeThread(threadId);
     await client.request("thread/settings/update", { threadId, model });
@@ -634,6 +653,6 @@ export const createAppServerConversationStore = ({
     listSessions, createSession, renameSession, findSession, sendMessage, steerMessage, interrupt,
     forkSession, archiveSession, unarchiveSession,
     listModels, updateModel, updateReasoningEffort, getRuntimeContext, getThreadStatus,
-    compactContext, reviewSession, close,
+    compactContext, reviewSession, getGoal, setGoal, clearGoal, close,
   };
 };

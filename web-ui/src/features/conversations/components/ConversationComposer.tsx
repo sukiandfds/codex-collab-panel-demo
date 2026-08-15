@@ -12,6 +12,8 @@ import { ModelSettingsControl } from "../../models/components/ModelSettingsContr
 import type { CodexModel } from "../../models/model/types";
 import type { MediaFile } from "../../../shared/model/media";
 import type { SessionMessage } from "../model/types";
+import { GoalControl } from "../../goals/components/GoalControl";
+import type { EditableGoalStatus, ThreadGoal } from "../../goals/model/types";
 import { goalCapabilityOptions } from "../../goals/model/capability";
 import { SlashCommandMenu, type SlashCommandOption } from "./SlashCommandMenu";
 import styles from "./ConversationComposer.module.css";
@@ -64,6 +66,12 @@ interface ConversationComposerProps {
   onCancelEdit: () => void;
   onInterrupt: () => Promise<boolean>;
   onReview: () => Promise<boolean>;
+  goal: ThreadGoal | null;
+  goalBusy: boolean;
+  goalError: string;
+  onStartGoal: (objective: string) => Promise<boolean>;
+  onChangeGoalStatus: (status: EditableGoalStatus) => Promise<boolean>;
+  onClearGoal: () => Promise<boolean>;
   onCompactContext: () => Promise<boolean>;
   onAutoCompactThresholdChange: (threshold: number | null) => Promise<boolean>;
   onModelChange: (model: string) => Promise<boolean>;
@@ -76,7 +84,8 @@ export function ConversationComposer({
   onSend, onQueue, queueing, queueItems, queueError, onEditQueueItem, onRemoveQueueItem, onMoveQueueItem, onRetryQueueItem,
   onSendQueueItem,
   editingMessage, onCancelEdit,
-  onInterrupt, onReview, onCompactContext, onAutoCompactThresholdChange, onModelChange,
+  onInterrupt, onReview, goal, goalBusy, goalError, onStartGoal, onChangeGoalStatus, onClearGoal,
+  onCompactContext, onAutoCompactThresholdChange, onModelChange,
   onReasoningEffortChange,
 }: ConversationComposerProps) {
   const [text, setText] = useState("");
@@ -160,6 +169,24 @@ export function ConversationComposer({
     setSlash(null);
     if (!editing && !draft.attachments.length && !inheritedAttachments.length) {
       const command = submittedText.trim().toLocaleLowerCase();
+      const goalMatch = /^\/goal(?:\s+([\s\S]*))?$/iu.exec(submittedText.trim());
+      if (goalMatch) {
+        const objective = String(goalMatch[1] || "").trim();
+        if (!objective) {
+          setText(submittedText);
+          submittingRef.current = false;
+          return;
+        }
+        try {
+          const accepted = await onStartGoal(objective);
+          if (!accepted) setText(submittedText);
+        } catch {
+          setText(submittedText);
+        } finally {
+          submittingRef.current = false;
+        }
+        return;
+      }
       if (command === "/compact" || command === "/stop" || command === "/review") {
         try {
           const accepted = command === "/compact"
@@ -312,6 +339,14 @@ export function ConversationComposer({
           </div>
           <span className={styles.spacer} />
           <div className={styles.settingsControls}>
+            <GoalControl
+              goal={goal}
+              busy={goalBusy}
+              error={goalError}
+              disabled={!connected || !selected || archived}
+              onStatusChange={onChangeGoalStatus}
+              onClear={onClearGoal}
+            />
             <ModelSettingsControl
               currentModel={contextStatus.model}
               currentEffort={contextStatus.reasoningEffort}

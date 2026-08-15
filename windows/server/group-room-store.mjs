@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { loadEmployeeDefinitions } from "./employee-definitions.mjs";
+import { CURRENT_MODEL_PROVIDER_ID } from "./model-provider-service.mjs";
 
 const cleanText = (value, maxLength) => String(value || "").trim().slice(0, maxLength);
 const safeSequence = (value) => Number.isSafeInteger(value) && value >= 0 ? value : 0;
@@ -18,6 +19,9 @@ const validDate = (value) => /^\d{4}-\d{2}-\d{2}$/u.test(String(value || ""));
 
 const initialAgent = (definition, saved = {}) => ({
   ...definition,
+  modelProviderId: cleanText(saved.modelProviderId, 80)
+    || cleanText(definition.modelProviderId, 80)
+    || CURRENT_MODEL_PROVIDER_ID,
   model: cleanText(saved.model, 120) || cleanText(definition.model, 120) || "",
   reasoningEffort: cleanText(saved.reasoningEffort, 40) || cleanText(definition.reasoningEffort, 40) || "",
   threadId: cleanText(saved.threadId, 80) || null,

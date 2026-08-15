@@ -69,20 +69,20 @@ const providerError = (status, body) => {
 };
 
 export const createHappyEveringImageClient = ({
-  apiKey = process.env.LYNN_IMAGE_API_KEY || "",
-  baseUrl = process.env.LYNN_IMAGE_BASE_URL || defaultBaseUrl,
-  model = process.env.LYNN_IMAGE_MODEL || defaultModel,
-  defaultSize = process.env.LYNN_IMAGE_DEFAULT_SIZE || "1024x1024",
-  outputDirectory = process.env.LYNN_IMAGE_OUTPUT_DIR || "",
-  timeoutMs = Number(process.env.LYNN_IMAGE_TIMEOUT_MS || 600_000),
-  pollIntervalMs = Number(process.env.LYNN_IMAGE_POLL_INTERVAL_MS || 5_000),
+  apiKey = process.env.NEGUS_IMAGE_API_KEY || process.env.LYNN_IMAGE_API_KEY || "",
+  baseUrl = process.env.NEGUS_IMAGE_BASE_URL || process.env.LYNN_IMAGE_BASE_URL || defaultBaseUrl,
+  model = process.env.NEGUS_IMAGE_MODEL || process.env.LYNN_IMAGE_MODEL || defaultModel,
+  defaultSize = process.env.NEGUS_IMAGE_DEFAULT_SIZE || process.env.LYNN_IMAGE_DEFAULT_SIZE || "1024x1024",
+  outputDirectory = process.env.NEGUS_IMAGE_OUTPUT_DIR || process.env.LYNN_IMAGE_OUTPUT_DIR || "",
+  timeoutMs = Number(process.env.NEGUS_IMAGE_TIMEOUT_MS || process.env.LYNN_IMAGE_TIMEOUT_MS || 600_000),
+  pollIntervalMs = Number(process.env.NEGUS_IMAGE_POLL_INTERVAL_MS || process.env.LYNN_IMAGE_POLL_INTERVAL_MS || 5_000),
   fetchImpl = fetch,
   sleep = wait,
 } = {}) => {
   const normalizedBaseUrl = baseUrl.replace(/\/+$/u, "");
 
   const request = async (endpoint, init) => {
-    if (!apiKey.trim()) throw new Error("LYNN_IMAGE_API_KEY is not configured. Set it and restart Codex.");
+    if (!apiKey.trim()) throw new Error("NEGUS_IMAGE_API_KEY is not configured. Set it and restart Codex.");
     let response;
     try {
       response = await fetchImpl(`${normalizedBaseUrl}${endpoint}`, {

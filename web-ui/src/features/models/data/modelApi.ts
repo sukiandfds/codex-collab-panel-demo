@@ -1,9 +1,16 @@
 import { fetchJson, postJson } from "../../../shared/api/http";
-import { withConversation } from "../../../shared/api/conversationScope";
+import { currentConversationId, withConversation } from "../../../shared/api/conversationScope";
 import type { CodexModel, ModelUpdateResult } from "../model/types";
 
 export const modelApi = {
-  list: (signal?: AbortSignal) => fetchJson<CodexModel[]>("/api/models", signal),
+  list: (signal?: AbortSignal) => {
+    const conversationId = currentConversationId();
+    return fetchJson<CodexModel[]>(
+      `/api/models${conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ""}`,
+      signal,
+    );
+  },
+  listForAgents: (signal?: AbortSignal) => fetchJson<CodexModel[]>("/api/models?scope=agents", signal),
   update: (threadId: string, model: string, signal?: AbortSignal) => postJson<ModelUpdateResult>(
     "/api/session/model",
     withConversation({ threadId, model }),

@@ -156,3 +156,28 @@ test("exposes active Agent work in snapshots without persisting it across restar
   assert.deepEqual(restored.snapshot().activeWorks, []);
   await restored.close();
 });
+
+test("adds a configured Grok employee to an existing group without changing saved agents", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "negus-group-grok-"));
+  const stateFile = path.join(directory, "group-room.json");
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  await fs.writeFile(stateFile, JSON.stringify({
+    agents: [{ id: "developer", modelProviderId: "current", model: "gpt-existing", threadId: "existing-thread" }],
+  }), "utf8");
+
+  const room = await createGroupRoomStore({
+    stateFile,
+    project: "negus",
+    agentDefinitions: [
+      { id: "developer", name: "Developer", modelProviderId: "current", model: "gpt-default" },
+      { id: "grok", name: "Grok Assistant", modelProviderId: "fusheng-grok", model: "grok-4.6" },
+    ],
+  });
+
+  assert.equal(room.getAgent("developer").threadId, "existing-thread");
+  assert.equal(room.getAgent("developer").model, "gpt-existing");
+  assert.equal(room.getAgent("grok").modelProviderId, "fusheng-grok");
+  assert.equal(room.getAgent("grok").model, "grok-4.6");
+  assert.equal(room.getAgent("grok").threadId, null);
+  await room.close();
+});

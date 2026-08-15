@@ -88,7 +88,35 @@ const resolveCodexCommand = () => {
   throw new Error("No runnable Codex app-server runtime was found.");
 };
 
-export const createAppServerClient = ({ requestTimeoutMs = 15000 } = {}) => {
+const sensitiveEnvironmentName = /(credential|password|secret|token|(?:^|_)key(?:_|$))/iu;
+
+export const buildAppServerEnvironment = ({
+  baseEnvironment = process.env,
+  environment = {},
+  codexHome = "",
+  sanitizeEnvironment = false,
+} = {}) => {
+  const next = {};
+  for (const [name, value] of Object.entries(baseEnvironment || {})) {
+    if (value === undefined || (sanitizeEnvironment && sensitiveEnvironmentName.test(name))) continue;
+    next[name] = value;
+  }
+  for (const [name, value] of Object.entries(environment || {})) {
+    if (value === undefined || value === null) delete next[name];
+    else next[name] = String(value);
+  }
+  if (codexHome) next.CODEX_HOME = path.resolve(codexHome);
+  return next;
+};
+
+export const createAppServerClient = ({
+  requestTimeoutMs = 15000,
+  codexHome = "",
+  environment = {},
+  sanitizeEnvironment = false,
+  label = "",
+  workingDirectory = process.cwd(),
+} = {}) => {
   let child;
   let buffer = "";
   let nextId = 1;
@@ -139,9 +167,15 @@ export const createAppServerClient = ({ requestTimeoutMs = 15000 } = {}) => {
   const start = () => {
     if (child && !child.killed) return;
     const selected = resolveCodexCommand();
-    console.log(`[app-server-client] using ${selected.entrypoint} (${selected.version})`);
+    const logPrefix = label ? `[app-server-client:${label}]` : "[app-server-client]";
+    console.log(`${logPrefix} using ${selected.entrypoint} (${selected.version})`);
     const spawned = spawn(selected.command, [...selected.prefixArgs, "app-server"], {
-      cwd: process.cwd(),
+      cwd: workingDirectory,
+      env: buildAppServerEnvironment({
+        environment,
+        codexHome,
+        sanitizeEnvironment,
+      }),
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
     });

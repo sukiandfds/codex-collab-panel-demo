@@ -14,7 +14,7 @@ const publicAttachment = ({ id, name, mimeType, url, width, height, readStatus, 
 export const createConversationRoutes = ({
   conversations, execution, followUpQueue, contextManagement, media, submissionStore,
   broadcast = () => {}, publishThreadEvent = (_threadId, event) => broadcast(event), agentConversationStore,
-  employeeRuntime, roomDirectory,
+  employeeRuntime, roomDirectory, modelProviders,
 }) => {
   const inFlightSubmissions = new Map();
   const submissionTtlMs = 60000;
@@ -101,6 +101,13 @@ export const createConversationRoutes = ({
     return binding;
   };
 
+  const isEmployeeDirectBinding = (binding) => Boolean(
+    binding?.conversationKind === "direct"
+      && binding?.agentId
+      && employeeRuntime?.supportsEmployee?.(binding.agentId)
+      && employeeRuntime?.ownsConversation?.(binding),
+  );
+
   const readGroupAgentSession = async (binding, pagination = {}) => {
     const room = roomDirectory?.get?.(binding.roomId);
     const snapshot = room?.snapshot?.();
@@ -162,12 +169,23 @@ export const createConversationRoutes = ({
 
   const readAgentSession = async (binding, source, pagination) => {
     if (binding.conversationKind === "group") return readGroupAgentSession(binding, pagination);
+    if (isEmployeeDirectBinding(binding)) return employeeRuntime.readSession(binding.agentId, pagination);
     return conversations.findSession(binding.runtimeSessionId, source, pagination);
   };
 
   return async (request, response, url) => {
   if (url.pathname === "/api/models" && request.method === "GET") {
-    sendJson(response, await conversations.listModels());
+    const currentModels = await conversations.listModels();
+    let includeAgentProviders = url.searchParams.get("scope") === "agents";
+    const conversationId = String(url.searchParams.get("conversationId") || "").trim();
+    if (!includeAgentProviders && conversationId && agentConversationStore) {
+      try {
+        includeAgentProviders = isEmployeeDirectBinding(await agentConversationStore.resolve({ conversationId }));
+      } catch {}
+    }
+    sendJson(response, includeAgentProviders && modelProviders
+      ? await modelProviders.listModels(currentModels)
+      : currentModels);
     return true;
   }
   if (url.pathname === "/api/session/message" && request.method === "POST") {
@@ -359,9 +377,18 @@ export const createConversationRoutes = ({
       sendJson(response, { error: "threadId and model are required" }, 400);
       return true;
     }
-    await authorizeAgentThread({ threadId, conversationId });
+    const binding = await authorizeAgentThread({ threadId, conversationId });
     if (execution.getStatus(threadId).active) {
       sendJson(response, { error: "当前任务运行中，请在完成后切换模型" }, 409);
+      return true;
+    }
+    if (isEmployeeDirectBinding(binding)) {
+      const result = await employeeRuntime.updateModelSettings(binding.agentId, { model });
+      sendJson(response, {
+        model: result.employee.model || model,
+        modelProvider: result.employee.modelProviderId || "current",
+        reasoningEffort: result.employee.reasoningEffort || "",
+      });
       return true;
     }
     sendJson(response, await conversations.updateModel(threadId, model));
@@ -376,9 +403,18 @@ export const createConversationRoutes = ({
       sendJson(response, { error: "threadId and reasoningEffort are required" }, 400);
       return true;
     }
-    await authorizeAgentThread({ threadId, conversationId });
+    const binding = await authorizeAgentThread({ threadId, conversationId });
     if (execution.getStatus(threadId).active) {
       sendJson(response, { error: "当前任务运行中，请在完成后调整推理强度" }, 409);
+      return true;
+    }
+    if (isEmployeeDirectBinding(binding)) {
+      const result = await employeeRuntime.updateModelSettings(binding.agentId, { reasoningEffort });
+      sendJson(response, {
+        model: result.employee.model || "",
+        modelProvider: result.employee.modelProviderId || "current",
+        reasoningEffort: result.employee.reasoningEffort || reasoningEffort,
+      });
       return true;
     }
     sendJson(response, await conversations.updateReasoningEffort(threadId, reasoningEffort));
@@ -388,13 +424,14 @@ export const createConversationRoutes = ({
     const body = await readJson(request);
     const threadId = String(body.threadId || "").trim();
     const conversationId = String(body.conversationId || "").trim();
-    await authorizeAgentThread({ threadId, conversationId });
+    const binding = await authorizeAgentThread({ threadId, conversationId });
     const status = execution.getStatus(threadId);
     if (!threadId || !status.active || !status.turnId) {
       sendJson(response, { error: "当前没有可停止的任务" }, 409);
       return true;
     }
-    await conversations.interrupt(threadId, status.turnId);
+    if (isEmployeeDirectBinding(binding)) await employeeRuntime.interrupt(binding.agentId, status.turnId);
+    else await conversations.interrupt(threadId, status.turnId);
     sendJson(response, { threadId, turnId: status.turnId, status: "interrupting" }, 202);
     return true;
   }
@@ -414,6 +451,59 @@ export const createConversationRoutes = ({
     await conversations.reviewSession(threadId);
     publishThreadEvent(threadId, { type: "sessions_changed", threadId });
     sendJson(response, { threadId, status: "started" }, 202);
+    return true;
+  }
+  if (url.pathname === "/api/session/goal" && request.method === "GET") {
+    const threadId = String(url.searchParams.get("threadId") || "").trim();
+    const conversationId = String(url.searchParams.get("conversationId") || "").trim();
+    if (!threadId) {
+      sendJson(response, { error: "threadId is required" }, 400);
+      return true;
+    }
+    await authorizeAgentThread({ threadId, conversationId });
+    sendJson(response, await conversations.getGoal(threadId));
+    return true;
+  }
+  if (url.pathname === "/api/session/goal" && request.method === "POST") {
+    const body = await readJson(request);
+    const threadId = String(body.threadId || "").trim();
+    const conversationId = String(body.conversationId || "").trim();
+    if (!threadId) {
+      sendJson(response, { error: "threadId is required" }, 400);
+      return true;
+    }
+    await authorizeAgentThread({ threadId, conversationId });
+    const objective = body.objective === undefined ? undefined : String(body.objective || "").trim();
+    const status = body.status === undefined ? undefined : String(body.status || "").trim();
+    const tokenBudget = body.tokenBudget === undefined || body.tokenBudget === null
+      ? undefined
+      : Number(body.tokenBudget);
+    if (objective !== undefined && (!objective || objective.length > 32000)) {
+      sendJson(response, { error: "objective must contain 1 to 32000 characters" }, 400);
+      return true;
+    }
+    if (status !== undefined && !["active", "paused", "complete"].includes(status)) {
+      sendJson(response, { error: "invalid goal status" }, 400);
+      return true;
+    }
+    if (tokenBudget !== undefined && (!Number.isSafeInteger(tokenBudget) || tokenBudget <= 0)) {
+      sendJson(response, { error: "tokenBudget must be a positive integer" }, 400);
+      return true;
+    }
+    sendJson(response, await conversations.setGoal(threadId, { objective, status, tokenBudget }));
+    return true;
+  }
+  if (url.pathname === "/api/session/goal" && request.method === "DELETE") {
+    const body = await readJson(request);
+    const threadId = String(body.threadId || "").trim();
+    const conversationId = String(body.conversationId || "").trim();
+    if (!threadId) {
+      sendJson(response, { error: "threadId is required" }, 400);
+      return true;
+    }
+    await authorizeAgentThread({ threadId, conversationId });
+    await conversations.clearGoal(threadId);
+    sendJson(response, { threadId, goal: null });
     return true;
   }
   if (url.pathname === "/api/session/fork" && request.method === "POST") {
@@ -509,11 +599,13 @@ export const createConversationRoutes = ({
       sendJson(response, { error: "threadId is required" }, 400);
       return true;
     }
-    await authorizeAgentThread({ threadId, conversationId });
+    const binding = await authorizeAgentThread({ threadId, conversationId });
     const current = execution.getStatus(threadId);
     if (current.active && url.searchParams.get("reconcile") === "1") {
       try {
-        execution.reconcile(threadId, await conversations.getThreadStatus(threadId));
+        execution.reconcile(threadId, isEmployeeDirectBinding(binding)
+          ? await employeeRuntime.getThreadStatus(threadId)
+          : await conversations.getThreadStatus(threadId));
       } catch {
         execution.reconcile(threadId, null);
       }

@@ -4,6 +4,7 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { createJsonlConversationStore } from "../server/jsonl-conversation-store.mjs";
 import { createAppServerConversationStore } from "../server/app-server-conversation-store.mjs";
+import { createAppServerClient } from "../server/app-server-client.mjs";
 import { createConversationService } from "../server/conversation-service.mjs";
 import { createConversationVersionStore } from "../server/conversation-version-store.mjs";
 import { createMediaService } from "../server/media-service.mjs";
@@ -35,6 +36,7 @@ import { createEmployeeGrowthService } from "../server/employee-growth-service.m
 import { createAttachmentContentService } from "../server/attachment-content-service.mjs";
 import { loadEmployeeDefinitions } from "../server/employee-definitions.mjs";
 import { loadBusinessProjects } from "../server/business-project-config.mjs";
+import { createModelProviderService } from "../server/model-provider-service.mjs";
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -73,6 +75,7 @@ const execution = createExecutionTracker({
 });
 let contextManagement;
 let employeeRegistry;
+let employeeRuntime;
 const jsonlConversations = createJsonlConversationStore({
   sessionRoot,
   projectRoot,
@@ -81,6 +84,11 @@ const jsonlConversations = createJsonlConversationStore({
   onChange: realtime.broadcast,
 });
 let agentConversationStore;
+const appServerClient = createAppServerClient({ label: "current" });
+const modelProviders = createModelProviderService({
+  projectRoot,
+  defaultClient: appServerClient,
+});
 const appServerConversations = createAppServerConversationStore({
   projectRoot,
   projectRoots,
@@ -94,6 +102,12 @@ const appServerConversations = createAppServerConversationStore({
     void agentConversationStore?.recordRuntimeEvent?.(message);
     if (message?.method === "thread/name/updated" && message.params?.threadId) {
       realtime.broadcast({ type: "sessions_changed", threadId: message.params.threadId });
+    }
+    if (message?.method === "thread/goal/updated" && message.params?.threadId) {
+      realtime.broadcast({ type: "goal_status", threadId: message.params.threadId, goal: message.params.goal || null });
+    }
+    if (message?.method === "thread/goal/cleared" && message.params?.threadId) {
+      realtime.broadcast({ type: "goal_status", threadId: message.params.threadId, goal: null });
     }
   },
   onSubmitted: execution.markSubmitted,
@@ -112,6 +126,7 @@ const appServerConversations = createAppServerConversationStore({
       },
     };
   },
+  client: appServerClient,
 });
 const conversationVersions = createConversationVersionStore({
   stateFile: path.join(projectRoot, "runtime", "conversation-versions.json"),
@@ -134,8 +149,12 @@ contextManagement = await createContextManagementService({
   stateFile: path.join(projectRoot, "runtime", "context-settings.json"),
   broadcast: realtime.broadcast,
   getExecutionStatus: execution.getStatus,
-  getRuntimeContext: conversations.getRuntimeContext,
-  compactContext: conversations.compactContext,
+  getRuntimeContext: (threadId) => employeeRuntime?.ownsThread?.(threadId)
+    ? employeeRuntime.getRuntimeContext(threadId)
+    : conversations.getRuntimeContext(threadId),
+  compactContext: (threadId) => employeeRuntime?.ownsThread?.(threadId)
+    ? employeeRuntime.compactContext(threadId)
+    : conversations.compactContext(threadId),
 });
 const employeeDefinitions = await loadEmployeeDefinitions(employeesRoot);
 employeeRegistry = await createEmployeeProjectRegistry({
@@ -230,6 +249,9 @@ const groupRoomEntries = await Promise.all(projectIdentities.filter((identity) =
       aliases: employee.aliases,
       responsibility: employee.responsibility,
       instructions: employee.instructions,
+      modelProviderId: employee.modelProviderId,
+      model: employee.model,
+      reasoningEffort: employee.reasoningEffort,
     })),
     broadcast: realtime.broadcast,
     onMessageCreated: broadcastEmployeeGroupMessage,
@@ -287,13 +309,15 @@ const employeeGrowth = createEmployeeGrowthService({
   conversationStore: employeeConversationStore,
   broadcast: realtime.broadcast,
 });
-const employeeRuntime = createEmployeeRuntimeService({
+employeeRuntime = createEmployeeRuntimeService({
   registry: employeeRegistry,
   conversationStore: employeeConversationStore,
   projectRoot,
   broadcast: realtime.broadcast,
   growthService: employeeGrowth,
   contextProvider: employeeGrowth.getContext,
+  client: appServerClient,
+  modelProviders,
 });
 const employeeProjectDirectory = createEmployeeProjectDirectory({
   project,
@@ -351,6 +375,8 @@ const multiAgentDirectory = new Map(groupRoomEntries.map(({ identity, room }) =>
       threadId,
       messages,
     }),
+    appServerClient,
+    modelProviders,
   });
   return [roomId, service];
 }));
@@ -374,6 +400,7 @@ const requestHandler = createRequestHandler({
   followUpQueue, contextManagement, groupRoom, roomDirectory: groupRoomDirectory, multiAgent, multiAgentDirectory, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
   agentConversationStore, agentPublicationService, employeeRuntime,
   employeeProjectDirectory, employeeGrowth,
+  modelProviders,
 });
 const server = http.createServer(requestHandler);
 
@@ -390,6 +417,7 @@ const close = () => {
   void artifacts.close();
   for (const { room } of groupRoomEntries) void room.close();
   employeeRuntime.close();
+  modelProviders.close();
   void employeeGrowthStore.close();
   void employeeConversationStore.close();
   void projectIdentity.close();

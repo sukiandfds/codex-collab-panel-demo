@@ -27,9 +27,9 @@ export const groupApi = {
     name: member.name,
     roomId,
   }, signal),
-  updateAgentSettings: (agentId: string, model: string, reasoningEffort: string, roomId = "", signal?: AbortSignal) => postJson<GroupAgent>(
+  updateAgentSettings: (agentId: string, modelProviderId: string, model: string, reasoningEffort: string, roomId = "", signal?: AbortSignal) => postJson<GroupAgent>(
     "/api/group/agent-settings",
-    { agentId, model, reasoningEffort, roomId },
+    { agentId, modelProviderId, model, reasoningEffort, roomId },
     signal,
   ),
   send: (member: StoredMember, roomId: string, text: string, clientMessageId: string, attachmentIds: string[] = [], signal?: AbortSignal) => postJson<GroupSendResponse>(

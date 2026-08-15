@@ -14,6 +14,7 @@ import { readInitialConversationState } from "../state/initialConversation";
 import { useConversationCatalog } from "./useConversationCatalog";
 import { useConversationSession } from "./useConversationSession";
 import { useFollowUpQueue } from "./useFollowUpQueue";
+import { useThreadGoal } from "../../goals/hooks/useThreadGoal";
 import type { SessionMessage } from "../model/types";
 
 const attachmentsFromMessage = (message: SessionMessage): MediaFile[] => {
@@ -41,6 +42,7 @@ export function useProjectConversations() {
 
   const execution = useCodexExecution(selection.selectedId);
   const followUpQueue = useFollowUpQueue(selection.selectedId);
+  const goal = useThreadGoal(selection.selectedId);
   const [forkingMessageId, setForkingMessageId] = useState("");
   const [editingMessage, setEditingMessage] = useState<SessionMessage | null>(null);
   const editingMessageRef = useRef<SessionMessage | null>(null);
@@ -277,6 +279,14 @@ export function useProjectConversations() {
     }
   }, [catalog.createSession, catalog.forkSession, execution.status.active, selection.selectedIdRef, selection.session, sendDirectMessage]);
 
+  const startGoal = useCallback(async (objective: string) => {
+    const normalized = objective.trim();
+    if (!normalized || !selection.selectedIdRef.current || selection.session?.archived) return false;
+    const created = await goal.update({ objective: normalized, status: "active" });
+    if (!created) return false;
+    return sendDirectMessage(normalized);
+  }, [goal.update, selection.selectedIdRef, selection.session?.archived, sendDirectMessage]);
+
   const beginEditMessage = useCallback((message: SessionMessage) => {
     if (message.role !== "user" || !message.turnId || selection.session?.archived) return;
     editingMessageRef.current = message;
@@ -355,6 +365,7 @@ export function useProjectConversations() {
   const handleEvent = useCallback((event: ProjectEvent) => {
     execution.handleEvent(event);
     followUpQueue.handleEvent(event);
+    goal.handleEvent(event);
     if (event.type === "context_status") contextManagement.handleEvent(event);
     if (event.type === "user_message_submitted") {
       const generated = createOptimisticMessage(
@@ -366,15 +377,16 @@ export function useProjectConversations() {
       const message = generated.id === event.messageId ? generated : { ...generated, id: event.messageId };
       selection.addOptimisticMessage(event.threadId, message);
     }
-  }, [contextManagement.handleEvent, execution.handleEvent, followUpQueue.handleEvent, selection.addOptimisticMessage]);
+  }, [contextManagement.handleEvent, execution.handleEvent, followUpQueue.handleEvent, goal.handleEvent, selection.addOptimisticMessage]);
   const recoverRealtime = useCallback((_reason: RealtimeRecoveryReason) => {
     const selected = selection.selectedIdRef.current;
     if (selected) void selection.loadSession(selected, { quiet: true, retry: false, recovery: true });
+    if (selected) void goal.refresh();
     void execution.refreshStatus(undefined, true).then(() => {
       onSessionsChanged(selection.selectedIdRef.current || undefined);
     });
     void followUpQueue.refresh();
-  }, [execution.refreshStatus, followUpQueue.refresh, onSessionsChanged, selection.selectedIdRef]);
+  }, [execution.refreshStatus, followUpQueue.refresh, goal.refresh, onSessionsChanged, selection.selectedIdRef]);
   const connected = useConversationEvents(
     onSessionsChanged,
     handleEvent,
@@ -445,6 +457,12 @@ export function useProjectConversations() {
     setAutoCompactThreshold: contextManagement.setThreshold,
     changeModel: modelManager.change,
     changeReasoningEffort: modelManager.changeReasoningEffort,
+    goal: goal.goal,
+    goalBusy: goal.busy,
+    goalError: goal.error,
+    startGoal,
+    changeGoalStatus: async (status: "active" | "paused" | "complete") => Boolean(await goal.update({ status })),
+    clearGoal: goal.clear,
     refresh: () => catalog.refreshSessions(),
   };
 }
