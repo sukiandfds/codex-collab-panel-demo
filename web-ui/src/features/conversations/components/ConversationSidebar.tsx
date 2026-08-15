@@ -61,7 +61,7 @@ export function ConversationSidebar({
       <SidebarHeader
         actions={(
           <>
-          <button className={styles.iconButton} type="button" aria-label="新建对话" title="新建对话" disabled={creating} onClick={() => void onCreate(activeProjectRoot)}>
+          <button className={styles.iconButton} type="button" aria-label="新建对话" title="新建对话" disabled={creating || !activeProjectRoot} onClick={() => void onCreate(activeProjectRoot)}>
             <SquarePen aria-hidden="true" />
           </button>
           <button className={styles.iconButton} type="button" aria-label="刷新会话" title="刷新会话" onClick={onRefresh}>
@@ -98,7 +98,7 @@ export function ConversationSidebar({
         onArchive={onArchive}
         onUnarchive={onUnarchive}
         onOpened={onCloseSidebar}
-        onActiveProjectChange={(entry) => setActiveProjectRoot(entry.root || defaultProjectRoot)}
+        onActiveProjectChange={(entry) => setActiveProjectRoot(entry.root || "")}
       />
       <ConnectionStatus connected={connected} />
     </aside>

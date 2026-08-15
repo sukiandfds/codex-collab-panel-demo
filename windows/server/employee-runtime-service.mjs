@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createAppServerClient } from "./app-server-client.mjs";
 import { messagesFromTurns } from "./codex-thread-history.mjs";
+import { employeeTurnInstructions } from "./employee-definitions.mjs";
 
 const clean = (value, maxLength = 200) => String(value || "").trim().slice(0, maxLength);
 const statusError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
@@ -155,7 +156,7 @@ export const createEmployeeRuntimeService = ({
   const startThread = async (employee) => {
     const result = await client.request("thread/start", {
       cwd: clean(employee.projectRoot, 400) || projectRoot,
-      developerInstructions: employee.instructions,
+      developerInstructions: employeeTurnInstructions(employee.instructions),
       ephemeral: false,
       serviceName: `negus-${employee.projectKey}`,
       ...policyFor(employee),
@@ -389,9 +390,10 @@ export const createEmployeeRuntimeService = ({
           threadId,
           input: [{ type: "text", text: cleanText, text_elements: [] }],
           cwd: clean(employee.projectRoot, 400) || projectRoot,
-          ...(context && client.turnDeveloperInstructions === true
-            ? { developerInstructions: context }
-            : {}),
+          developerInstructions: employeeTurnInstructions(
+            employee.instructions,
+            context && client.turnDeveloperInstructions === true ? context : "",
+          ),
         });
         const currentStatus = statusFor(employee.id);
         if (currentStatus.active && ["submitted", "working"].includes(currentStatus.phase)) {

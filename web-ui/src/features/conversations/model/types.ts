@@ -28,6 +28,10 @@ export interface SessionMessage {
   createdAt?: string;
   turnId?: string;
   itemId?: string;
+  authorId?: string;
+  authorName?: string;
+  sequence?: number;
+  source?: string;
 }
 
 export interface SessionSummary {
@@ -43,6 +47,7 @@ export interface SessionSummary {
   conversationKind?: string;
   readOnly?: boolean;
   forkedFromId?: string | null;
+  cwd?: string | null;
 }
 
 export interface SessionDetail extends SessionSummary {

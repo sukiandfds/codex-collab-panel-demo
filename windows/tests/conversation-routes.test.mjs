@@ -16,6 +16,83 @@ const invoke = (route, body) => {
   return { response, promise: route(request, response, new URL("http://127.0.0.1/api/session/message")) };
 };
 
+const invokeGet = (route, pathname) => {
+  const request = Readable.from([]);
+  request.method = "GET";
+  request.url = pathname;
+  const response = {
+    status: 0,
+    body: "",
+    writeHead(status) { this.status = status; },
+    end(value) { this.body = value || ""; },
+  };
+  return { response, promise: route(request, response, new URL(`http://127.0.0.1${pathname}`)) };
+};
+
+test("shows delivered group context and the employee reply as one normal conversation", async () => {
+  const binding = {
+    conversationId: "group:current-project:manager",
+    agentId: "manager",
+    runtimeKind: "codex",
+    runtimeSessionId: "group-thread-manager",
+    conversationKind: "group",
+    roomId: "current-project",
+    projectId: "project:employee:employee-manager",
+    targetProjectId: "project:personal:negus",
+  };
+  const route = createConversationRoutes({
+    conversations: {},
+    execution: { getStatus: () => ({ active: false, turnId: "" }) },
+    contextManagement: {},
+    media: { resolveMany: () => [] },
+    agentConversationStore: {
+      findByRuntimeSession: () => binding,
+      resolve: async () => binding,
+      readMessages: async () => [{
+        id: "group:current-project:human-1",
+        role: "user",
+        text: "检查当前问题",
+        authorId: "member-1",
+        authorName: "Hans",
+        sequence: 1,
+        createdAt: "2026-08-15T00:00:00.000Z",
+        source: "group",
+        roomId: "current-project",
+        groupMessageId: "human-1",
+      }],
+    },
+    roomDirectory: {
+      get: () => ({
+        snapshot: () => ({
+          room: { id: "current-project", name: "Negus 项目群" },
+          messages: [{
+            id: "agent-1",
+            type: "agent",
+            authorId: "manager",
+            authorName: "运营管理",
+            agentId: "manager",
+            sequence: 2,
+            text: "检查完成",
+            createdAt: "2026-08-15T00:00:30.000Z",
+          }],
+        }),
+      }),
+    },
+  });
+  const call = invokeGet(route, "/api/session?threadId=group-thread-manager&conversationId=group%3Acurrent-project%3Amanager");
+  await call.promise;
+  const session = JSON.parse(call.response.body);
+
+  assert.equal(call.response.status, 200);
+  assert.deepEqual(session.messages.map(({ role, authorName, text }) => ({ role, authorName, text })), [
+    { role: "user", authorName: "Hans", text: "检查当前问题" },
+    { role: "assistant", authorName: "运营管理", text: "检查完成" },
+  ]);
+  assert.equal(session.latestUser, "检查当前问题");
+  assert.equal(session.latestAssistant, "检查完成");
+  assert.equal(session.messages.some((message) => message.text.includes("目标项目：")), false);
+});
+
 test("reuses the in-flight result for a repeated submission id", async () => {
   let release;
   const gate = new Promise((resolve) => { release = resolve; });

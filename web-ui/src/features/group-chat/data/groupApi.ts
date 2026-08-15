@@ -1,5 +1,5 @@
 import { fetchJson, postJson, withAccessToken } from "../../../shared/api/http";
-import type { GroupAgent, GroupMessagePage, GroupRoomListResponse, GroupSendResponse, GroupSnapshot, StoredMember } from "../model/types";
+import type { GroupAgent, GroupInterruptResponse, GroupMessagePage, GroupRoomListResponse, GroupSendResponse, GroupSnapshot, StoredMember } from "../model/types";
 
 const roomQuery = (roomId: string) => roomId ? `?roomId=${encodeURIComponent(roomId)}` : "";
 const messageQuery = (roomId: string, params: Record<string, string | number | undefined>) => {
@@ -35,6 +35,11 @@ export const groupApi = {
   send: (member: StoredMember, roomId: string, text: string, clientMessageId: string, attachmentIds: string[] = [], signal?: AbortSignal) => postJson<GroupSendResponse>(
     "/api/group/message",
     { memberId: member.id, authorName: member.name, roomId, text, attachmentIds, clientMessageId },
+    signal,
+  ),
+  interrupt: (roomId = "", signal?: AbortSignal) => postJson<GroupInterruptResponse>(
+    "/api/group/interrupt",
+    { roomId },
     signal,
   ),
   eventsUrl: () => withAccessToken("/events"),

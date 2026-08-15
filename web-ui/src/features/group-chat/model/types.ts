@@ -104,6 +104,12 @@ export interface GroupSendResponse {
   deduplicated?: boolean;
 }
 
+export interface GroupInterruptResponse {
+  status: "interrupting" | "interrupted";
+  interruptedAgentIds: string[];
+  cancelledDiscussionCount: number;
+}
+
 export type GroupEvent =
   | { type: "connected"; roomId?: string }
   | { type: "group_message_created"; roomId?: string; message: GroupMessage }

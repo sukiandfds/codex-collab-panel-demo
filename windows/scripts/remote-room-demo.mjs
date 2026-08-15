@@ -35,9 +35,6 @@ import { createEmployeeGrowthService } from "../server/employee-growth-service.m
 import { createAttachmentContentService } from "../server/attachment-content-service.mjs";
 import { loadEmployeeDefinitions } from "../server/employee-definitions.mjs";
 import { loadBusinessProjects } from "../server/business-project-config.mjs";
-import { createGoalStore } from "../server/goal-store.mjs";
-import { createGoalService } from "../server/goal-service.mjs";
-import { buildGoalPrompt, createGoalRuntimeAdapter } from "../server/goal-runtime-adapter.mjs";
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -87,12 +84,17 @@ let agentConversationStore;
 const appServerConversations = createAppServerConversationStore({
   projectRoot,
   projectRoots,
+  autoTitleStateFile: path.join(projectRoot, "runtime", "conversation-display-titles.json"),
+  onAutoTitleChanged: (threadId) => realtime.broadcast({ type: "sessions_changed", threadId }),
   attachmentContent,
   registerMedia: media.register,
   onProtocolMessage: (message) => {
     execution.handleProtocolMessage(message);
     contextManagement?.handleProtocolMessage(message);
     void agentConversationStore?.recordRuntimeEvent?.(message);
+    if (message?.method === "thread/name/updated" && message.params?.threadId) {
+      realtime.broadcast({ type: "sessions_changed", threadId: message.params.threadId });
+    }
   },
   onSubmitted: execution.markSubmitted,
   onFailed: execution.markFailed,
@@ -152,6 +154,30 @@ const projectIdentities = projectIdentity.list();
 const roomIdForProject = (identity) => identity.kind === "personal"
   ? "current-project"
   : `project-room:${identity.projectId}`;
+const projectedGroupText = (message) => {
+  const text = String(message?.text || "").trim();
+  const attachmentNames = (Array.isArray(message?.attachments) ? message.attachments : [])
+    .map((file) => String(file?.name || "").trim())
+    .filter(Boolean);
+  return [text, attachmentNames.length ? `附件：${attachmentNames.join("、")}` : ""].filter(Boolean).join("\n");
+};
+const projectedGroupMessage = ({ message, binding, employeeId }) => ({
+  id: `group:${binding.roomId}:${message.id}`,
+  role: message.type === "agent" && (message.agentId === employeeId || message.authorId === employeeId)
+    ? "assistant"
+    : "user",
+  text: projectedGroupText(message),
+  authorId: message.authorId,
+  authorName: message.authorName,
+  sequence: message.sequence,
+  createdAt: message.createdAt,
+  source: "group",
+  projectId: binding.projectId,
+  targetProjectId: binding.targetProjectId,
+  executionRoot: binding.executionRoot,
+  roomId: binding.roomId,
+  groupMessageId: message.id,
+});
 const broadcastEmployeeGroupMessage = async ({ message, projectId, roomId }) => {
   const employeeId = String(message?.agentId || message?.authorId || "").trim();
   const employee = employeeRegistry.get(employeeId);
@@ -159,24 +185,20 @@ const broadcastEmployeeGroupMessage = async ({ message, projectId, roomId }) => 
   const agent = roomStore?.getAgent?.(employeeId);
   const threadId = String(agent?.threadId || "").trim();
   if (!employee || !roomStore || !threadId || message?.type !== "agent") return;
+  const employeeProject = projectIdentity.getForEmployee(employeeId);
+  const targetProject = projectIdentity.get(projectId);
   const binding = await employeeConversationStore?.openGroupForAgent?.({
     agentId: employeeId,
     roomId,
-    projectId,
+    projectId: employeeProject?.projectId,
+    targetProjectId: projectId,
+    executionRoot: targetProject?.root,
     threadId,
     title: `${roomStore.snapshot().room.name} · ${agent.name}`,
   });
   if (!binding) return;
-  const projectedMessage = {
-    id: `group:${roomId}:${message.id}`,
-    role: "assistant",
-    text: String(message.text || ""),
-    createdAt: message.createdAt,
-    source: "group",
-    projectId,
-    roomId,
-    groupMessageId: message.id,
-  };
+  const projectedMessage = projectedGroupMessage({ message, binding, employeeId });
+  await employeeConversationStore.appendMessage({ conversationId: binding.conversationId, message: projectedMessage });
   realtime.broadcast({
     type: "employee_message_completed",
     employeeId,
@@ -184,10 +206,12 @@ const broadcastEmployeeGroupMessage = async ({ message, projectId, roomId }) => 
     conversationId: binding.conversationId,
     message: projectedMessage,
     source: "group",
-    projectId,
+    projectId: binding.projectId,
+    targetProjectId: binding.targetProjectId,
+    executionRoot: binding.executionRoot,
     roomId,
   });
-  realtime.broadcast({ type: "sessions_changed", threadId, conversationId: binding.conversationId, employeeId, source: "group", projectId, roomId });
+  realtime.broadcast({ type: "sessions_changed", threadId, conversationId: binding.conversationId, employeeId, source: "group", projectId: binding.projectId, targetProjectId: binding.targetProjectId, roomId });
 };
 const groupRoomEntries = await Promise.all(projectIdentities.filter((identity) => identity.kind !== "employee").map(async (identity) => {
   const roomId = roomIdForProject(identity);
@@ -221,6 +245,37 @@ const employeeConversationStore = await createAgentConversationStore({
   groupRoom,
   roomDirectory: groupRoomDirectory,
 });
+const recordEmployeeGroupContext = async ({ identity, room, agentId, threadId, messages }) => {
+  const employee = employeeRegistry.get(agentId);
+  if (!employee || !threadId || !Array.isArray(messages) || !messages.length) return;
+  const employeeProject = projectIdentity.getForEmployee(agentId);
+  const binding = await employeeConversationStore.openGroupForAgent({
+    agentId,
+    roomId: room.snapshot().room.id,
+    projectId: employeeProject?.projectId,
+    targetProjectId: identity.projectId,
+    executionRoot: identity.root || identity.roots?.project,
+    threadId,
+    title: `${room.snapshot().room.name} · ${employee.name}`,
+  });
+  if (!binding) return;
+  for (const message of messages) {
+    const projected = projectedGroupMessage({ message, binding, employeeId: agentId });
+    if (projected.text) {
+      await employeeConversationStore.appendMessage({ conversationId: binding.conversationId, message: projected });
+    }
+  }
+  realtime.broadcast({
+    type: "sessions_changed",
+    threadId,
+    conversationId: binding.conversationId,
+    employeeId: agentId,
+    source: "group",
+    projectId: binding.projectId,
+    targetProjectId: binding.targetProjectId,
+    roomId: binding.roomId,
+  });
+};
 const employeeGrowthStore = await createEmployeeGrowthStore({
   stateFile: path.join(projectRoot, "runtime", "employee-growth.json"),
   registry: employeeRegistry,
@@ -232,7 +287,6 @@ const employeeGrowth = createEmployeeGrowthService({
   conversationStore: employeeConversationStore,
   broadcast: realtime.broadcast,
 });
-let goals = null;
 const employeeRuntime = createEmployeeRuntimeService({
   registry: employeeRegistry,
   conversationStore: employeeConversationStore,
@@ -240,57 +294,6 @@ const employeeRuntime = createEmployeeRuntimeService({
   broadcast: realtime.broadcast,
   growthService: employeeGrowth,
   contextProvider: employeeGrowth.getContext,
-  onTurnCompleted: (completion) => goals?.handleRuntimeEvent(completion),
-});
-const goalStore = createGoalStore({
-  stateFile: path.join(projectRoot, "runtime", "goals.json"),
-});
-const goalRuntimeAdapter = createGoalRuntimeAdapter({
-  dispatchGoal: async ({ goal }) => {
-    const employeeId = goal.ownerId || "manager";
-    if (!employeeRuntime.supportsEmployee(employeeId)) {
-      realtime.broadcast({ type: "goal_runtime_requested", goalId: goal.id, ownerId: employeeId });
-      return { status: "running", detail: "Goal 已进入系统运行队列，等待负责人适配器" };
-    }
-    const result = await employeeRuntime.sendMessage({
-      employeeId,
-      text: buildGoalPrompt(goal),
-      requestId: `goal:${goal.id}:start`,
-    });
-    return {
-      status: "running",
-      externalRef: result.turnId || result.threadId,
-      detail: "Goal 已发送给负责人运行时",
-    };
-  },
-  pauseGoal: async ({ goal }) => {
-    if (!employeeRuntime.supportsEmployee(goal.ownerId)) {
-      realtime.broadcast({ type: "goal_runtime_pause_requested", goalId: goal.id, ownerId: goal.ownerId });
-      return { status: "paused", detail: "已向外部运行适配器请求暂停" };
-    }
-    return employeeRuntime.interrupt?.(goal.ownerId, goal.runtime?.externalRef);
-  },
-  resumeGoal: async ({ goal }) => {
-    if (!employeeRuntime.supportsEmployee(goal.ownerId)) return { status: "running" };
-    const result = await employeeRuntime.sendMessage({
-      employeeId: goal.ownerId,
-      text: `${buildGoalPrompt(goal)}\n\n请从上次暂停的位置继续。`,
-      requestId: `goal:${goal.id}:resume:${goal.version}`,
-    });
-    return { status: "running", externalRef: result.turnId || result.threadId, detail: "Goal 已继续" };
-  },
-  stopGoal: async ({ goal }) => {
-    if (!employeeRuntime.supportsEmployee(goal.ownerId)) {
-      realtime.broadcast({ type: "goal_runtime_stop_requested", goalId: goal.id, ownerId: goal.ownerId });
-      return { status: "stop_requested", detail: "已向外部运行适配器请求停止" };
-    }
-    return employeeRuntime.interrupt?.(goal.ownerId, goal.runtime?.externalRef);
-  },
-});
-goals = createGoalService({
-  store: goalStore,
-  runtimeAdapter: goalRuntimeAdapter,
-  broadcast: realtime.broadcast,
 });
 const employeeProjectDirectory = createEmployeeProjectDirectory({
   project,
@@ -341,6 +344,13 @@ const multiAgentDirectory = new Map(groupRoomEntries.map(({ identity, room }) =>
     attachmentContent,
     resolveAttachments: media.resolveMany,
     resolveArtifacts: resolveArtifactInputs,
+    onContextDelivered: ({ agentId, threadId, messages }) => recordEmployeeGroupContext({
+      identity,
+      room,
+      agentId,
+      threadId,
+      messages,
+    }),
   });
   return [roomId, service];
 }));
@@ -363,7 +373,7 @@ const requestHandler = createRequestHandler({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime, submissions,
   followUpQueue, contextManagement, groupRoom, roomDirectory: groupRoomDirectory, multiAgent, multiAgentDirectory, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
   agentConversationStore, agentPublicationService, employeeRuntime,
-  employeeProjectDirectory, employeeGrowth, goals,
+  employeeProjectDirectory, employeeGrowth,
 });
 const server = http.createServer(requestHandler);
 
@@ -382,7 +392,6 @@ const close = () => {
   employeeRuntime.close();
   void employeeGrowthStore.close();
   void employeeConversationStore.close();
-  void goals.close();
   void projectIdentity.close();
   void employeeRegistry.close();
   void publicationStore.close();

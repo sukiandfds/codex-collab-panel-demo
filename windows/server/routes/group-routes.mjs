@@ -45,6 +45,13 @@ export const createGroupRoutes = ({ groupRoom, roomDirectory, media, multiAgent,
     sendJson(response, await service.updateAgentSettings(agentId, { model, reasoningEffort }));
     return true;
   }
+  if (url.pathname === "/api/group/interrupt" && request.method === "POST") {
+    const body = await readJson(request);
+    const room = resolveRoom(body);
+    const service = resolveAgentService(room.snapshot().room.id);
+    sendJson(response, await service.interruptDiscussion(), 202);
+    return true;
+  }
   if (url.pathname !== "/api/group/message" || request.method !== "POST") return false;
 
   const body = await readJson(request);
@@ -63,7 +70,6 @@ export const createGroupRoutes = ({ groupRoom, roomDirectory, media, multiAgent,
     text,
     requestedAgentIds,
     agents,
-    outputRequested: webOutputs.isRequest(text),
   });
   const { message, created } = await room.addMessageWithStatus({
     type: "human",

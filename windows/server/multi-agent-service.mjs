@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createAppServerClient } from "./app-server-client.mjs";
 import { inputFromAttachments } from "./app-server-conversation-store.mjs";
+import { employeeTurnInstructions } from "./employee-definitions.mjs";
 import { buildDiscussionPrompt } from "./multi-agent/discussion-prompt.mjs";
 import { cleanAgentIds, mentionedAgentIds, resolveAgentRouting } from "./multi-agent/agent-routing.mjs";
 import { completeOutputJob } from "./multi-agent/output-job.mjs";
@@ -32,9 +33,12 @@ export const createMultiAgentService = ({
   attachmentContent,
   resolveAttachments = () => [],
   resolveArtifacts = () => [],
+  onContextDelivered = async () => {},
+  appServerClient = null,
 }) => {
-  const client = createAppServerClient();
+  const client = appServerClient || createAppServerClient();
   const threadAgents = new Map();
+  const discussions = new Map();
   let currentRun = null;
   let workQueue = Promise.resolve();
   let closed = false;
@@ -116,6 +120,12 @@ export const createMultiAgentService = ({
 
     if (method === "turn/started") {
       const run = currentRun?.threadId === params.threadId ? currentRun : null;
+      if (run) {
+        run.turnId = String(params.turn?.id || params.turnId || run.turnId || "");
+        if (run.stopRequested) void interruptRun(run).catch((error) => {
+          console.warn(`[multi-agent] deferred interrupt failed: ${error.message}`);
+        });
+      }
       announceRunStarted(run);
       void setStatus(agentId, { phase: "working", label: "正在处理任务", detail: "", active: true });
       return;
@@ -168,6 +178,18 @@ export const createMultiAgentService = ({
 
   const unsubscribe = client.subscribe(handleProtocolMessage);
 
+  async function interruptRun(run) {
+    if (!run?.threadId || !run.turnId || run.interruptSent) return false;
+    run.interruptSent = true;
+    try {
+      await client.request("turn/interrupt", { threadId: run.threadId, turnId: run.turnId });
+      return true;
+    } catch (error) {
+      run.interruptSent = false;
+      throw error;
+    }
+  }
+
   const ensureThread = async (agent) => {
     let currentAgent = agent;
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -189,7 +211,7 @@ export const createMultiAgentService = ({
 
       const result = await client.request("thread/start", {
         cwd: employeeWorkRoots[agent.id] || projectRoot,
-        developerInstructions: currentAgent.instructions,
+        developerInstructions: employeeTurnInstructions(currentAgent.instructions),
         ephemeral: false,
         serviceName: "negus",
       });
@@ -225,13 +247,17 @@ export const createMultiAgentService = ({
     return ensureThread(agent);
   };
 
-  const runAgent = async ({ agentId, attachments, outputJob }) => {
+  const runAgent = async ({ agentId, attachments, outputJob, discussion }) => {
     if (closed) throw new Error("多 Agent 服务已关闭");
     const agent = room.getAgent(agentId);
     if (!agent) throw Object.assign(new Error("Agent 不存在"), { statusCode: 404 });
 
     await setStatus(agentId, { phase: "submitted", label: "已接收群聊任务", detail: "正在连接 Codex", active: true });
     const threadId = await ensureThread(agent);
+    if (discussion.cancelled) {
+      finishStatus(agentId, { phase: "interrupted", label: "任务已中断", detail: "" });
+      return { status: "interrupted", text: "", message: null };
+    }
     const outputInstructions = outputJob && outputJob.agentId === agentId
       ? webOutputs.buildAgentInstructions(outputJob)
       : "";
@@ -281,14 +307,28 @@ export const createMultiAgentService = ({
       workId: randomUUID(),
       startedAt: new Date().toISOString(),
       startedBroadcast: false,
+      discussion,
+      turnId: "",
+      stopRequested: false,
+      interruptSent: false,
     };
 
     try {
-      await client.request("turn/start", {
+      const started = await client.request("turn/start", {
         threadId,
         input: await inputFromAttachments(prompt, inputAttachments, attachmentContent),
         cwd: projectRoot,
+        developerInstructions: employeeTurnInstructions(agent.instructions),
       });
+      try {
+        await onContextDelivered({ agentId, threadId, messages: context.messages });
+      } catch (error) {
+        console.warn(`[multi-agent] employee context projection failed: ${error.message}`);
+      }
+      if (currentRun?.threadId === threadId) {
+        currentRun.turnId = String(started?.turn?.id || currentRun.turnId || "");
+        if (currentRun.stopRequested) await interruptRun(currentRun);
+      }
       const result = await completion;
       if (result.status === "completed") await room.advanceAgentContext(agentId, context.throughSequence);
       return result;
@@ -303,14 +343,19 @@ export const createMultiAgentService = ({
     }
   };
 
-  const runDiscussion = async ({ agentIds, requestText, attachments, outputJob }) => {
+  const runDiscussion = async ({ agentIds, requestText, attachments, outputJob, discussion }) => {
     const agents = room.snapshot().agents;
     const pendingAgentIds = cleanAgentIds(agentIds, agents);
     const scheduledAgentIds = new Set(pendingAgentIds);
     for (let index = 0; index < pendingAgentIds.length; index += 1) {
+      if (discussion.cancelled) break;
       const agentId = pendingAgentIds[index];
       try {
-        const result = await runAgent({ agentId, attachments, outputJob });
+        const result = await runAgent({ agentId, attachments, outputJob, discussion });
+        if (discussion.cancelled || result.status === "interrupted") {
+          if (outputJob) webOutputs.abandonJob(outputJob.jobId);
+          break;
+        }
         if (outputJob && outputJob.agentId === agentId) {
           await completeOutputJob({ outputJob, result, agentId, room, webOutputs, setStatus, finishStatus });
           return;
@@ -336,9 +381,8 @@ export const createMultiAgentService = ({
     }
   };
 
-  const enqueueDiscussion = async ({ agentIds, requestText, attachments = [], sourceMessageId = "", explicitAgentIds }) => {
+  const enqueueDiscussion = async ({ agentIds, requestText, attachments = [], sourceMessageId = "", explicitAgentIds, outputRequested = false }) => {
     const agents = room.snapshot().agents;
-    const outputRequested = Boolean(webOutputs?.isRequest(requestText));
     const routing = resolveAgentRouting({
       text: requestText,
       requestedAgentIds: agentIds,
@@ -355,16 +399,57 @@ export const createMultiAgentService = ({
       ? await webOutputs.createJob({ sourceMessageId, agentId: routing.outputAgentId })
       : null;
     const jobId = outputJob?.jobId || randomUUID();
+    const discussion = { jobId, agentIds: targets, outputJob, cancelled: false };
+    discussions.set(jobId, discussion);
     void setStatus(targets[0], { phase: "queued", label: "已加入讨论队列", detail: "", active: true });
     workQueue = workQueue
       .catch(() => {})
-      .then(() => runDiscussion({ agentIds: targets, requestText, attachments, outputJob }))
-      .catch((error) => console.warn(`[multi-agent] discussion ${jobId} failed: ${error.message}`));
+      .then(() => discussion.cancelled
+        ? undefined
+        : runDiscussion({ agentIds: targets, requestText, attachments, outputJob, discussion }))
+      .catch((error) => console.warn(`[multi-agent] discussion ${jobId} failed: ${error.message}`))
+      .finally(() => discussions.delete(jobId));
     return { jobId, agentIds: targets, status: "queued" };
+  };
+
+  const interruptDiscussion = async () => {
+    const pending = [...discussions.values()].filter((discussion) => !discussion.cancelled);
+    if (!pending.length && !currentRun) {
+      throw Object.assign(new Error("当前群聊没有可停止的任务"), { statusCode: 409 });
+    }
+    for (const discussion of pending) {
+      discussion.cancelled = true;
+      if (discussion.outputJob) webOutputs.abandonJob(discussion.outputJob.jobId);
+    }
+    const interruptedAgentIds = [...new Set(pending.flatMap((discussion) => discussion.agentIds))];
+    const run = currentRun;
+    if (run) {
+      run.stopRequested = true;
+      await setStatus(run.agentId, { phase: "working", label: "正在停止任务", detail: "", active: true });
+      await interruptRun(run);
+    }
+    for (const agentId of interruptedAgentIds) {
+      if (agentId === run?.agentId) continue;
+      finishStatus(agentId, { phase: "interrupted", label: "任务已中断", detail: "" });
+    }
+    await room.addMessage({
+      type: "system",
+      authorId: "system",
+      authorName: "系统",
+      agentId: null,
+      text: "您终止了本次任务。",
+    });
+    return {
+      status: run ? "interrupting" : "interrupted",
+      interruptedAgentIds,
+      cancelledDiscussionCount: pending.length,
+    };
   };
 
   const close = () => {
     closed = true;
+    for (const discussion of discussions.values()) discussion.cancelled = true;
+    discussions.clear();
     if (currentRun) {
       clearTimeout(currentRun.timer);
       room.finishAgentWork?.(currentRun.workId);
@@ -375,5 +460,5 @@ export const createMultiAgentService = ({
     client.close();
   };
 
-  return { enqueueDiscussion, updateAgentSettings, ensureAgentThread, close };
+  return { enqueueDiscussion, interruptDiscussion, updateAgentSettings, ensureAgentThread, close };
 };

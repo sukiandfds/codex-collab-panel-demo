@@ -4,7 +4,6 @@ import { AttachmentButton, AttachmentPreviews } from "../../attachments/componen
 import { useAttachmentDraft } from "../../attachments/hooks/useAttachmentDraft";
 import { SlashCommandMenu, type SlashCommandOption } from "../../conversations/components/SlashCommandMenu";
 import { goalCapabilityOptions } from "../../goals/model/capability";
-import { useGoalCapability } from "../../goals/hooks/useGoalCapability";
 import type { GroupAgent, GroupMember } from "../model/types";
 import { mentionedAgentIds } from "../model/agentMentions";
 import { MentionMenu, type MentionOption } from "./MentionMenu";
@@ -13,6 +12,7 @@ import styles from "./GroupComposer.module.css";
 interface MentionState { start: number; end: number; query: string }
 
 const capabilityOptions: SlashCommandOption[] = [
+  { id: "stop", command: "/stop", group: "会话", label: "停止当前任务", detail: "终止当前群聊正在运行和排队的任务" },
   ...goalCapabilityOptions,
   { id: "file", command: "/file", group: "文件", label: "读取附件", detail: "按问题读取并处理已上传文件" },
   { id: "image", command: "/image", group: "MCP 工具", label: "生成或修改图片", detail: "调用已配置的图片能力" },
@@ -28,15 +28,15 @@ const findMention = (text: string, caret: number): MentionState | null => {
   return atIndex >= 0 ? { start: atIndex, end: caret, query: match[1].trim() } : null;
 };
 
-export function GroupComposer({ agents, members, disabled, error, onSend }: {
+export function GroupComposer({ agents, members, disabled, error, onSend, onInterrupt }: {
   agents: GroupAgent[];
   members: GroupMember[];
   disabled: boolean;
   error: string;
   onSend: (text: string, attachmentIds?: string[]) => Promise<boolean>;
+  onInterrupt: () => Promise<boolean>;
 }) {
   const [text, setText] = useState("");
-  const [goalFeedback, setGoalFeedback] = useState<{ accepted: boolean; message: string } | null>(null);
   const draft = useAttachmentDraft();
   const [mention, setMention] = useState<MentionState | null>(null);
   const [personnelOpen, setPersonnelOpen] = useState(false);
@@ -44,7 +44,6 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
   const [activeMention, setActiveMention] = useState(0);
   const [activeCapability, setActiveCapability] = useState(0);
   const [collapsedCapabilityGroups, setCollapsedCapabilityGroups] = useState<Record<string, boolean>>({});
-  const executeGoalCapability = useGoalCapability();
   const composerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submittingRef = useRef(false);
@@ -102,6 +101,11 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
   };
 
   const insertCapability = (option: SlashCommandOption) => {
+    if (option.id === "stop") {
+      setCapabilityOpen(false);
+      void onInterrupt();
+      return;
+    }
     const textarea = textareaRef.current;
     const caret = textarea?.selectionStart ?? text.length;
     const prefix = caret > 0 && !/\s$/u.test(text.slice(0, caret)) ? " " : "";
@@ -120,18 +124,6 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
     if (submittingRef.current || disabled || draft.uploading || (!text.trim() && !draft.attachments.length)) return;
     submittingRef.current = true;
     try {
-      if (!draft.attachments.length) {
-        const goalResult = await executeGoalCapability(text);
-        if (goalResult.handled) {
-          setGoalFeedback(goalResult.feedback ? { accepted: goalResult.accepted, message: goalResult.feedback } : null);
-          if (goalResult.accepted) {
-            setText("");
-            setMention(null);
-          }
-          return;
-        }
-        setGoalFeedback(null);
-      }
       const uploaded = await draft.uploadAll();
       if (await onSend(text, uploaded.map((attachment) => attachment.id))) {
         setText("");
@@ -171,14 +163,6 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
   return (
     <div className={styles.composerArea} ref={composerRef}>
       {error ? <div className={styles.errorText} role="alert">{error}</div> : null}
-      {goalFeedback ? (
-        <div
-          className={goalFeedback.accepted ? styles.goalFeedback : styles.errorText}
-          role={goalFeedback.accepted ? "status" : "alert"}
-        >
-          {goalFeedback.message}
-        </div>
-      ) : null}
       {mention ? (
         <MentionMenu options={mentionOptions} activeIndex={activeMention} onActiveChange={setActiveMention} onSelect={insertMention} />
       ) : personnelOpen ? (
@@ -227,7 +211,6 @@ export function GroupComposer({ agents, members, disabled, error, onSend }: {
           placeholder="发送到项目群"
           onChange={(event) => {
             setText(event.target.value);
-            setGoalFeedback(null);
             setPersonnelOpen(false);
             setCapabilityOpen(false);
             updateMention(event.target.value, event.target.selectionStart);

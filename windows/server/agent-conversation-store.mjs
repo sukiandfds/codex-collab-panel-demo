@@ -1,10 +1,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 const clean = (value, maxLength = 160) => String(value || "").trim().slice(0, maxLength);
 
 const statusError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
+
+const groupConversationId = (roomId, agentId) => {
+  const readableId = `group:${roomId}:${agentId}`;
+  if (readableId.length <= 120) return readableId;
+  return `group:${createHash("sha256").update(`${roomId}\u0000${agentId}`).digest("hex")}`;
+};
 
 const normalizeRuntimeSessions = (binding) => {
   const sessions = [];
@@ -62,6 +68,15 @@ const normalizeHistoryMessage = (message, binding) => {
     createdAt: message.createdAt || new Date().toISOString(),
     runtimeKind: clean(message.runtimeKind, 40) || binding?.runtimeKind || "codex",
     runtimeSessionId: clean(message.runtimeSessionId, 120) || binding?.runtimeSessionId || "",
+    ...(message.authorId ? { authorId: clean(message.authorId, 80) } : {}),
+    ...(message.authorName ? { authorName: clean(message.authorName, 80) } : {}),
+    ...(Number.isSafeInteger(message.sequence) ? { sequence: message.sequence } : {}),
+    ...(message.source ? { source: clean(message.source, 40) } : {}),
+    ...(message.projectId ? { projectId: clean(message.projectId, 200) } : {}),
+    ...(message.targetProjectId ? { targetProjectId: clean(message.targetProjectId, 200) } : {}),
+    ...(message.executionRoot ? { executionRoot: clean(message.executionRoot, 800) } : {}),
+    ...(message.roomId ? { roomId: clean(message.roomId, 120) } : {}),
+    ...(message.groupMessageId ? { groupMessageId: clean(message.groupMessageId, 120) } : {}),
   };
 };
 
@@ -101,6 +116,8 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
       conversationKind: clean(binding.conversationKind, 40) || "legacy",
       roomId: clean(binding.roomId, 120) || null,
       projectId: clean(binding.projectId, 200) || null,
+      targetProjectId: clean(binding.targetProjectId, 200) || null,
+      executionRoot: clean(binding.executionRoot, 800) || null,
       title: clean(binding.title, 240) || null,
       createdAt: binding.createdAt || new Date().toISOString(),
       updatedAt: binding.updatedAt || binding.createdAt || new Date().toISOString(),
@@ -135,10 +152,15 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
   const findByAgentKind = (agentId, conversationKind) => [...bindings.values()]
     .find((binding) => binding.agentId === agentId && binding.conversationKind === conversationKind) || null;
 
-  const findByAgentRoom = (agentId, roomId) => [...bindings.values()]
-    .find((binding) => binding.agentId === agentId
-      && binding.conversationKind === "group"
-      && binding.roomId === roomId) || null;
+  const findByAgentRoom = (agentId, roomId) => {
+    const canonical = bindings.get(groupConversationId(roomId, agentId));
+    if (canonical) return canonical;
+    return [...bindings.values()]
+      .filter((binding) => binding.agentId === agentId
+        && binding.conversationKind === "group"
+        && binding.roomId === roomId)
+      .sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")))[0] || null;
+  };
 
   const bindRuntime = async ({
     conversationId = "",
@@ -148,17 +170,20 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
     conversationKind = "",
     roomId = "",
     projectId = "",
+    targetProjectId = "",
+    executionRoot = "",
     title = "",
   }) => {
     const cleanAgentId = clean(agentId, 80);
     const cleanRuntimeKind = clean(runtimeKind, 40) || "codex";
     const cleanRuntimeSessionId = clean(runtimeSessionId, 120);
+    const requestedConversationId = clean(conversationId, 120);
     const requestedConversationKind = clean(conversationKind, 40);
     const cleanRoomId = clean(roomId, 120);
     if (!cleanAgentId || !cleanRuntimeSessionId) throw statusError("Agent 对话绑定不完整", 400);
     if (!groupRoom.getAgent(cleanAgentId)) throw statusError("Agent 不存在", 404);
-    const existing = clean(conversationId, 120)
-      ? bindings.get(clean(conversationId, 120))
+    const existing = requestedConversationId
+      ? bindings.get(requestedConversationId)
       : requestedConversationKind === "direct"
         ? findByAgentKind(cleanAgentId, "direct")
         : requestedConversationKind === "legacy"
@@ -188,7 +213,7 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
       });
     }
     const binding = {
-      conversationId: existing?.conversationId || `conversation-${randomUUID()}`,
+      conversationId: existing?.conversationId || requestedConversationId || `conversation-${randomUUID()}`,
       agentId: cleanAgentId,
       runtimeKind: cleanRuntimeKind,
       runtimeSessionId: cleanRuntimeSessionId,
@@ -196,6 +221,8 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
       conversationKind: cleanConversationKind || existing?.conversationKind || "direct",
       roomId: cleanRoomId || existing?.roomId || null,
       projectId: clean(projectId, 200) || existing?.projectId || null,
+      targetProjectId: clean(targetProjectId, 200) || existing?.targetProjectId || null,
+      executionRoot: clean(executionRoot, 800) || existing?.executionRoot || null,
       title: clean(title, 240) || existing?.title || null,
       createdAt: existing?.createdAt || now,
       updatedAt: now,
@@ -227,7 +254,7 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
     });
   };
 
-  const openGroupForAgent = async ({ agentId, roomId, projectId = "", threadId = "", title = "" }) => {
+  const openGroupForAgent = async ({ agentId, roomId, projectId = "", targetProjectId = "", executionRoot = "", threadId = "", title = "" }) => {
     const cleanAgentId = clean(agentId, 80);
     const cleanRoomId = clean(roomId, 120);
     const room = roomDirectory?.get?.(cleanRoomId)
@@ -236,13 +263,15 @@ export const createAgentConversationStore = async ({ stateFile, groupRoom, roomD
     const runtimeSessionId = clean(threadId, 120) || clean(agent?.threadId, 120);
     if (!room || !agent || !runtimeSessionId) return null;
     return bindRuntime({
-      conversationId: `group:${cleanRoomId}:${cleanAgentId}`,
+      conversationId: groupConversationId(cleanRoomId, cleanAgentId),
       agentId: cleanAgentId,
       runtimeKind: "codex",
       runtimeSessionId,
       conversationKind: "group",
       roomId: cleanRoomId,
       projectId,
+      targetProjectId,
+      executionRoot,
       title,
     });
   };

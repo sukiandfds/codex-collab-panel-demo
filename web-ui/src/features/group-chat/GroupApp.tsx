@@ -161,6 +161,7 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
           disabled={!group.member || group.sending}
           error={group.error}
           onSend={sendMessage}
+          onInterrupt={group.interrupt}
         />
         ) : <div className={styles.composerPlaceholder} />}
       />

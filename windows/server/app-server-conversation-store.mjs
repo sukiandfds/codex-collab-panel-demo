@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import { previewText } from "./content-blocks.mjs";
 import { createAppServerClient } from "./app-server-client.mjs";
@@ -22,6 +23,32 @@ const latestIsoFromEpochMilliseconds = (values, fallback = "") => {
   const date = new Date(latest);
   return Number.isFinite(date.getTime()) ? date.toISOString() : fallback;
 };
+
+const AUTO_TITLE_MODEL = "gpt-5.6-terra";
+const AUTO_TITLE_TIMEOUT_MS = 20000;
+const AUTO_TITLE_SCHEMA = {
+  type: "object",
+  properties: { title: { type: "string", minLength: 1, maxLength: 36 } },
+  required: ["title"],
+  additionalProperties: false,
+};
+
+const cleanAutoTitle = (value) => {
+  let title = String(value || "").replace(/\s+/gu, " ").trim();
+  try { title = JSON.parse(title)?.title || title; } catch {}
+  title = String(title).replace(/^[`"'“”‘’]+|[`"'“”‘’]+$/gu, "").replace(/[。.!！?？]+$/gu, "").trim();
+  return [...title].slice(0, 36).join("");
+};
+
+const titlePromptFrom = (text) => [
+  "请为用户请求生成简洁的对话标题。",
+  "使用用户的语言，尽量不超过 5 个词或 20 个汉字，最多 36 个字符。",
+  "标题应概括实际主题，不要回答问题，不要使用引号、Markdown 或结尾标点。",
+  "只填写结构化 title 字段。",
+  "",
+  "用户请求：",
+  String(text || "").slice(0, 2000),
+].join("\n");
 
 export const inputFromAttachments = async (text, attachments = [], attachmentContent) => {
   const input = [];
@@ -67,6 +94,7 @@ const promptFromSlashCommand = (text, attachments = []) => {
 
 export const createAppServerConversationStore = ({
   projectRoot, projectRoots = [projectRoot], registerMedia, onProtocolMessage, onSubmitted, onFailed, onHealthState,
+  autoTitleStateFile = "", onAutoTitleChanged,
   attachmentContent,
   threadRuntimeOptions = async () => null,
   client = createAppServerClient(),
@@ -77,16 +105,62 @@ export const createAppServerConversationStore = ({
     if (!cwd) return false;
     try { return allowedProjectRoots.includes(path.resolve(cwd).toLowerCase()); } catch { return false; }
   };
+  const isSameProjectRoot = (left, right) => {
+    if (!left || !right) return false;
+    try { return path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase(); } catch { return false; }
+  };
   const activeRuns = new Map();
+  const autoTitleAttempts = new Set();
+  const autoTitleThreads = new Map();
+  const autoTitles = new Map();
+  let autoTitlesLoaded = false;
+  let autoTitlesLoading = null;
   const monitorIntervalMs = supervision.intervalMs ?? 5000;
   const staleAfterMs = supervision.staleAfterMs ?? 30000;
   const finalizingAfterMs = supervision.finalizingAfterMs ?? 10000;
   const retryAfterMs = supervision.retryAfterMs ?? 10000;
   let monitorBusy = false;
 
+  const loadAutoTitles = async () => {
+    if (autoTitlesLoaded || !autoTitleStateFile) return;
+    if (!autoTitlesLoading) {
+      autoTitlesLoading = fs.readFile(autoTitleStateFile, "utf8")
+        .then((text) => JSON.parse(text)?.titles || {})
+        .catch((error) => error?.code === "ENOENT" ? {} : Promise.reject(error))
+        .then((titles) => {
+          for (const [threadId, value] of Object.entries(titles)) {
+            const title = cleanAutoTitle(value?.title);
+            if (title) autoTitles.set(threadId, { title, updatedAt: String(value?.updatedAt || "") });
+          }
+          autoTitlesLoaded = true;
+        })
+        .finally(() => { autoTitlesLoading = null; });
+    }
+    await autoTitlesLoading;
+  };
+
+  const saveAutoTitle = async (threadId, title) => {
+    await loadAutoTitles();
+    autoTitles.set(threadId, { title, updatedAt: new Date().toISOString() });
+    if (!autoTitleStateFile) return;
+    const state = { version: 1, titles: Object.fromEntries(autoTitles) };
+    await fs.mkdir(path.dirname(autoTitleStateFile), { recursive: true });
+    const temporary = `${autoTitleStateFile}.${process.pid}.tmp`;
+    await fs.writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    await fs.rename(temporary, autoTitleStateFile);
+  };
+
   const handleProtocolMessage = (message) => {
     const { method, params = {} } = message || {};
     const threadId = params.threadId;
+    const autoTitleThread = autoTitleThreads.get(threadId);
+    if (autoTitleThread) {
+      if (method === "item/completed" && params.item?.type === "agentMessage" && params.item?.phase !== "commentary") {
+        autoTitleThread.text = String(params.item.text || "");
+      }
+      if (method === "turn/completed") autoTitleThread.resolve(autoTitleThread.text);
+      return;
+    }
     if (threadId) {
       const current = activeRuns.get(threadId) || {};
       const eventTurnId = String(params.turnId || params.turn?.id || params.item?.turnId || params.item?.turn?.id || "");
@@ -207,7 +281,7 @@ export const createAppServerConversationStore = ({
   const summaryFromThread = (thread, archived = archivedFromThread(thread)) => ({
     threadId: thread.id,
     source: sourceFromThread(thread),
-    title: thread.name?.trim() || "未命名会话",
+    title: thread.name?.trim() || autoTitles.get(thread.id)?.title || "未命名会话",
     updatedAt: isoFromUnixSeconds(thread.updatedAt),
     messageCount: null,
     latestUser: "",
@@ -218,6 +292,7 @@ export const createAppServerConversationStore = ({
   });
 
   const listSessions = async (source = "all", archived = false) => {
+    await loadAutoTitles();
     const threads = await listThreads({ archived });
     return threads
       .filter((thread) => source === "all" || sourceFromThread(thread) === source)
@@ -230,7 +305,15 @@ export const createAppServerConversationStore = ({
     const params = { cwd };
     if (model) params.model = model;
     const result = await client.request("thread/start", params);
-    const thread = result.thread;
+    let thread = result.thread;
+    if (!thread?.id) throw new Error("Codex did not return the newly created Thread.");
+    if (!thread.cwd) {
+      const verified = await client.request("thread/read", { threadId: thread.id, includeTurns: false });
+      thread = verified.thread || thread;
+    }
+    if (!isSameProjectRoot(thread.cwd, cwd)) {
+      throw Object.assign(new Error("新对话未创建在所选项目中，请检查项目路径后重试。"), { statusCode: 502 });
+    }
     threadCache.set(thread.id, thread);
     freshThreadRuntime.set(thread.id, {
       ...result,
@@ -246,6 +329,65 @@ export const createAppServerConversationStore = ({
     const thread = result?.thread || { ...cached, name };
     threadCache.set(threadId, thread);
     return summaryFromThread(thread, archivedFromThread(thread));
+  };
+
+  const generateAutoTitle = async (text, cwd) => {
+    const started = await client.request("thread/start", {
+      model: AUTO_TITLE_MODEL,
+      cwd,
+      approvalPolicy: "never",
+      permissions: ":read-only",
+      config: {
+        model_reasoning_effort: "low",
+        web_search: "disabled",
+        "features.enable_fanout": false,
+        "features.multi_agent": false,
+        "features.multi_agent_v2": false,
+        "features.plugins": false,
+      },
+      ephemeral: true,
+      threadSource: "system",
+      experimentalRawEvents: false,
+    }, { timeoutMs: AUTO_TITLE_TIMEOUT_MS });
+    const titleThreadId = started.thread.id;
+    let timer;
+    const response = new Promise((resolve, reject) => {
+      timer = setTimeout(() => reject(new Error("Automatic title generation timed out")), AUTO_TITLE_TIMEOUT_MS);
+      timer.unref?.();
+      autoTitleThreads.set(titleThreadId, { resolve, text: "" });
+    });
+    try {
+      await client.request("turn/start", {
+        threadId: titleThreadId,
+        input: [{ type: "text", text: titlePromptFrom(text), text_elements: [] }],
+        outputSchema: AUTO_TITLE_SCHEMA,
+      }, { timeoutMs: AUTO_TITLE_TIMEOUT_MS });
+      return cleanAutoTitle(await response);
+    } finally {
+      clearTimeout(timer);
+      autoTitleThreads.delete(titleThreadId);
+      void client.request("thread/unsubscribe", { threadId: titleThreadId }, { timeoutMs: 2000 }).catch(() => {});
+    }
+  };
+
+  const autoTitleSession = async (threadId, text) => {
+    await loadAutoTitles();
+    if (autoTitleAttempts.has(threadId) || autoTitles.has(threadId)) return;
+    const cached = threadCache.get(threadId);
+    if (cached?.name?.trim()) return;
+    autoTitleAttempts.add(threadId);
+    try {
+      const generatedTitle = await generateAutoTitle(text, cached?.cwd || projectRoot);
+      if (!generatedTitle) return;
+      const current = await client.request("thread/read", { threadId, includeTurns: false });
+      if (String(current.thread?.name || "").trim()) return;
+      await saveAutoTitle(threadId, generatedTitle);
+      onAutoTitleChanged?.(threadId);
+    } catch (error) {
+      console.warn(`[auto-title] generation failed for ${threadId}: ${error.message}`);
+    } finally {
+      autoTitleAttempts.delete(threadId);
+    }
   };
 
   const listModels = async () => {
@@ -305,6 +447,7 @@ export const createAppServerConversationStore = ({
   };
 
   const findSession = async (threadId, source = "all", { before, cursor, limit } = {}) => {
+    await loadAutoTitles();
     const cached = threadCache.get(threadId);
     if (cached && source !== "all" && sourceFromThread(cached) !== source) return null;
 
@@ -412,6 +555,9 @@ export const createAppServerConversationStore = ({
         ...(runtimeOptions?.turn || {}),
       });
       freshThreadRuntime.delete(threadId);
+      void autoTitleSession(threadId, text).catch((error) => {
+        console.warn(`[auto-title] failed for ${threadId}: ${error.message}`);
+      });
       return result;
     } catch (error) {
       onFailed?.(threadId, error);
@@ -479,6 +625,8 @@ export const createAppServerConversationStore = ({
     if (monitorTimer) clearInterval(monitorTimer);
     unsubscribe();
     unsubscribeHealth();
+    for (const pending of autoTitleThreads.values()) pending.resolve(pending.text);
+    autoTitleThreads.clear();
     client.close();
   };
 

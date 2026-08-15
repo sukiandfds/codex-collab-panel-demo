@@ -38,3 +38,12 @@
 - 产品提交：`964ad4e6297c369b9bf8e856c98bd5e67b13382e`。
 - 验证：Goal Service 聚焦测试 `10/10`、Windows Node 测试 `160/160`、相关 MJS 语法检查和 `git diff --check` 通过；本次后端边界补丁未重复构建 UI。
 - 待验收：未重启服务；真实 Goal 长任务、跨入口操作和移动端体验仍待用户验收。
+
+### 2026-08-14 21:42 +08:00
+
+- 版本：`v0.2.0`，状态保持 `implemented_pending_review`。
+- 方向纠正：删除 Negus 自建 Goal Store、Service、Runtime Adapter、API、Provider、命令拦截和生命周期操作，不再维护第二套 Goal 状态。
+- 用户入口：单聊和群聊能力菜单只保留一个“Goal 目标模式”；`/goal <目标>` 通过现有消息通道交给 Codex 原生 Goal。
+- 原生证据：历史 Negus Thread 已确认调用 `create_goal`，并由 `update_goal` 正常完成。
+- 验证：Windows Node 测试 `146/146`、`pnpm build:ui`、修改后 MJS 语法检查和 `git diff --check` 通过。
+- 待验收：当前服务尚未安全重启；重启后需要从能力菜单发起一个真实短 Goal，确认原生过程和完成结果。

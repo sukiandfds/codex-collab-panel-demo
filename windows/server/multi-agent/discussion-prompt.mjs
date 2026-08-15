@@ -9,20 +9,19 @@ const visibleMessageText = (message) => {
 };
 
 export const buildDiscussionPrompt = ({ agent, agents = [], messages = [], outputInstructions = "", targetProjectRoot = "" }) => {
-  const agentNames = agents.map((item) => `@${item.name}`).join(", ");
+  const agentName = String(agent?.name || "当前员工").trim();
+  const handoffAgentNames = agents
+    .filter((item) => item.id !== agent?.id)
+    .map((item) => `@${item.name}`)
+    .join(", ");
   const publicMessages = messages.map(visibleMessageText).filter(Boolean).join("\n\n");
   const lines = [
-    "You are replying inside a shared public project group chat.",
-    `Your public role: ${agent.name} (${agent.responsibility}).`,
-    targetProjectRoot ? `Target project path for this group task: ${targetProjectRoot}` : "",
-    "The messages below are the only new public group-chat context for this turn.",
-    "Do not use or reveal hidden thinking, commentary, tool output, private reasoning, or unrelated private conversation history from another Agent.",
-    agentNames ? `To hand work to another employee, explicitly mention them in your final reply: ${agentNames}. A mentioned employee will continue after you finish.` : "",
-    "Reply with useful content for the group. Do not describe hidden reasoning.",
-    "",
-    "New public group messages since your last checkpoint:",
-    publicMessages || "(No new public group messages.)",
+    targetProjectRoot ? `目标项目：${targetProjectRoot}` : "",
+    `你是${agentName}，只能以自己的身份回复。不得代替其他员工发言，也不得用“[员工名]”等格式模拟他们的回复。`,
+    handoffAgentNames ? `需要其他员工实际参与时，必须在最终回复中准确提及：${handoffAgentNames}。系统会在你回复后调用被提及的员工；不要声称未被调用的员工已经回复或完成工作。` : "",
+    "本轮新增群聊消息：",
+    publicMessages || "（没有新增群聊消息）",
   ];
-  if (outputInstructions) lines.push("", "Output constraints for this request:", outputInstructions);
+  if (outputInstructions) lines.push("", outputInstructions);
   return lines.filter((line, index) => line || index === lines.length - 1).join("\n");
 };

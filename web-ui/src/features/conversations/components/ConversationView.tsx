@@ -73,6 +73,7 @@ function Message({
   const reserveTimestamp = message.role === "assistant";
   return (
     <article className={`${styles.message} ${message.role === "user" ? styles.user : styles.assistant}`}>
+      {message.authorName ? <span className={styles.authorName}>{message.authorName}</span> : null}
       {executionStatus && contextStatus ? (
         <ExecutionTimeline status={executionStatus} contextStatus={contextStatus} timestamp={formattedTime} />
       ) : formattedTime || reserveTimestamp ? (

@@ -118,6 +118,58 @@ test("an explicit Agent mention is not replaced by the web-output shortcut", asy
   assert.deepEqual(execution.explicitAgentIds, ["reviewer"]);
 });
 
+test("ordinary file-creation wording does not activate the legacy web-output shortcut", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "negus-group-route-default-output-"));
+  const room = await createGroupRoomStore({ stateFile: path.join(directory, "group-room.json"), project: "negus", broadcast: () => {} });
+  let execution = null;
+  const route = createGroupRoutes({
+    groupRoom: room,
+    media: { resolveMany: () => [] },
+    multiAgent: { enqueueDiscussion: async (input) => { execution = input; return { jobId: "job-default", agentIds: input.agentIds, status: "queued" }; } },
+    webOutputs: { isRequest: () => true },
+  });
+  const server = http.createServer(async (request, response) => {
+    if (!(await route(request, response, new URL(request.url, "http://127.0.0.1")))) { response.writeHead(404); response.end(); }
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { await new Promise((resolve) => server.close(resolve)); await room.close(); await fs.rm(directory, { recursive: true, force: true }); });
+  const { port } = server.address();
+  const response = await fetch(`http://127.0.0.1:${port}/api/group/message`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ memberId: "member-1", authorName: "Hans", clientMessageId: "client-default-1", text: "在单人聊天页面点击创建对话", attachmentIds: [] }),
+  });
+
+  assert.equal(response.status, 202);
+  assert.deepEqual(execution.agentIds, ["manager"]);
+  assert.equal("outputRequested" in execution, false);
+});
+
+test("interrupts only the selected group room", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "negus-group-route-interrupt-"));
+  const room = await createGroupRoomStore({ stateFile: path.join(directory, "group-room.json"), project: "negus", broadcast: () => {} });
+  let interrupted = 0;
+  const route = createGroupRoutes({
+    groupRoom: room,
+    media: { resolveMany: () => [] },
+    multiAgent: { interruptDiscussion: async () => { interrupted += 1; return { status: "interrupting", interruptedAgentIds: ["manager"], cancelledDiscussionCount: 1 }; } },
+    webOutputs: {},
+  });
+  const server = http.createServer(async (request, response) => {
+    if (!(await route(request, response, new URL(request.url, "http://127.0.0.1")))) { response.writeHead(404); response.end(); }
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { await new Promise((resolve) => server.close(resolve)); await room.close(); await fs.rm(directory, { recursive: true, force: true }); });
+  const { port } = server.address();
+  const response = await fetch(`http://127.0.0.1:${port}/api/group/interrupt`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roomId: room.snapshot().room.id }),
+  });
+  const result = await response.json();
+
+  assert.equal(response.status, 202);
+  assert.equal(result.status, "interrupting");
+  assert.equal(interrupted, 1);
+});
+
 test("a historical Agent alias routes to the registered employee", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "negus-group-route-alias-"));
   const room = await createGroupRoomStore({ stateFile: path.join(directory, "group-room.json"), project: "negus", broadcast: () => {} });

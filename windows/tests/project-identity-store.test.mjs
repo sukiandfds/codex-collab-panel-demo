@@ -152,3 +152,86 @@ test("directory groups Codex conversations under an additional business project"
     ["main-thread"],
   );
 });
+
+test("directory reads existing employee group bindings without creating them", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "negus-project-directory-readonly-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const worker = employee(root, {
+    id: "manager",
+    projectKey: "employee-manager",
+    mainThreadId: null,
+    conversationId: null,
+  });
+  let createCalls = 0;
+  const binding = {
+    conversationId: "group:current-project:manager",
+    runtimeKind: "codex",
+    runtimeSessionId: "group-thread-manager",
+    projectId: "project:employee:employee-manager",
+    targetProjectId: "project:personal:negus",
+    executionRoot: root,
+    title: "negus 项目群 · 运营管理",
+  };
+  const roomStore = {
+    getAgent: () => ({ id: "manager", name: "运营管理", threadId: "group-thread-manager" }),
+    snapshot: () => ({ messages: [] }),
+  };
+  const directory = createEmployeeProjectDirectory({
+    project: "negus",
+    projectRoot: root,
+    registry: { list: () => [worker] },
+    projectIdentity: {
+      sync: async () => {},
+      list: () => [
+        { projectId: "project:personal:negus", key: "negus", name: "negus", kind: "personal", root },
+        { projectId: "project:employee:employee-manager", key: "employee-manager", name: "运营管理", kind: "employee", root: worker.projectRoot },
+      ],
+      getByKey: () => ({ projectId: "project:employee:employee-manager", root: worker.projectRoot }),
+    },
+    employeeRuntime: { getStatus: async () => ({ status: { phase: "idle", active: false } }) },
+    employeeConversations: {
+      findByAgentRoom: () => binding,
+      openGroupForAgent: async () => { createCalls += 1; return binding; },
+    },
+    roomDirectory: {
+      listForAgent: () => [{ id: "current-project", projectId: "project:personal:negus", name: "negus 项目群" }],
+      get: () => roomStore,
+      threadIds: () => ["group-thread-manager"],
+    },
+    conversations: { listSessions: async () => [] },
+  });
+
+  const first = await directory.list();
+  const second = await directory.list();
+  const employeeProject = second.projects.find((item) => item.kind === "employee");
+  assert.equal(createCalls, 0);
+  assert.equal(employeeProject.conversations.length, 1);
+  assert.equal(employeeProject.conversations[0].conversationId, binding.conversationId);
+  assert.equal(employeeProject.conversations[0].projectId, "project:employee:employee-manager");
+  assert.equal(employeeProject.conversations[0].targetProjectId, "project:personal:negus");
+  assert.equal(first.projects.length, second.projects.length);
+});
+
+test("directory never assigns employee Runtime threads to a business project", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "negus-project-directory-owner-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const employeeThreadId = "employee-group-thread";
+  const directory = createEmployeeProjectDirectory({
+    project: "project-a",
+    projectRoot: root,
+    registry: { list: () => [] },
+    employeeConversations: {
+      findByRuntimeSession: (_runtimeKind, threadId) => threadId === employeeThreadId ? { conversationKind: "group" } : null,
+    },
+    conversations: {
+      listSessions: async () => [
+        { threadId: employeeThreadId, title: "employee work", cwd: root },
+        { threadId: "project-thread", title: "project work", cwd: root },
+      ],
+    },
+  });
+
+  const listing = await directory.list();
+  const project = listing.projects.find((item) => item.kind === "personal");
+  assert.deepEqual(project.conversations.map((item) => item.threadId), ["project-thread"]);
+});

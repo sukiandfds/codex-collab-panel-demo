@@ -101,10 +101,10 @@ export const createConversationRoutes = ({
     return binding;
   };
 
-  const readGroupAgentSession = (binding, pagination = {}) => {
+  const readGroupAgentSession = async (binding, pagination = {}) => {
     const room = roomDirectory?.get?.(binding.roomId);
     const snapshot = room?.snapshot?.();
-    const allMessages = (snapshot?.messages || [])
+    const existingReplies = (snapshot?.messages || [])
       .filter((message) => message?.type === "agent"
         && (message.agentId === binding.agentId || message.authorId === binding.agentId)
         && String(message.text || "").trim())
@@ -112,24 +112,43 @@ export const createConversationRoutes = ({
         id: `group:${binding.roomId}:${message.id}`,
         role: "assistant",
         text: String(message.text || ""),
+        authorId: message.authorId,
+        authorName: message.authorName,
+        sequence: message.sequence,
         createdAt: message.createdAt,
         source: "group",
         projectId: binding.projectId,
+        targetProjectId: binding.targetProjectId,
+        executionRoot: binding.executionRoot,
         roomId: binding.roomId,
         groupMessageId: message.id,
       }));
+    let deliveredMessages = [];
+    try {
+      deliveredMessages = await agentConversationStore.readMessages(binding.conversationId);
+    } catch {}
+    const messagesById = new Map();
+    for (const message of [...deliveredMessages, ...existingReplies]) {
+      if (message?.id && !messagesById.has(message.id)) messagesById.set(message.id, message);
+    }
+    const allMessages = [...messagesById.values()].sort((left, right) => {
+      if (Number.isSafeInteger(left.sequence) && Number.isSafeInteger(right.sequence)) return left.sequence - right.sequence;
+      return Date.parse(left.createdAt || "") - Date.parse(right.createdAt || "");
+    });
     const end = Math.min(Number.isSafeInteger(pagination.before) ? pagination.before : allMessages.length, allMessages.length);
     const start = pagination.limit ? Math.max(0, end - pagination.limit) : 0;
     const messages = allMessages.slice(start, end);
     const latest = allMessages[allMessages.length - 1];
+    const latestUser = [...allMessages].reverse().find((message) => message.role === "user");
+    const latestAssistant = [...allMessages].reverse().find((message) => message.role === "assistant");
     return {
       threadId: binding.runtimeSessionId,
       source: "codex",
       title: binding.title || `${snapshot?.room?.name || "项目群"} · 员工回复`,
       updatedAt: latest?.createdAt || "",
       messageCount: allMessages.length,
-      latestUser: "",
-      latestAssistant: latest?.text || "",
+      latestUser: latestUser?.text || "",
+      latestAssistant: latestAssistant?.text || "",
       archived: false,
       conversationKind: "group",
       readOnly: true,

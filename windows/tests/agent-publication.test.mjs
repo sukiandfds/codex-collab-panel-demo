@@ -75,6 +75,56 @@ test("publishes one Agent message without starting a discussion", async (t) => {
   assert.equal(events.filter((event) => event.type === "group_message_created").length, 1);
 });
 
+test("reuses one stable group conversation binding", async (t) => {
+  const { conversationStore, conversationStateFile } = await fixture(t);
+
+  const first = await conversationStore.openGroupForAgent({
+    agentId: "manager",
+    roomId: "current-project",
+    projectId: "project:employee:employee-manager",
+    targetProjectId: "project:personal:negus",
+    executionRoot: "D:\\projects\\negus",
+    threadId: "thread-manager",
+    title: "negus 项目群 · 运营管理",
+  });
+  const second = await conversationStore.openGroupForAgent({
+    agentId: "manager",
+    roomId: "current-project",
+    projectId: "project:employee:employee-manager",
+    targetProjectId: "project:personal:negus",
+    executionRoot: "D:\\projects\\negus",
+    threadId: "thread-manager",
+    title: "negus 项目群 · 运营管理",
+  });
+
+  assert.equal(first.conversationId, "group:current-project:manager");
+  assert.equal(second.conversationId, first.conversationId);
+  assert.equal(second.projectId, "project:employee:employee-manager");
+  assert.equal(second.targetProjectId, "project:personal:negus");
+  assert.equal(second.executionRoot, "D:\\projects\\negus");
+  await conversationStore.appendMessage({
+    conversationId: first.conversationId,
+    message: {
+      id: "group:current-project:message-1",
+      role: "user",
+      text: "检查当前问题",
+      authorId: "member-1",
+      authorName: "Hans",
+      sequence: 1,
+      createdAt: "2026-08-15T00:00:00.000Z",
+      source: "group",
+      roomId: "current-project",
+      groupMessageId: "message-1",
+    },
+  });
+  const delivered = await conversationStore.readMessages(first.conversationId);
+  assert.equal(delivered[0].authorName, "Hans");
+  assert.equal(delivered[0].sequence, 1);
+  assert.equal(delivered[0].groupMessageId, "message-1");
+  const stored = JSON.parse(await fs.readFile(conversationStateFile, "utf8"));
+  assert.equal(stored.bindings.length, 1);
+});
+
 test("publishes a locally persisted Agent reply when Runtime is unavailable", async (t) => {
   const { conversationStore, groupRoom, roomDirectory, publicationStore } = await fixture(t);
   const targets = await conversationStore.getShareTargets({ threadId: "thread-manager" });

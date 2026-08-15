@@ -259,7 +259,7 @@ export function useProjectConversations() {
     try {
       const created = previousTurnId
         ? await catalog.forkSession(sourceThreadId, previousTurnId)
-        : await catalog.createSession();
+        : await catalog.createSession(selection.session?.cwd || "");
       if (!created) return false;
       setEditingMessage(null);
       editingMessageRef.current = null;

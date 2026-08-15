@@ -76,20 +76,14 @@ export const createEmployeeProjectDirectory = ({
     return latestTimestamp(timestamps);
   };
 
-  const groupConversationsFor = async (employee, conversationStatuses) => {
+  const groupConversationsFor = async (employee, identity, conversationStatuses) => {
     const rooms = roomDirectory?.listForAgent?.(employee.id) || [];
     const entries = await Promise.all(rooms.map(async (room) => {
       const roomStore = roomDirectory?.get?.(room.id);
       const agent = roomStore?.getAgent?.(employee.id);
       const threadId = clean(agent?.threadId, 120);
       if (!roomStore || !threadId) return null;
-      const binding = await employeeConversations?.openGroupForAgent?.({
-        agentId: employee.id,
-        roomId: room.id,
-        projectId: room.projectId,
-        threadId,
-        title: `${clean(room.name, 200) || "项目群"} · ${clean(agent.name, 120) || employee.name}`,
-      });
+      const binding = employeeConversations?.findByAgentRoom?.(employee.id, room.id);
       if (!binding) return null;
       const messages = roomStore.snapshot().messages
         .filter((message) => message?.type === "agent"
@@ -103,7 +97,9 @@ export const createEmployeeProjectDirectory = ({
         id: binding.conversationId,
         threadId: binding.runtimeSessionId,
         conversationId: binding.conversationId,
-        projectId: clean(room.projectId, 200) || null,
+        projectId: clean(identity?.projectId, 200) || clean(employee.projectKey, 120) || `employee-${employee.id}`,
+        targetProjectId: clean(binding.targetProjectId || room.projectId, 200) || null,
+        executionRoot: clean(binding.executionRoot, 800) || null,
         role: "project",
         runtimeKind: binding.runtimeKind,
         runtimeSessionId: binding.runtimeSessionId,
@@ -145,7 +141,7 @@ export const createEmployeeProjectDirectory = ({
       const status = await readEmployeeStatus(employee.id);
       const statusKey = clean(mainThreadId || mainConversationId, 120);
       const mainLastActivityAt = await employeeLastActivity({ ...employee, conversationId: mainConversationId, mainThreadId });
-      const groupConversations = await groupConversationsFor(employee, conversationStatuses);
+      const groupConversations = await groupConversationsFor(employee, identity, conversationStatuses);
       const lastActivityAt = latestTimestamp([
         mainLastActivityAt,
         ...groupConversations.map((conversation) => conversation.lastActivityAt),
@@ -205,7 +201,12 @@ export const createEmployeeProjectDirectory = ({
       ...employees.map((employee) => clean(employee.mainThreadId, 120)),
       ...(roomDirectory?.threadIds?.() || []),
     ].filter(Boolean));
-    sessions = sessions.filter((session) => !employeeThreadIds.has(clean(session?.threadId, 120)));
+    sessions = sessions.filter((session) => {
+      const threadId = clean(session?.threadId, 120);
+      if (!threadId || employeeThreadIds.has(threadId)) return false;
+      if (employeeRuntime?.ownsThread?.(threadId)) return false;
+      return !employeeConversations?.findByRuntimeSession?.("codex", threadId);
+    });
     const sessionStatuses = sessions.map((session) => {
       const threadId = clean(session?.threadId, 120);
       let status = idleStatus();

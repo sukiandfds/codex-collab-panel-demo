@@ -12,7 +12,6 @@ import { GroupApp } from "./features/group-chat/GroupApp";
 import { IntelligenceEfficiencyControl } from "./features/intelligence-efficiency/components/IntelligenceEfficiencyControl";
 import { UsageSummaryControl } from "./features/usage-monitor/components/UsageSummaryControl";
 import { useUsageMonitor } from "./features/usage-monitor/hooks/useUsageMonitor";
-import { GoalProvider } from "./features/goals/state/GoalProvider";
 
 type InteractiveSurface = Exclude<ViewSurface, "progress">;
 const surfaceStorageKey = "negus:last-surface";
@@ -202,8 +201,7 @@ export function App() {
   }, []);
 
   return (
-    <GoalProvider>
-      <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
       <div
         aria-hidden={surface !== "conversation"}
         style={{
@@ -234,7 +232,6 @@ export function App() {
           <GroupApp active={surface === "group"} onViewChange={showSurface} />
         </div>
       ) : null}
-      </div>
-    </GoalProvider>
+    </div>
   );
 }

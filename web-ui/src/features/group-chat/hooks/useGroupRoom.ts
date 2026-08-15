@@ -226,8 +226,19 @@ export function useGroupRoom() {
     return true;
   }, [member, roomId]);
 
+  const interrupt = useCallback(async () => {
+    setError("");
+    try {
+      await groupApi.interrupt(roomId);
+      return true;
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+      return false;
+    }
+  }, [roomId]);
+
   return {
-    snapshot, rooms, roomId, selectRoom, member, loading, initialSyncReady, sending, error, join, send, refresh,
+    snapshot, rooms, roomId, selectRoom, member, loading, initialSyncReady, sending, error, join, send, interrupt, refresh,
     historyLoading, historyNotice, historyNavigation, loadOlder, loadNewer, jumpToDate, returnToLatest,
     connected: realtime.connected,
     streaming: realtime.streaming,

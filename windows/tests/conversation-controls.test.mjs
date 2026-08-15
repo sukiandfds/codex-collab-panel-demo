@@ -61,6 +61,53 @@ test("creates a persisted project thread and exposes the real model catalog", as
   assert.equal(calls.filter((call) => call.method === "model/list").length, 2);
 });
 
+test("keeps automatic titles local to Negus without renaming the Codex thread", async () => {
+  const calls = [];
+  let protocolHandler = () => {};
+  let resolveTitleChanged;
+  const titleChanged = new Promise((resolve) => { resolveTitleChanged = resolve; });
+  const sourceThread = { id: "source-thread", cwd: "D:\\project", source: "appServer", name: "", updatedAt: 100 };
+  let startCount = 0;
+  const client = {
+    subscribe: (handler) => { protocolHandler = handler; return () => {}; },
+    close: () => {},
+    request: async (method, params) => {
+      calls.push({ method, params });
+      if (method === "thread/start") {
+        startCount += 1;
+        return { thread: startCount === 1 ? sourceThread : { id: "title-thread", cwd: "D:\\project" } };
+      }
+      if (method === "turn/start" && params.threadId === "source-thread") return { turn: { id: "source-turn" } };
+      if (method === "turn/start" && params.threadId === "title-thread") {
+        queueMicrotask(() => {
+          protocolHandler({ method: "item/completed", params: { threadId: "title-thread", item: { type: "agentMessage", text: '{"title":"自动标题"}' } } });
+          protocolHandler({ method: "turn/completed", params: { threadId: "title-thread", turn: { id: "title-turn", status: "completed" } } });
+        });
+        return { turn: { id: "title-turn" } };
+      }
+      if (method === "thread/read") return { thread: sourceThread };
+      if (method === "thread/list") return { data: [sourceThread], nextCursor: null };
+      if (method === "thread/unsubscribe") return {};
+      throw new Error(`Unexpected request: ${method}`);
+    },
+  };
+  const store = createAppServerConversationStore({
+    projectRoot: "D:\\project",
+    registerMedia: () => null,
+    client,
+    onAutoTitleChanged: resolveTitleChanged,
+  });
+
+  await store.createSession();
+  await store.sendMessage("source-thread", "请排查自动标题问题");
+  await titleChanged;
+  const [session] = await store.listSessions();
+  store.close();
+
+  assert.equal(session.title, "自动标题");
+  assert.equal(calls.some((call) => call.method === "thread/name/set"), false);
+});
+
 test("creates a thread in a registered business project and rejects unknown folders", async () => {
   const calls = [];
   const client = {
@@ -81,6 +128,28 @@ test("creates a thread in a registered business project and rejects unknown fold
   await store.createSession("gpt-5.6-sol", "D:\\finance");
   assert.equal(calls[0].params.cwd, "D:\\finance");
   await assert.rejects(() => store.createSession("", "D:\\unknown"), /not registered/iu);
+  store.close();
+});
+
+test("rejects a new thread when Codex creates it outside the selected project", async () => {
+  const client = {
+    subscribe: () => () => {},
+    close: () => {},
+    request: async () => ({
+      thread: { id: "wrong-project-thread", cwd: "D:\\main", source: "appServer", updatedAt: 100 },
+    }),
+  };
+  const store = createAppServerConversationStore({
+    projectRoot: "D:\\main",
+    projectRoots: ["D:\\main", "D:\\finance"],
+    registerMedia: () => null,
+    client,
+  });
+
+  await assert.rejects(
+    () => store.createSession("gpt-5.6-sol", "D:\\finance"),
+    /未创建在所选项目/u,
+  );
   store.close();
 });
 

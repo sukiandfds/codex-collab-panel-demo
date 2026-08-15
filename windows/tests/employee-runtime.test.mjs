@@ -56,7 +56,7 @@ test("employee registry keeps identity state private from API-shaped values", as
   const employee = registry.get("developer");
   assert.equal(employee.id, "developer");
   assert.equal("instructions" in employee, false);
-  assert.equal(registry.require("developer").instructions.includes("只能讨论"), true);
+  assert.equal(registry.require("developer").instructions.includes("Legacy policy marker"), false);
 });
 
 test("employee runtime binds one main thread and gates workspace writes", async (t) => {
@@ -65,7 +65,10 @@ test("employee runtime binds one main thread and gates workspace writes", async 
   assert.equal(opened.employee.modificationConfirmed, false);
   assert.equal(calls.find((call) => call.method === "thread/start").params.sandbox, "read-only");
   await runtime.sendMessage({ employeeId: "developer", text: "先讨论方案", requestId: "request-1" });
-  assert.equal(calls.find((call) => call.method === "turn/start").params.cwd, path.join("D:\\project", "employees", "developer"));
+  const turnStart = calls.find((call) => call.method === "turn/start");
+  assert.equal(turnStart.params.cwd, path.join("D:\\project", "employees", "developer"));
+  assert.match(turnStart.params.developerInstructions, /1 分钟/u);
+  assert.match(turnStart.params.developerInstructions, /详细或全面检查/u);
   assert.equal((events.find((event) => event.type === "employee_status")?.modificationConfirmed), false);
   listener({ method: "turn/completed", params: { threadId: "employee-thread", turn: { status: "completed" } } });
   await runtime.confirmModification("developer");

@@ -13,7 +13,6 @@ import type { CodexModel } from "../../models/model/types";
 import type { MediaFile } from "../../../shared/model/media";
 import type { SessionMessage } from "../model/types";
 import { goalCapabilityOptions } from "../../goals/model/capability";
-import { useGoalCapability } from "../../goals/hooks/useGoalCapability";
 import { SlashCommandMenu, type SlashCommandOption } from "./SlashCommandMenu";
 import styles from "./ConversationComposer.module.css";
 
@@ -81,11 +80,9 @@ export function ConversationComposer({
   onReasoningEffortChange,
 }: ConversationComposerProps) {
   const [text, setText] = useState("");
-  const [goalFeedback, setGoalFeedback] = useState<{ accepted: boolean; message: string } | null>(null);
   const [slash, setSlash] = useState<SlashState | null>(null);
   const [activeSlash, setActiveSlash] = useState(0);
   const [collapsedSlashGroups, setCollapsedSlashGroups] = useState<Record<string, boolean>>({});
-  const executeGoalCapability = useGoalCapability();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submittingRef = useRef(false);
   const draft = useAttachmentDraft();
@@ -108,6 +105,11 @@ export function ConversationComposer({
 
   const insertSlashCommand = (option: SlashCommandOption) => {
     if (!slash) return;
+    if (option.id === "stop") {
+      setSlash(null);
+      void onInterrupt();
+      return;
+    }
     const next = slash.replaceDraft
       ? `${option.command} ${text.trim()}`
       : `${text.slice(0, slash.start)}${option.command} ${text.slice(slash.end)}`;
@@ -157,14 +159,6 @@ export function ConversationComposer({
     setText("");
     setSlash(null);
     if (!editing && !draft.attachments.length && !inheritedAttachments.length) {
-      const goalResult = await executeGoalCapability(submittedText);
-      if (goalResult.handled) {
-        setGoalFeedback(goalResult.feedback ? { accepted: goalResult.accepted, message: goalResult.feedback } : null);
-        if (!goalResult.accepted) setText(submittedText);
-        submittingRef.current = false;
-        return;
-      }
-      setGoalFeedback(null);
       const command = submittedText.trim().toLocaleLowerCase();
       if (command === "/compact" || command === "/stop" || command === "/review") {
         try {
@@ -216,15 +210,6 @@ export function ConversationComposer({
         onRetry={onRetryQueueItem}
         onSendNow={onSendQueueItem}
       />
-      {goalFeedback ? (
-        <div
-          className={styles.goalFeedback}
-          data-state={goalFeedback.accepted ? "success" : "error"}
-          role={goalFeedback.accepted ? "status" : "alert"}
-        >
-          {goalFeedback.message}
-        </div>
-      ) : null}
       <div
         className={styles.composer}
         aria-label="Codex 对话输入"
@@ -268,7 +253,6 @@ export function ConversationComposer({
           disabled={inputDisabled}
           onChange={(event) => {
             setText(event.target.value);
-            setGoalFeedback(null);
             updateSlash(event.target.value, event.target.selectionStart);
           }}
           onPaste={(event) => {
