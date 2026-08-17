@@ -32,6 +32,7 @@ test("selects the matching provider model and infers resolution from model overr
     n: 1,
     quality: undefined,
     targetSize: undefined,
+    aspectSourceImageIndex: undefined,
     outputDirectory: undefined,
     outputName: undefined,
   });
@@ -40,6 +41,17 @@ test("selects the matching provider model and infers resolution from model overr
     model: "gpt-image-2-4k",
     size: "2.35:1",
   }).size, "3840x1632");
+  assert.equal(providerImageRequestFromArgs({
+    prompt: "preserve the third image ratio",
+    aspect_source_image_index: 3,
+  }).aspectSourceImageIndex, 3);
+});
+
+test("selects the image model from an explicit pixel size when resolution is omitted", () => {
+  assert.equal(providerImageRequestFromArgs({ size: "3840x2160" }).model, "gpt-image-2-4k");
+  assert.equal(providerImageRequestFromArgs({ size: "2160×3840" }).model, "gpt-image-2-4k");
+  assert.equal(providerImageRequestFromArgs({ size: "2560x1440" }).model, "gpt-image-2-2k");
+  assert.equal(providerImageRequestFromArgs({ size: "1920x1080" }).model, "gpt-image-2");
 });
 
 test("rejects malformed or out-of-range image sizes", () => {

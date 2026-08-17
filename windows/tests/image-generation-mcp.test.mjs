@@ -9,6 +9,12 @@ import { createHappyEveringImageClient } from "../server/image-generation/happye
 
 const pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 const pngBuffer = Buffer.from(pngBase64, "base64");
+const pngWithDimensions = (width, height) => {
+  const buffer = Buffer.from(pngBuffer);
+  buffer.writeUInt32BE(width, 16);
+  buffer.writeUInt32BE(height, 20);
+  return buffer;
+};
 
 const temporaryRoot = async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "negus-image-mcp-test-"));
@@ -36,39 +42,53 @@ const mockServer = async (t, handler) => {
   return `http://127.0.0.1:${address.port}/v1`;
 };
 
-test("waits for generation by default and falls back to polling using Retry-After", async (t) => {
+test("receives Base64 image data in one generation request without polling", async (t) => {
   const outputDirectory = await temporaryRoot(t);
   const requests = [];
   const baseUrl = await mockServer(t, async (request, response) => {
     const body = JSON.parse((await readRequestBody(request)).toString("utf8"));
     requests.push(body);
-    if (!body.task_id) {
-      response.writeHead(202, { "Content-Type": "application/json", "Retry-After": "0.002" });
-      response.end(JSON.stringify({ task_id: "img-test-1" }));
-      return;
-    }
     response.writeHead(200, { "Content-Type": "application/json" });
     response.end(JSON.stringify({ data: [{ b64_json: pngBase64 }], usage: { total_tokens: 12 } }));
   });
-  const sleeps = [];
   const client = createHappyEveringImageClient({
     apiKey: "test-key",
     baseUrl,
     outputDirectory,
     timeoutMs: 5_000,
-    pollIntervalMs: 1,
-    sleep: async (milliseconds) => sleeps.push(milliseconds),
   });
   const result = await client.generate({ prompt: "a minimal test image", size: "1:1" });
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 1);
   assert.equal(requests[0].async, undefined);
+  assert.equal(requests[0].stream, undefined);
   assert.equal(requests[0].response_format, "b64_json");
-  assert.deepEqual(requests[1], { model: "gpt-image-2", task_id: "img-test-1" });
-  assert.deepEqual(sleeps, [2]);
-  assert.equal(result.taskId, "img-test-1");
   assert.equal(result.outputs[0].width, 1);
   assert.equal(result.outputs[0].height, 1);
   assert.equal(path.extname(result.outputs[0].path), ".png");
+  assert.deepEqual(await fs.readFile(result.outputs[0].path), pngBuffer);
+});
+
+test("returns complete Base64 JSON without waiting for the connection to close", async (t) => {
+  const outputDirectory = await temporaryRoot(t);
+  let cancelled = false;
+  const responseBody = JSON.stringify({ data: [{ b64_json: pngBase64 }] });
+  const fetchImpl = async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(responseBody));
+    },
+    cancel() {
+      cancelled = true;
+    },
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  const client = createHappyEveringImageClient({
+    apiKey: "test-key",
+    baseUrl: "https://example.test/v1",
+    outputDirectory,
+    timeoutMs: 5_000,
+    fetchImpl,
+  });
+  const result = await client.generate({ prompt: "complete before EOF" });
+  assert.equal(cancelled, true);
   assert.deepEqual(await fs.readFile(result.outputs[0].path), pngBuffer);
 });
 
@@ -90,8 +110,100 @@ test("uploads multiple references and a PNG mask as multipart edit data", async 
   assert.equal((multipartText.match(/name="image"/gu) || []).length, 2);
   assert.match(multipartText, /name="mask"/u);
   assert.doesNotMatch(multipartText, /name="async"/u);
+  assert.doesNotMatch(multipartText, /name="stream"/u);
   assert.match(multipartText, /name="response_format"\r\n\r\nb64_json/u);
   assert.equal(result.outputs.length, 1);
+});
+
+test("keeps reference images in their original order, including duplicates", async (t) => {
+  const root = await temporaryRoot(t);
+  const files = ["first.png", "second.png", "third.png"].map((name) => path.join(root, name));
+  await Promise.all(files.map((file) => fs.writeFile(file, pngBuffer)));
+  let multipartText = "";
+  const baseUrl = await mockServer(t, async (request, response) => {
+    multipartText = (await readRequestBody(request)).toString("latin1");
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ data: [{ b64_json: pngBase64 }] }));
+  });
+  const client = createHappyEveringImageClient({ apiKey: "test-key", baseUrl, outputDirectory: root, timeoutMs: 5_000 });
+  await client.edit({ prompt: "keep attachment order", imagePaths: [files[1], files[0], files[2], files[0]] });
+  const uploadedNames = [...multipartText.matchAll(/name="image"; filename="([^"]+)"/gu)].map((match) => match[1]);
+  assert.deepEqual(uploadedNames, ["second.png", "first.png", "third.png", "first.png"]);
+});
+
+test("uses explicit size instead of inspecting the requested reference ratio", async (t) => {
+  const root = await temporaryRoot(t);
+  const reference = path.join(root, "not-an-image.bin");
+  await fs.writeFile(reference, "not an image");
+  let multipartText = "";
+  const baseUrl = await mockServer(t, async (request, response) => {
+    multipartText = (await readRequestBody(request)).toString("latin1");
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ data: [{ b64_json: pngBase64 }] }));
+  });
+  const client = createHappyEveringImageClient({ apiKey: "test-key", baseUrl, outputDirectory: root, timeoutMs: 5_000 });
+  await client.edit({
+    prompt: "explicit ratio wins",
+    imagePaths: [reference],
+    size: "16:9",
+    aspectSourceImageIndex: 1,
+  });
+  assert.match(multipartText, /name="size"\r\n\r\n16:9/u);
+});
+
+test("derives size only from the explicitly selected one-based reference", async (t) => {
+  const root = await temporaryRoot(t);
+  const files = ["wide.png", "square.png", "portrait.png"].map((name) => path.join(root, name));
+  await Promise.all([
+    fs.writeFile(files[0], pngWithDimensions(160, 90)),
+    fs.writeFile(files[1], pngWithDimensions(100, 100)),
+    fs.writeFile(files[2], pngWithDimensions(200, 300)),
+  ]);
+  let multipartText = "";
+  const baseUrl = await mockServer(t, async (request, response) => {
+    multipartText = (await readRequestBody(request)).toString("latin1");
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ data: [{ b64_json: pngBase64 }] }));
+  });
+  const client = createHappyEveringImageClient({ apiKey: "test-key", baseUrl, outputDirectory: root, timeoutMs: 5_000 });
+  await client.edit({ prompt: "preserve image three ratio", imagePaths: files, aspectSourceImageIndex: 3 });
+  assert.match(multipartText, /name="size"\r\n\r\n2:3/u);
+  assert.doesNotMatch(multipartText, /aspect_source_image_index/u);
+});
+
+test("retains the configured default when no ratio instruction is supplied", async (t) => {
+  const root = await temporaryRoot(t);
+  const reference = path.join(root, "reference.png");
+  await fs.writeFile(reference, pngWithDimensions(160, 90));
+  let multipartText = "";
+  const baseUrl = await mockServer(t, async (request, response) => {
+    multipartText = (await readRequestBody(request)).toString("latin1");
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ data: [{ b64_json: pngBase64 }] }));
+  });
+  const client = createHappyEveringImageClient({
+    apiKey: "test-key",
+    baseUrl,
+    defaultSize: "1024x1024",
+    outputDirectory: root,
+    timeoutMs: 5_000,
+  });
+  await client.edit({ prompt: "use defaults", imagePaths: [reference] });
+  assert.match(multipartText, /name="size"\r\n\r\n1024x1024/u);
+});
+
+test("rejects an unexpected asynchronous response instead of polling", async (t) => {
+  const root = await temporaryRoot(t);
+  let requests = 0;
+  const baseUrl = await mockServer(t, async (request, response) => {
+    requests += 1;
+    await readRequestBody(request);
+    response.writeHead(202, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ task_id: "img-unexpected" }));
+  });
+  const client = createHappyEveringImageClient({ apiKey: "test-key", baseUrl, outputDirectory: root, timeoutMs: 5_000 });
+  await assert.rejects(client.generate({ prompt: "do not poll" }), /unexpected asynchronous task/u);
+  assert.equal(requests, 1);
 });
 
 test("downloads URL results and uses the detected image extension", async (t) => {
@@ -186,6 +298,7 @@ test("stdio MCP advertises the image tools and completes a mocked tool call", as
   send({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
   const listed = await responseFor(2);
   assert.deepEqual(listed.result.tools.map((tool) => tool.name), ["generate_image", "edit_image"]);
+  assert.ok(listed.result.tools[1].inputSchema.properties.aspect_source_image_index);
   send({
     jsonrpc: "2.0",
     id: 3,
@@ -198,6 +311,9 @@ test("stdio MCP advertises the image tools and completes a mocked tool call", as
   const called = await responseFor(3);
   assert.equal(called.result.isError, undefined);
   assert.match(called.result.content[0].text, /Generated 1 image/u);
+  assert.equal(called.result.content[1].type, "image");
+  assert.equal(called.result.content[1].mimeType, "image/png");
+  assert.equal(called.result.content[1].data, pngBase64);
   assert.equal(called.result.structuredContent.outputs[0].width, 1);
   assert.equal(providerRequest.prompt, "mocked MCP cinematic image");
   assert.equal(providerRequest.model, "gpt-image-2-4k");

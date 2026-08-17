@@ -17,9 +17,23 @@ export const normalizeImageResolution = (value, fallback = "1K") => {
 
 export const modelForImageResolution = (value) => imageModelByResolution[normalizeImageResolution(value)];
 
+const resolutionFromPixelSize = (value) => {
+  const normalized = String(value || "").trim().replace(/[×＊*]/gu, "x").replace(/\s+/gu, "");
+  const pixels = /^(\d{2,4})[xX](\d{2,4})$/u.exec(normalized);
+  if (!pixels) return undefined;
+  const longEdge = Math.max(Number(pixels[1]), Number(pixels[2]));
+  if (longEdge > 2560) return "4K";
+  if (longEdge > 1920) return "2K";
+  return "1K";
+};
+
 const resolutionForArgs = (args) => normalizeImageResolution(
   args.resolution,
-  resolutionByImageModel[String(args.model || "").trim()] || "1K",
+  resolutionByImageModel[String(args.model || "").trim()] || resolutionFromPixelSize(args.size) || "1K",
+);
+
+export const imageResolutionForModel = (value) => (
+  resolutionByImageModel[String(value || "").trim()] || "1K"
 );
 
 const roundedDimension = (value) => Math.max(64, Math.min(4096, Math.round(value / 16) * 16));
@@ -63,6 +77,7 @@ export const providerImageRequestFromArgs = (args = {}) => {
     n: args.n,
     quality: args.quality,
     targetSize: args.target_size || args.targetSize,
+    aspectSourceImageIndex: args.aspect_source_image_index || args.aspectSourceImageIndex,
     outputDirectory: args.output_directory || args.outputDirectory,
     outputName: args.output_name || args.outputName,
   };

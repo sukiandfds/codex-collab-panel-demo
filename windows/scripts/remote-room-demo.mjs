@@ -37,6 +37,7 @@ import { createAttachmentContentService } from "../server/attachment-content-ser
 import { loadEmployeeDefinitions } from "../server/employee-definitions.mjs";
 import { loadBusinessProjects } from "../server/business-project-config.mjs";
 import { createModelProviderService } from "../server/model-provider-service.mjs";
+import { createProjectActivityIndex } from "../server/project-activity-index.mjs";
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -392,6 +393,13 @@ const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppDat
 const fushengUsage = createFushengUsageService({
   credentialsFile: path.join(localAppData, "FushengUsageMonitor", "credentials.json"),
 });
+const projectActivityIndex = createProjectActivityIndex({
+  projectDirectory: projectIdentity,
+  conversations,
+  roomDirectory: groupRoomDirectory,
+  excludeThread: (threadId) => employeeRuntime.ownsThread(threadId)
+    || Boolean(agentConversationStore.findByRuntimeSession("codex", threadId)),
+});
 
 const serveStatic = createStaticFileServer(webRoot);
 const readWebVersion = createWebVersionReader(webRoot);
@@ -400,7 +408,7 @@ const requestHandler = createRequestHandler({
   followUpQueue, contextManagement, groupRoom, roomDirectory: groupRoomDirectory, multiAgent, multiAgentDirectory, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
   agentConversationStore, agentPublicationService, employeeRuntime,
   employeeProjectDirectory, employeeGrowth,
-  modelProviders,
+  modelProviders, projectActivityIndex,
 });
 const server = http.createServer(requestHandler);
 

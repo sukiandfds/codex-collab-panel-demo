@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import fs from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { createHappyEveringImageClient } from "./happyevering-client.mjs";
@@ -23,8 +24,13 @@ const resultText = (verb, result) => {
 const toolResult = async (operation, successVerb) => {
   try {
     const result = await operation();
+    const images = await Promise.all(result.outputs.map(async (output) => ({
+      type: "image",
+      data: (await fs.readFile(output.path)).toString("base64"),
+      mimeType: output.mimeType,
+    })));
     return {
-      content: [{ type: "text", text: resultText(successVerb, result) }],
+      content: [{ type: "text", text: resultText(successVerb, result) }, ...images],
       structuredContent: result,
     };
   } catch (error) {
@@ -39,16 +45,17 @@ export const createImageMcpServer = ({ client = createHappyEveringImageClient() 
   const server = new McpServer({ name: "negus-image", version: "0.1.0" }, { capabilities: { tools: {} } });
   server.registerTool("generate_image", {
     title: "Generate image",
-    description: "Call immediately when the user explicitly asks to generate or create an image. Preserve the user's wording and pass only options the user specified; the service supplies defaults and saves the result.",
+    description: "Call immediately when the user explicitly asks to generate or create an image. Preserve the user's wording and pass only options the user specified. The result already includes the image; do not call another image-viewing tool after success.",
     inputSchema: z.object(commonInput),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, (args) => toolResult(() => client.generate(providerImageRequestFromArgs(args)), "Generated"));
   server.registerTool("edit_image", {
     title: "Edit image",
-    description: "Use for a request to change an existing image. Reuse the latest generated image path when available, preserve composition or identity constraints, and pass only options the user specified.",
+    description: "Use for a request to change an existing image. Reuse the latest generated image path when available and pass only options the user specified. The result already includes the image; do not call another image-viewing tool after success.",
     inputSchema: z.object({
       ...commonInput,
-      image_paths: z.array(z.string().min(1)).min(1).max(16).describe("Absolute local paths to reference images."),
+      image_paths: z.array(z.string().min(1)).min(1).max(16).describe("Absolute local paths in the user's original attachment order. Never reorder them."),
+      aspect_source_image_index: z.number().int().min(1).max(16).optional().describe("One-based attachment index whose aspect ratio should be preserved. Set only when the user explicitly asks to preserve that image's ratio, and omit when size is set."),
       mask_path: z.string().min(1).optional().describe("Optional absolute path to a PNG mask."),
     }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },

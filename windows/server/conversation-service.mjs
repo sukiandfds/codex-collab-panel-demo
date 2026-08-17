@@ -197,6 +197,9 @@ export const createConversationService = ({ primary, fallback, contentVersionSto
     getThreadStatus: (...args) => primary.getThreadStatus(...args),
     compactContext: (...args) => primary.compactContext(...args),
     reviewSession: (...args) => primary.reviewSession(...args),
+    getGoal: (...args) => primary.getGoal(...args),
+    setGoal: (...args) => primary.setGoal(...args),
+    clearGoal: (...args) => primary.clearGoal(...args),
     close: () => {
       inFlightFinds.clear();
       primary.close();

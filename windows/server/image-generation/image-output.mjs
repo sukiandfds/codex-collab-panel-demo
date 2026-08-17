@@ -53,10 +53,10 @@ const identifyImage = (buffer, hintedMime = "") => {
   return { mimeType, extension, ...dimensions };
 };
 
-const downloadImage = async ({ url, fetchImpl, apiKey, baseUrl, timeoutMs }) => {
+const downloadImage = async ({ url, fetchImpl, apiKey, baseUrl, timeoutMs, signal }) => {
   const headers = {};
   if (new URL(url).origin === new URL(baseUrl).origin) headers.Authorization = `Bearer ${apiKey}`;
-  const response = await fetchImpl(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
+  const response = await fetchImpl(url, { headers, signal: signal || AbortSignal.timeout(timeoutMs) });
   if (!response.ok) throw new Error(`Failed to download generated image: HTTP ${response.status}`);
   return {
     buffer: Buffer.from(await response.arrayBuffer()),
@@ -99,6 +99,7 @@ export const saveImageResponse = async ({
   apiKey,
   baseUrl,
   timeoutMs,
+  signal,
 }) => {
   const sources = [...new Set(collectImageSources(response))];
   if (!sources.length) {
@@ -112,7 +113,7 @@ export const saveImageResponse = async ({
   const stem = safeStem(outputName, prefix, stamp);
   const outputs = [];
   for (let index = 0; index < sources.length; index += 1) {
-    const decoded = await decodeImageSource(sources[index], { fetchImpl, apiKey, baseUrl, timeoutMs });
+    const decoded = await decodeImageSource(sources[index], { fetchImpl, apiKey, baseUrl, timeoutMs, signal });
     if (!decoded.buffer.length) throw new Error("Image API returned an empty image");
     const identified = identifyImage(decoded.buffer, decoded.mimeType);
     const suffix = sources.length > 1 ? `-${index + 1}` : "";

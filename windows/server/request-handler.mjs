@@ -11,12 +11,13 @@ import { createAgentPublicationRoutes } from "./routes/agent-publication-routes.
 import { createEmployeeRoutes } from "./routes/employee-routes.mjs";
 import { createEmployeeProjectDirectoryRoutes } from "./routes/employee-project-directory-routes.mjs";
 import { createEmployeeGrowthRoutes } from "./routes/employee-growth-routes.mjs";
+import { createProjectReviewRoutes } from "./routes/project-review-routes.mjs";
 
 export const createRequestHandler = ({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime, submissions,
   followUpQueue, contextManagement, groupRoom, roomDirectory, multiAgent, multiAgentDirectory, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
   agentConversationStore, agentPublicationService,
-  employeeRuntime, employeeProjectDirectory, employeeGrowth, modelProviders,
+  employeeRuntime, employeeProjectDirectory, employeeGrowth, modelProviders, projectActivityIndex,
 }) => {
   const routes = [
     createVersionRoutes({ readWebVersion }),
@@ -29,6 +30,7 @@ export const createRequestHandler = ({
     ...(employeeRuntime ? [createEmployeeRoutes({ employeeRuntime })] : []),
     ...(employeeProjectDirectory ? [createEmployeeProjectDirectoryRoutes({ directory: employeeProjectDirectory })] : []),
     ...(employeeGrowth ? [createEmployeeGrowthRoutes({ growth: employeeGrowth })] : []),
+    ...(projectActivityIndex ? [createProjectReviewRoutes({ activityIndex: projectActivityIndex })] : []),
     createGroupRoutes({ groupRoom, roomDirectory, media, multiAgent, multiAgentDirectory, webOutputs }),
     createFollowUpQueueRoutes({ queue: followUpQueue, media }),
     createConversationRoutes({
