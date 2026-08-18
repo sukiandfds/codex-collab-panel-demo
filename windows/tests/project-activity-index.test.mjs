@@ -174,6 +174,35 @@ test("rejects invalid dates, unknown projects, and employee projects", async () 
   );
 });
 
+test("reports archived project threads without treating them as active", async () => {
+  const conversations = {
+    listSessions: async (_source, archived) => archived ? [{
+      threadId: "thread-archived",
+      cwd: project.root,
+      title: "Archived work",
+      updatedAt: "2026-08-14T08:00:00.000Z",
+    }] : [],
+    findSession: async () => ({
+      messages: [{
+        id: "message-archived",
+        role: "assistant",
+        text: "Archived result",
+        createdAt: "2026-08-14T08:00:00.000Z",
+      }],
+    }),
+  };
+  const index = createProjectActivityIndex({
+    projectDirectory: { get: (projectId) => projectId === project.projectId ? project : null },
+    conversations,
+    readGitCommits: async () => [],
+  });
+
+  const result = await index.read({ projectId: project.projectId, date: "2026-08-14", timeZoneOffsetMinutes: 480 });
+
+  assert.deepEqual(result.archivedThreadIds, ["thread-archived"]);
+  assert.equal(result.activities[0].archived, true);
+});
+
 test("exposes the activity index through a read-only route", async () => {
   const calls = [];
   const route = createProjectReviewRoutes({

@@ -1,6 +1,6 @@
 # negus Web 协作工作台项目说明
 
-更新日期：2026-08-10
+更新日期：2026-08-17 11:10 +08:00
 
 本文件只说明 negus Web 协作工作台。Codex Dream Skin 换肤工具的使用说明放在 `macos/README.md` 和 `windows/README.md`。
 
@@ -32,6 +32,14 @@ negus 是一个围绕真实 Codex 工作过程的 Web 协作工作台。
 - PWA、设备身份、移动端入口和用量摘要。
 
 功能是否已经达到可交付状态，以 `docs/feature-development/FEATURE_STATUS_INDEX.md` 和对应功能文档为准。
+
+## 产品定义入口
+
+当前全部产品功能、用户流程、归属关系和不可违反的边界统一写在 [`PRODUCT_DEFINITION.md`](./PRODUCT_DEFINITION.md)。本文件只保留项目定位和入口，不重复维护完整功能正文。
+
+固定阅读顺序：`PROJECT.md` -> `PRODUCT_DEFINITION.md` -> 本次涉及的 `FEAT-*.md`。
+
+其中群聊和员工的核心原则是：工作项目拥有项目文件和公共群聊记录；员工自己的项目始终拥有该员工的直属单聊和参与各项目群聊的长期会话。员工可以操作目标工作项目，但不得在目标工作项目的普通会话列表中创建或留下员工会话。
 
 ## 代码结构与模块入口
 

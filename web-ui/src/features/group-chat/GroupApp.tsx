@@ -109,6 +109,8 @@ export function GroupApp({ active = true, onViewChange }: { active?: boolean; on
         header={
           <GroupHeader
             roomName={snapshot?.room.name || "Negus 项目群"}
+            roomId={snapshot?.room.id || ""}
+            projectId={snapshot?.projectId || ""}
             connected={group.connected}
             deviceName={device?.name}
             members={members}

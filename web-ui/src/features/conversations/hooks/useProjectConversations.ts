@@ -417,7 +417,7 @@ export function useProjectConversations() {
     setArchiveViewMode: catalog.setArchiveViewMode,
     archiveSession: catalog.archiveSession,
     unarchiveSession: catalog.unarchiveSession,
-    archiveBusyId: catalog.archiveBusyId,
+    archiveBusyIds: catalog.archiveBusyIds,
     forkFromMessage,
     forkingMessageId,
     editingMessage,

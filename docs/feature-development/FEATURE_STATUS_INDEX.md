@@ -1,7 +1,7 @@
 ---
 document_type: feature_status_index
 schema_version: 1
-last_updated: 2026-08-14
+last_updated: "2026-08-17 11:10 +08:00"
 ---
 
 # 功能状态索引
@@ -13,7 +13,7 @@ AI 助手根据任务定位功能编号，再读取对应功能文件。不要�
 | 功能编号 | 功能 | 当前状态 | 当前版本 | 最近更新 | 当前结论 | 记录 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `FEAT-001` | 单人 Codex Web 对话与控制 | `implemented_pending_review` | `v0.10.11` | 2026-08-06 | 已完成提交身份幂等、恢复与最终回复交接、加载完成前隐藏旧快照、历史消息加载位置保持等代码修复；当前只剩最新构建的真实刷新、重开、跨端和长任务体验确认，不再把已完成的代码修复列为待开发 | [`FEAT-001-single-codex-web.md`](./features/FEAT-001-single-codex-web.md) |
-| `FEAT-002` | 项目群聊与多 Agent 讨论 | `in_progress` | `v0.4.4` | 2026-08-10 | 群聊基础界面、Agent 独立单聊与“带到群聊”已接入；员工项目页显示成长事实和待审批建议，审批写入失败可重试；消息样式、富文本、历史加载、流式回复、等候队列、模型与上下文仍列为后续开发 | [`FEAT-002-group-multi-agent.md`](./features/FEAT-002-group-multi-agent.md) |
+| `FEAT-002` | 项目群聊与多 Agent 讨论 | `in_progress` | `v0.4.4` | 2026-08-17 11:10 +08:00 | 产品定义已确认：一个员工在一个项目群聊中使用员工项目下的一个长期会话；工作项目只保存公共群聊记录和目标文件，员工结果只生成一次并发布回群聊。当前代码归属缺口仍待修复，压缩、复盘和中止过程发布属于后续能力 | [`FEAT-002-group-multi-agent.md`](./features/FEAT-002-group-multi-agent.md) |
 | `FEAT-003` | 附件与对话内容渲染 | `implemented_pending_review` | `v0.3.0` | 2026-07-25 22:49 +08:00 | 支持上传、图片/音频/视频/文件展示和 Markdown 本地图片登记；仍是 Demo 级上传协议 | [`FEAT-003-attachments-content-rendering.md`](./features/FEAT-003-attachments-content-rendering.md) |
 | `FEAT-004` | PWA、设备身份与移动/平板入口 | `implemented_pending_review` | `v0.2.0` | 2026-07-28 17:43 +08:00 | 新构建会提示用户刷新且不会自动打断任务；连接状态不再误报电脑离线，真实 PWA 更新流程待原开发电脑验证 | [`FEAT-004-pwa-device-identity.md`](./features/FEAT-004-pwa-device-identity.md) |
 | `FEAT-005` | Desktop/Web 连续性与同任务提示 | `discovery` | `v0.4.1` | 2026-07-28 22:20 +08:00 | Desktop 与 Web 共享持久化 Thread 但不共享实时事件；双端同时操作曾导致 Web app-server 失联，需先做同任务提示、最小控制权和受控恢复 | [`FEAT-005-desktop-web-continuity.md`](./features/FEAT-005-desktop-web-continuity.md) |
@@ -28,7 +28,7 @@ AI 助手根据任务定位功能编号，再读取对应功能文件。不要�
 | `FEAT-014` | 项目对话归档与恢复 | `implemented_pending_review` | `v0.1.0` | 2026-08-06 | 活动/归档列表、恢复、失败提示和 JSONL fallback 隔离已提交；剩余是本机运行时与移动端体验确认 | [`FEAT-014-conversation-archive.md`](./features/FEAT-014-conversation-archive.md) |
 | `FEAT-015` | 自然语言生图与自动化工作台 | `in_progress` | `v0.5.0` | 2026-08-06 | 对话生图核心已经完成并进入真实 Thread/Turn：自然语言触发、2.35:1 4K、连续改图、普通后续对话、旧会话迁移和结果去重已有实现；仍在开发的是专门工作台、Artifact、批量模板、队列和定时任务 | [`FEAT-015-image-generation-and-automation-workbench.md`](./features/FEAT-015-image-generation-and-automation-workbench.md) |
 | `FEAT-016` | 项目统一更名为 negus | `implemented_pending_review` | `v1.0.0` | 2026-08-05 09:28 +08:00 | 界面、PWA、包名和 GitHub 仓库已统一为 negus，浏览器旧数据保留兼容；本地目录将在当前活动 Turn 收口后由独立 Worker 迁移并恢复同一端口 | [`FEAT-016-project-identity-negus.md`](./features/FEAT-016-project-identity-negus.md) |
-| `FEAT-017` | 多业务项目与 Codex 会话归类 | `implemented_pending_review` | `v0.1.0` | 2026-08-12 | 已支持从本机配置登记多个业务项目，并按 Thread 工作目录显示已有会话；当前接入 `negus税务管理`，等待运行服务验收 | [`FEAT-017-multiple-business-projects.md`](./features/FEAT-017-multiple-business-projects.md) |
+| `FEAT-017` | 多业务项目与 Codex 会话归类 | `implemented_pending_review` | `v0.1.0` | 2026-08-17 11:10 +08:00 | 已确认所有者项目、目标工作项目和文件访问路径必须分离；员工 Thread 不得进入工作项目普通会话列表。现有实现仍需按该定义检查和修复 | [`FEAT-017-multiple-business-projects.md`](./features/FEAT-017-multiple-business-projects.md) |
 | `FEAT-018` | Codex 原生 Goal 目标模式入口 | `implemented_pending_review` | `v0.2.0` | 2026-08-14 | 已删除 Negus 自建 Goal 生命周期，只保留单聊和群聊能力菜单入口并走现有 Codex 消息通道；UI 构建及 Windows 146 项测试通过，等待安全重启后的原生 Goal 运行验收 | [`FEAT-018-system-goal-orchestration.md`](./features/FEAT-018-system-goal-orchestration.md) |
 
 `FEAT-010` 曾用于已暂停的 Orca 路线实验，本轮不复用该编号。

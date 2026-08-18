@@ -99,7 +99,12 @@ export function ConversationHeader({ project, session, deviceName, connected, si
           <button className={styles.iconButton} type="button" aria-label="分享当前对话" title="分享" onClick={() => setSharing(true)}>
             <Share2 aria-hidden="true" />
           </button>
-          <ViewSwitcher current="conversation" onViewChange={onViewChange} />
+          <ViewSwitcher
+            current="conversation"
+            onViewChange={onViewChange}
+            projectRoot={session?.cwd || project?.root || ""}
+            currentSourceId={session?.threadId ? `conversation:${session.threadId}` : ""}
+          />
         </div>
         <div className={styles.statusbar}>
           <DeviceStatus name={deviceName} connected={connected} />

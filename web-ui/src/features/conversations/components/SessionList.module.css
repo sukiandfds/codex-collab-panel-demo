@@ -10,6 +10,14 @@
 .itemAction:focus-visible { outline: 2px solid var(--color-text-secondary); outline-offset: 1px; }
 .itemAction:disabled { cursor: default; opacity: .5; }
 .itemAction svg { width: 14px; height: 14px; stroke-width: 1.8; }
+.itemActionPressed,
+.itemActionPressed:disabled { background: var(--color-surface-active); color: var(--color-text); opacity: 1; }
+.itemActionPressed svg { animation: archive-icon-press 110ms var(--ease-out); }
+@keyframes archive-icon-press {
+  0% { transform: scale(1); }
+  55% { transform: scale(.72); }
+  100% { transform: scale(.9); }
+}
 .content { display: flex; width: 100%; min-width: 0; align-items: center; gap: 8px; }
 .textColumn { display: grid; min-width: 0; flex: 1; gap: 3px; text-align: left; }
 .statusSlot { display: grid; width: 6px; height: 12px; flex: 0 0 6px; place-items: center; }

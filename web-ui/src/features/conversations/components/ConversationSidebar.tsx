@@ -16,7 +16,7 @@ interface ConversationSidebarProps {
   connected: boolean;
   creating: boolean;
   archivedView: boolean;
-  archiveBusyId: string;
+  archiveBusyIds: ReadonlySet<string>;
   error: string;
   onSelect: (threadId: string) => void;
   onCreate: (projectRoot?: string) => Promise<boolean>;
@@ -36,7 +36,7 @@ export function ConversationSidebar({
   connected,
   creating,
   archivedView,
-  archiveBusyId,
+  archiveBusyIds,
   error,
   onSelect,
   onCreate,
@@ -93,7 +93,7 @@ export function ConversationSidebar({
         sessionsLoading={loading}
         sessionsError={error}
         archivedView={archivedView}
-        archiveBusyId={archiveBusyId}
+        archiveBusyIds={archiveBusyIds}
         onSelect={onSelect}
         onArchive={onArchive}
         onUnarchive={onUnarchive}

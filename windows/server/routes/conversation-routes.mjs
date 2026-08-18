@@ -108,67 +108,19 @@ export const createConversationRoutes = ({
       && employeeRuntime?.ownsConversation?.(binding),
   );
 
-  const readGroupAgentSession = async (binding, pagination = {}) => {
-    const room = roomDirectory?.get?.(binding.roomId);
-    const snapshot = room?.snapshot?.();
-    const existingReplies = (snapshot?.messages || [])
-      .filter((message) => message?.type === "agent"
-        && (message.agentId === binding.agentId || message.authorId === binding.agentId)
-        && String(message.text || "").trim())
-      .map((message) => ({
-        id: `group:${binding.roomId}:${message.id}`,
-        role: "assistant",
-        text: String(message.text || ""),
-        authorId: message.authorId,
-        authorName: message.authorName,
-        sequence: message.sequence,
-        createdAt: message.createdAt,
-        source: "group",
-        projectId: binding.projectId,
-        targetProjectId: binding.targetProjectId,
-        executionRoot: binding.executionRoot,
-        roomId: binding.roomId,
-        groupMessageId: message.id,
-      }));
-    let deliveredMessages = [];
-    try {
-      deliveredMessages = await agentConversationStore.readMessages(binding.conversationId);
-    } catch {}
-    const messagesById = new Map();
-    for (const message of [...deliveredMessages, ...existingReplies]) {
-      if (message?.id && !messagesById.has(message.id)) messagesById.set(message.id, message);
-    }
-    const allMessages = [...messagesById.values()].sort((left, right) => {
-      if (Number.isSafeInteger(left.sequence) && Number.isSafeInteger(right.sequence)) return left.sequence - right.sequence;
-      return Date.parse(left.createdAt || "") - Date.parse(right.createdAt || "");
-    });
-    const end = Math.min(Number.isSafeInteger(pagination.before) ? pagination.before : allMessages.length, allMessages.length);
-    const start = pagination.limit ? Math.max(0, end - pagination.limit) : 0;
-    const messages = allMessages.slice(start, end);
-    const latest = allMessages[allMessages.length - 1];
-    const latestUser = [...allMessages].reverse().find((message) => message.role === "user");
-    const latestAssistant = [...allMessages].reverse().find((message) => message.role === "assistant");
+  const readGroupAgentSession = async (binding, source, pagination = {}) => {
+    const session = await conversations.findSession(binding.runtimeSessionId, source, pagination);
+    if (!session) return null;
     return {
-      threadId: binding.runtimeSessionId,
-      source: "codex",
-      title: binding.title || `${snapshot?.room?.name || "项目群"} · 员工回复`,
-      updatedAt: latest?.createdAt || "",
-      messageCount: allMessages.length,
-      latestUser: latestUser?.text || "",
-      latestAssistant: latestAssistant?.text || "",
-      archived: false,
+      ...session,
       conversationKind: "group",
       readOnly: true,
-      messages,
-      hasMore: start > 0,
-      nextBefore: start || null,
-      nextCursor: null,
       conversationId: binding.conversationId,
     };
   };
 
   const readAgentSession = async (binding, source, pagination) => {
-    if (binding.conversationKind === "group") return readGroupAgentSession(binding, pagination);
+    if (binding.conversationKind === "group") return readGroupAgentSession(binding, source, pagination);
     if (isEmployeeDirectBinding(binding)) return employeeRuntime.readSession(binding.agentId, pagination);
     return conversations.findSession(binding.runtimeSessionId, source, pagination);
   };
@@ -541,7 +493,9 @@ export const createConversationRoutes = ({
       sendJson(response, { error: "当前任务运行中，请完成后再归档" }, 409);
       return true;
     }
-    sendJson(response, await conversations.archiveSession(threadId), 202);
+    const result = await conversations.archiveSession(threadId);
+    publishThreadEvent(threadId, { type: "sessions_changed", threadId });
+    sendJson(response, result, 202);
     return true;
   }
   if (url.pathname === "/api/session/unarchive" && request.method === "POST") {
@@ -553,7 +507,9 @@ export const createConversationRoutes = ({
       return true;
     }
     await authorizeAgentThread({ threadId, conversationId });
-    sendJson(response, await conversations.unarchiveSession(threadId), 202);
+    const result = await conversations.unarchiveSession(threadId);
+    publishThreadEvent(threadId, { type: "sessions_changed", threadId });
+    sendJson(response, result, 202);
     return true;
   }
   if (url.pathname === "/api/session/context" && request.method === "GET") {

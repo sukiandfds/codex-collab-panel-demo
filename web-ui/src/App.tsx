@@ -65,7 +65,7 @@ function ConversationApp({ active, onViewChange }: { active: boolean; onViewChan
           connected={conversations.connected}
           creating={conversations.creating}
           archivedView={conversations.archivedView}
-          archiveBusyId={conversations.archiveBusyId}
+          archiveBusyIds={conversations.archiveBusyIds}
           error={conversations.listError}
           onSelect={selectSession}
           onCreate={conversations.createSession}

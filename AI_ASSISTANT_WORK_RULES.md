@@ -1,10 +1,11 @@
 # AI 助手工作规则
 
-更新日期：2026-08-14
+更新日期：2026-08-17 11:10 +08:00
 
 本文件只说明助手如何工作。
 
 - 项目资料看根目录 PROJECT.md。
+- 当前完整产品定义看根目录 PRODUCT_DEFINITION.md。
 - 常犯错误看 docs/feature-development/DEVELOPMENT_COMMON_MISTAKES.md。
 - 功能状态看 docs/feature-development/FEATURE_STATUS_INDEX.md。
 
@@ -28,9 +29,10 @@
 
 1. 本文件。
 2. 根目录 PROJECT.md。
-3. 相关功能文档和 FEATURE_STATUS_INDEX.md。
-4. 与当前任务相关的 PROC-*。
-5. 需要项目状态时，再读取 docs/project-management/items/<ITEM-ID>/。
+3. 根目录 PRODUCT_DEFINITION.md；功能修改前必须读取完整文件，不能只依赖索引摘要。
+4. 相关功能文档和 FEATURE_STATUS_INDEX.md。
+5. 与当前任务相关的 PROC-*。
+6. 需要项目状态时，再读取 docs/project-management/items/<ITEM-ID>/。
 
 开始修改前执行：
 
@@ -69,6 +71,8 @@
 ## 4. 开发记录
 
 - 功能变更更新对应 FEAT-*.md。
+- 功能变更同时更新 PRODUCT_DEFINITION.md 对应的当前定义；总定义只保留当前有效规则，不堆历史方案。
+- 每次产品或功能定义修改都标注精确到分钟的日期时间，并写清修改前体验、修改后体验、归属、运行逻辑、边界和未实现项。
 - 功能状态或版本变化时更新 FEATURE_STATUS_INDEX.md。
 - 项目当前状态更新对应 item.md，过程更新 updates.md。
 - 研究写入 docs/research/。

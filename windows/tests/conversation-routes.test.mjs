@@ -29,7 +29,7 @@ const invokeGet = (route, pathname) => {
   return { response, promise: route(request, response, new URL(`http://127.0.0.1${pathname}`)) };
 };
 
-test("shows delivered group context and the employee reply as one normal conversation", async () => {
+test("shows the real Runtime thread for a group employee conversation while keeping it read-only", async () => {
   const binding = {
     conversationId: "group:current-project:manager",
     agentId: "manager",
@@ -40,43 +40,31 @@ test("shows delivered group context and the employee reply as one normal convers
     projectId: "project:employee:employee-manager",
     targetProjectId: "project:personal:negus",
   };
+  const runtimeSession = {
+    threadId: binding.runtimeSessionId,
+    source: "codex",
+    title: "运营管理处理项目群任务",
+    archived: false,
+    messages: [
+      { id: "message-1", role: "assistant", text: "我先检查相关文件。" },
+      { id: "message-2", role: "tool", text: "rg -n group windows/server" },
+      { id: "message-3", role: "assistant", text: "检查完成" },
+    ],
+  };
+  const reads = [];
   const route = createConversationRoutes({
-    conversations: {},
+    conversations: {
+      findSession: async (...args) => {
+        reads.push(args);
+        return runtimeSession;
+      },
+    },
     execution: { getStatus: () => ({ active: false, turnId: "" }) },
     contextManagement: {},
     media: { resolveMany: () => [] },
     agentConversationStore: {
       findByRuntimeSession: () => binding,
       resolve: async () => binding,
-      readMessages: async () => [{
-        id: "group:current-project:human-1",
-        role: "user",
-        text: "检查当前问题",
-        authorId: "member-1",
-        authorName: "Hans",
-        sequence: 1,
-        createdAt: "2026-08-15T00:00:00.000Z",
-        source: "group",
-        roomId: "current-project",
-        groupMessageId: "human-1",
-      }],
-    },
-    roomDirectory: {
-      get: () => ({
-        snapshot: () => ({
-          room: { id: "current-project", name: "Negus 项目群" },
-          messages: [{
-            id: "agent-1",
-            type: "agent",
-            authorId: "manager",
-            authorName: "运营管理",
-            agentId: "manager",
-            sequence: 2,
-            text: "检查完成",
-            createdAt: "2026-08-15T00:00:30.000Z",
-          }],
-        }),
-      }),
     },
   });
   const call = invokeGet(route, "/api/session?threadId=group-thread-manager&conversationId=group%3Acurrent-project%3Amanager");
@@ -84,13 +72,14 @@ test("shows delivered group context and the employee reply as one normal convers
   const session = JSON.parse(call.response.body);
 
   assert.equal(call.response.status, 200);
-  assert.deepEqual(session.messages.map(({ role, authorName, text }) => ({ role, authorName, text })), [
-    { role: "user", authorName: "Hans", text: "检查当前问题" },
-    { role: "assistant", authorName: "运营管理", text: "检查完成" },
-  ]);
-  assert.equal(session.latestUser, "检查当前问题");
-  assert.equal(session.latestAssistant, "检查完成");
-  assert.equal(session.messages.some((message) => message.text.includes("目标项目：")), false);
+  assert.equal(reads.length, 1);
+  assert.equal(reads[0][0], binding.runtimeSessionId);
+  assert.equal(reads[0][1], "all");
+  assert.deepEqual(session.messages, runtimeSession.messages);
+  assert.equal(session.title, runtimeSession.title);
+  assert.equal(session.conversationKind, "group");
+  assert.equal(session.conversationId, binding.conversationId);
+  assert.equal(session.readOnly, true);
 });
 
 test("reuses the in-flight result for a repeated submission id", async () => {

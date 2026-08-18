@@ -115,10 +115,19 @@ export const createProjectActivityIndex = ({
   if (!projectDirectory?.get) throw new Error("Project directory is required.");
   if (!conversations?.listSessions || !conversations?.findSession) throw new Error("Conversation service is required.");
 
-  const read = async ({ projectId, date, timeZoneOffsetMinutes = defaultTimeZoneOffsetMinutes } = {}) => {
-    const identity = projectDirectory.get(clean(projectId, 200));
+  const resolve = ({ projectId, projectRoot } = {}) => {
+    const requestedId = clean(projectId, 200);
+    const requestedRoot = clean(projectRoot, 1000);
+    const identity = requestedId
+      ? projectDirectory.get(requestedId)
+      : projectDirectory.list?.().find((entry) => requestedRoot && sameRoot(entry?.root, requestedRoot));
     if (!identity) throw statusError("Project does not exist.", 404);
     if (identity.kind === "employee") throw statusError("Employee project activity is not part of the project review index.", 409);
+    return identity;
+  };
+
+  const read = async ({ projectId, projectRoot, date, timeZoneOffsetMinutes = defaultTimeZoneOffsetMinutes } = {}) => {
+    const identity = resolve({ projectId, projectRoot });
     const root = clean(identity.root || identity.roots?.project, 1000);
     if (!root) throw statusError("Project root is not configured.", 409);
 
@@ -127,6 +136,8 @@ export const createProjectActivityIndex = ({
     const end = new Date(endMs).toISOString();
     const warnings = [];
     const activities = new Map();
+    let activeAgentCount = 0;
+    const activeAgentCountByRoom = {};
     const add = (activity) => {
       const occurredAtMs = timestamp(activity.occurredAt);
       if (!Number.isFinite(occurredAtMs) || occurredAtMs < startMs || occurredAtMs >= endMs) return;
@@ -134,17 +145,29 @@ export const createProjectActivityIndex = ({
       if (!activities.has(normalized.id)) activities.set(normalized.id, normalized);
     };
 
-    const sessionLists = await Promise.all([
+    const [activeSessions, archivedSessions] = await Promise.all([
       conversations.listSessions("all", false),
       conversations.listSessions("all", true),
     ]);
+    const activeThreadIds = new Set(activeSessions
+      .filter((session) => sameRoot(session?.cwd, root) && !excludeThread(clean(session?.threadId, 200)))
+      .map((session) => clean(session?.threadId, 200))
+      .filter(Boolean));
+    const archivedThreadIds = new Set(archivedSessions
+      .filter((session) => sameRoot(session?.cwd, root) && !excludeThread(clean(session?.threadId, 200)))
+      .map((session) => clean(session?.threadId, 200))
+      .filter((threadId) => threadId && !activeThreadIds.has(threadId)));
     const sessions = new Map();
-    for (const session of sessionLists.flat()) {
-      const threadId = clean(session?.threadId, 200);
-      if (!threadId || !sameRoot(session?.cwd, root) || excludeThread(threadId)) continue;
-      const updatedAt = timestamp(session?.updatedAt);
-      if (Number.isFinite(updatedAt) && updatedAt < startMs) continue;
-      sessions.set(threadId, session);
+    for (const [archived, list] of [[false, activeSessions], [true, archivedSessions]]) {
+      for (const session of list) {
+        const threadId = clean(session?.threadId, 200);
+        if (!threadId || !sameRoot(session?.cwd, root) || excludeThread(threadId)) continue;
+        const updatedAt = timestamp(session?.updatedAt);
+        if (Number.isFinite(updatedAt) && updatedAt < startMs) continue;
+        const existing = sessions.get(threadId);
+        if (existing && !existing.archived && archived) continue;
+        sessions.set(threadId, { ...session, archived });
+      }
     }
 
     for (const [threadId, summary] of sessions) {
@@ -163,6 +186,7 @@ export const createProjectActivityIndex = ({
             source: "codex_thread",
             projectId: identity.projectId,
             threadId,
+            archived: summary.archived === true,
             messageId,
             turnId: clean(message?.turnId, 200),
             title: clean(summary?.title, 240),
@@ -184,6 +208,7 @@ export const createProjectActivityIndex = ({
               source: "codex_goal",
               projectId: identity.projectId,
               threadId,
+              archived: summary.archived === true,
               title: clean(summary?.title, 240),
               text: clean(goal.objective),
               status: clean(goal.status, 40),
@@ -201,6 +226,9 @@ export const createProjectActivityIndex = ({
     for (const roomSummary of roomDirectory?.list?.() || []) {
       if (clean(roomSummary?.projectId, 200) !== identity.projectId) continue;
       const room = roomDirectory.get?.(roomSummary.id);
+      const roomActiveAgentCount = (room?.snapshot?.().agents || []).filter((agent) => agent?.active).length;
+      activeAgentCount += roomActiveAgentCount;
+      activeAgentCountByRoom[roomSummary.id] = roomActiveAgentCount;
       for (const message of roomMessagesForDate(room, date)) {
         const text = messageText(message);
         if (!text) continue;
@@ -213,6 +241,8 @@ export const createProjectActivityIndex = ({
           source: "negus_group",
           projectId: identity.projectId,
           roomId: roomSummary.id,
+          messageId,
+          title: clean(roomSummary.name, 240),
           role: message?.type === "agent" ? "assistant" : "user",
           authorId: clean(message?.authorId, 120),
           authorName: clean(message?.authorName, 160),
@@ -253,10 +283,13 @@ export const createProjectActivityIndex = ({
       timeZoneOffsetMinutes: Number(timeZoneOffsetMinutes),
       window: { start, end },
       counts: { total: ordered.length, ...counts },
+      activeAgentCount,
+      activeAgentCountByRoom,
+      archivedThreadIds: [...archivedThreadIds],
       activities: ordered,
       warnings,
     };
   };
 
-  return { read };
+  return { read, resolve };
 };

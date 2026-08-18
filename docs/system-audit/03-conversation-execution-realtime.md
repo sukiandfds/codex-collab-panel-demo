@@ -1,5 +1,15 @@
 # 03 会话、执行与实时
 
+产品约束更新时间：2026-08-17 11:10 +08:00
+
+## 已确认的群聊执行约束
+
+- 一个员工在一个项目群聊中的 Runtime Thread 对应员工自己项目下的一个长期会话，不属于目标工作项目。
+- 第一次调用默认不灌入此前完整群聊；后续调用补入员工上一次回复之后的新群聊内容。
+- 员工最终回复只生成一次，同一结果同时保留在员工会话并发布到公共群聊。
+- 工作项目保存完整公共群聊记录，员工可以通过项目文件访问；该记录不是员工 Runtime 会话。
+- 中止过程文本进入群聊、每日压缩和经验沉淀尚未实现，不能在状态或文档中表述为当前能力。
+
 ## 当前数据链路
 
 | 链路 | 当前实现 | 主要数据源 | 评价 |
@@ -10,7 +20,7 @@
 | 群聊消息 | `GroupApp -> useGroupRoom -> group-routes -> group-room-store` | 房间 JSON 状态、SSE 群事件 | 消息幂等和分页已接入，但契约与单人不同 |
 | 群聊 Agent 执行 | `multi-agent-service -> app-server Thread -> group-room-store` | 内存队列、Agent Thread、群消息 | 能执行和流式展示，但队列状态不持久化 |
 | 员工主对话 | `employee-runtime-service -> employee-conversation-store -> app-server Thread` | 员工绑定和本地 JSONL 历史 | 单独运行、权限和确认逻辑清楚 |
-| 员工群聊投影 | `group-room-store onMessageCreated -> employee-conversation-store/realtime` | 群消息投影 | 目前是只读 Agent 回复投影，不是完整会话 |
+| 员工项目群聊会话 | `multi-agent-service -> app-server Thread -> employee-conversation-store/realtime` | 员工自己的长期会话与群聊增量上下文 | 产品目标是普通长期会话；当前只读投影实现与目标仍有差距 |
 
 ## 同一概念的多套契约
 

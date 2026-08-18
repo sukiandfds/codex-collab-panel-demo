@@ -159,7 +159,7 @@ export const createHappyEveringImageClient = ({
   model = process.env.NEGUS_IMAGE_MODEL || process.env.LYNN_IMAGE_MODEL || defaultModel,
   defaultSize = process.env.NEGUS_IMAGE_DEFAULT_SIZE || process.env.LYNN_IMAGE_DEFAULT_SIZE || "1024x1024",
   outputDirectory = process.env.NEGUS_IMAGE_OUTPUT_DIR || process.env.LYNN_IMAGE_OUTPUT_DIR || "",
-  timeoutMs = Number(process.env.NEGUS_IMAGE_TIMEOUT_MS || process.env.LYNN_IMAGE_TIMEOUT_MS || 150_000),
+  timeoutMs = Number(process.env.NEGUS_IMAGE_TIMEOUT_MS || process.env.LYNN_IMAGE_TIMEOUT_MS || 180_000),
   fetchImpl = fetch,
 } = {}) => {
   const normalizedBaseUrl = baseUrl.replace(/\/+$/u, "");
@@ -193,12 +193,22 @@ export const createHappyEveringImageClient = ({
 
   const run = async ({ endpoint, requestBody, formData, prefix, outputName, requestOutputDirectory }) => {
     const selectedModel = requestBody.model || model;
+    const startedAt = Date.now();
+    process.stderr.write(`[negus-image] timing request_started model=${selectedModel}\n`);
     const signal = AbortSignal.timeout(timeoutMs);
-    const submission = await request(endpoint, formData ? { method: "POST", body: formData } : {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-    }, signal);
+    let submission;
+    try {
+      submission = await request(endpoint, formData ? { method: "POST", body: formData } : {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      }, signal);
+    } catch (error) {
+      process.stderr.write(`[negus-image] timing request_failed duration_ms=${Date.now() - startedAt}\n`);
+      throw error;
+    }
+    const providerReturnedAt = Date.now();
+    process.stderr.write(`[negus-image] timing provider_returned duration_ms=${providerReturnedAt - startedAt}\n`);
     const completed = submission.body;
     const outputs = await saveImageResponse({
       response: completed,
@@ -211,6 +221,7 @@ export const createHappyEveringImageClient = ({
       timeoutMs,
       signal,
     });
+    process.stderr.write(`[negus-image] timing image_saved duration_ms=${Date.now() - providerReturnedAt} total_ms=${Date.now() - startedAt}\n`);
     return {
       model: selectedModel,
       outputs,

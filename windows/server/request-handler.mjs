@@ -17,7 +17,7 @@ export const createRequestHandler = ({
   token, project, projectRoot, device, observerPort, conversations, execution, media, realtime, submissions,
   followUpQueue, contextManagement, groupRoom, roomDirectory, multiAgent, multiAgentDirectory, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
   agentConversationStore, agentPublicationService,
-  employeeRuntime, employeeProjectDirectory, employeeGrowth, modelProviders, projectActivityIndex,
+  employeeRuntime, employeeProjectDirectory, employeeGrowth, modelProviders, projectActivityIndex, projectStatus,
 }) => {
   const routes = [
     createVersionRoutes({ readWebVersion }),
@@ -30,7 +30,7 @@ export const createRequestHandler = ({
     ...(employeeRuntime ? [createEmployeeRoutes({ employeeRuntime })] : []),
     ...(employeeProjectDirectory ? [createEmployeeProjectDirectoryRoutes({ directory: employeeProjectDirectory })] : []),
     ...(employeeGrowth ? [createEmployeeGrowthRoutes({ growth: employeeGrowth })] : []),
-    ...(projectActivityIndex ? [createProjectReviewRoutes({ activityIndex: projectActivityIndex })] : []),
+    ...(projectActivityIndex ? [createProjectReviewRoutes({ activityIndex: projectActivityIndex, projectStatus })] : []),
     createGroupRoutes({ groupRoom, roomDirectory, media, multiAgent, multiAgentDirectory, webOutputs }),
     createFollowUpQueueRoutes({ queue: followUpQueue, media }),
     createConversationRoutes({

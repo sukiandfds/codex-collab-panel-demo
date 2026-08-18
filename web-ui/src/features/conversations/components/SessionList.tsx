@@ -13,7 +13,7 @@ interface SessionListProps {
   loading: boolean;
   error: string;
   archivedView: boolean;
-  archiveBusyId: string;
+  archiveBusyIds: ReadonlySet<string>;
   onSelect: (threadId: string) => void;
   onArchive: (threadId: string) => Promise<boolean>;
   onUnarchive: (threadId: string) => Promise<boolean>;
@@ -27,7 +27,7 @@ export function SessionList({
   loading,
   error,
   archivedView,
-  archiveBusyId,
+  archiveBusyIds,
   onSelect,
   onArchive,
   onUnarchive,
@@ -35,6 +35,7 @@ export function SessionList({
   statusByThread = {},
 }: SessionListProps) {
   const [revealedId, setRevealedId] = useState("");
+  const [pressedActionId, setPressedActionId] = useState("");
   const swipeRef = useRef<{
     pointerId: number;
     threadId: string;
@@ -113,9 +114,11 @@ export function SessionList({
   };
 
   const runArchiveAction = async (threadId: string) => {
+    setPressedActionId(threadId);
     try {
       await (archivedView ? onUnarchive(threadId) : onArchive(threadId));
     } finally {
+      setPressedActionId((current) => current === threadId ? "" : current);
       setRevealedId((current) => current === threadId ? "" : current);
     }
   };
@@ -173,11 +176,11 @@ export function SessionList({
             </button>
             {session.archivable !== false ? (
             <button
-              className={styles.itemAction}
+              className={`${styles.itemAction} ${pressedActionId === session.threadId ? styles.itemActionPressed : ""}`}
               type="button"
               aria-label={archivedView ? `恢复 ${session.title}` : `归档 ${session.title}`}
               title={archivedView ? "恢复对话" : "归档对话"}
-              disabled={archiveBusyId === session.threadId}
+              disabled={archiveBusyIds.has(session.threadId)}
               onClick={() => void runArchiveAction(session.threadId)}
             >
               {archivedView ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}

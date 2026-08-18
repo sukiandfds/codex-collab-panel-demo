@@ -109,3 +109,38 @@ test("serves Negus entrypoints without injecting a second share implementation",
     assert.doesNotMatch(await group.text(), /negus-agent-share-bridge\.js/u);
   });
 });
+
+test("returns an existing employee conversation without reopening its Runtime", async () => {
+  let openCalls = 0;
+  const route = createAgentPublicationRoutes({
+    conversationStore: {},
+    publicationService: {},
+    employeeRuntime: {
+      getStatus: async (agentId) => ({
+        employee: { id: agentId },
+        threadId: "employee-thread",
+        conversationId: "employee-conversation",
+      }),
+      open: async () => {
+        openCalls += 1;
+        throw new Error("existing Runtime must not be reopened");
+      },
+    },
+  });
+  await withServer(async (request, response) => {
+    await route(request, response, new URL(request.url, "http://127.0.0.1"));
+  }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/agent-conversations/open`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agentId: "manager" }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      conversationId: "employee-conversation",
+      runtimeKind: "codex",
+      threadId: "employee-thread",
+    });
+  });
+  assert.equal(openCalls, 0);
+});

@@ -148,7 +148,10 @@ export function MessageTimeline({
             {index === 0 || localDateKey(messages[index - 1].createdAt) !== localDateKey(message.createdAt)
               ? <div className={styles.dateDivider}><span>{formatDayLabel(message.createdAt)}</span></div>
               : null}
-            <article className={`${styles.message} ${message.type === "system" ? styles.systemMessage : ""}`}>
+            <article
+              className={`${styles.message} ${message.type === "system" ? styles.systemMessage : ""}`}
+              data-message-id={message.id}
+            >
               {profile ? (
                 <button
                   className={`${styles.messageAvatar} ${message.type === "agent" ? styles.agentMessageAvatar : ""}`}

@@ -38,6 +38,7 @@ import { loadEmployeeDefinitions } from "../server/employee-definitions.mjs";
 import { loadBusinessProjects } from "../server/business-project-config.mjs";
 import { createModelProviderService } from "../server/model-provider-service.mjs";
 import { createProjectActivityIndex } from "../server/project-activity-index.mjs";
+import { createProjectStatusService } from "../server/project-status-service.mjs";
 
 const args = process.argv.slice(2);
 const getArg = (name, fallback) => {
@@ -400,6 +401,7 @@ const projectActivityIndex = createProjectActivityIndex({
   excludeThread: (threadId) => employeeRuntime.ownsThread(threadId)
     || Boolean(agentConversationStore.findByRuntimeSession("codex", threadId)),
 });
+const projectStatus = createProjectStatusService({ activityIndex: projectActivityIndex });
 
 const serveStatic = createStaticFileServer(webRoot);
 const readWebVersion = createWebVersionReader(webRoot);
@@ -408,7 +410,7 @@ const requestHandler = createRequestHandler({
   followUpQueue, contextManagement, groupRoom, roomDirectory: groupRoomDirectory, multiAgent, multiAgentDirectory, artifacts, webOutputs, fushengUsage, readWebVersion, serveStatic,
   agentConversationStore, agentPublicationService, employeeRuntime,
   employeeProjectDirectory, employeeGrowth,
-  modelProviders, projectActivityIndex,
+  modelProviders, projectActivityIndex, projectStatus,
 });
 const server = http.createServer(requestHandler);
 

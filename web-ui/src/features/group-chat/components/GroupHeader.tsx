@@ -6,8 +6,10 @@ import { DeviceStatus } from "../../device/components/DeviceStatus";
 import type { GroupAgent, GroupMember } from "../model/types";
 import styles from "./GroupHeader.module.css";
 
-export function GroupHeader({ roomName, connected, deviceName, members, agents, historyNotice, onDateSelect, onOpenSidebar, onViewChange }: {
+export function GroupHeader({ roomName, roomId, projectId, connected, deviceName, members, agents, historyNotice, onDateSelect, onOpenSidebar, onViewChange }: {
   roomName: string;
+  roomId: string;
+  projectId: string;
   connected: boolean;
   deviceName?: string;
   members: GroupMember[];
@@ -53,7 +55,7 @@ export function GroupHeader({ roomName, connected, deviceName, members, agents, 
         <button className={styles.iconButton} type="button" aria-label="分享项目群聊" title="分享" onClick={() => setSharing(true)}>
           <Share2 aria-hidden="true" />
         </button>
-        <ViewSwitcher current="group" onViewChange={onViewChange} />
+        <ViewSwitcher current="group" onViewChange={onViewChange} projectId={projectId} currentSourceId={roomId ? `group:${roomId}` : ""} />
       </div>
       <div className={styles.statusbar}>
         <DeviceStatus name={deviceName} connected={connected} />

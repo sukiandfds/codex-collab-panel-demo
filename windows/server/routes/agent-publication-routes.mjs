@@ -4,6 +4,16 @@ export const createAgentPublicationRoutes = ({ conversationStore, publicationSer
   if (url.pathname === "/api/agent-conversations/open" && request.method === "POST") {
     const body = await readJson(request);
     if (!employeeRuntime?.open) throw Object.assign(new Error("员工运行服务不可用"), { statusCode: 503 });
+    const agentId = String(body.agentId || "").trim();
+    const existing = await employeeRuntime.getStatus?.(agentId);
+    if (existing?.threadId && existing?.conversationId) {
+      sendJson(response, {
+        conversationId: existing.conversationId,
+        runtimeKind: existing.runtimeKind || "codex",
+        threadId: existing.threadId,
+      }, 200);
+      return true;
+    }
     const session = await employeeRuntime.open(body.agentId);
     sendJson(response, {
       conversationId: session.conversation.id,

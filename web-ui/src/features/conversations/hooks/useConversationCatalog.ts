@@ -13,6 +13,37 @@ interface ConversationSelection {
   setCreatedSession: (detail: SessionDetail) => void;
 }
 
+interface RemovedSession {
+  session: SessionSummary;
+  index: number;
+  archivedView: boolean;
+}
+
+const archiveIconFeedbackMs = 110;
+const waitForArchiveIconFeedback = () => new Promise<void>((resolve) => {
+  window.setTimeout(resolve, archiveIconFeedbackMs);
+});
+
+const sameSessionSummary = (left: SessionSummary, right: SessionSummary) => (
+  left.threadId === right.threadId
+  && left.source === right.source
+  && left.title === right.title
+  && left.updatedAt === right.updatedAt
+  && left.messageCount === right.messageCount
+  && left.latestUser === right.latestUser
+  && left.latestAssistant === right.latestAssistant
+  && left.archived === right.archived
+  && left.archivable === right.archivable
+  && left.conversationKind === right.conversationKind
+  && left.readOnly === right.readOnly
+  && left.forkedFromId === right.forkedFromId
+  && left.cwd === right.cwd
+);
+
+const sameSessionList = (left: SessionSummary[], right: SessionSummary[]) => (
+  left.length === right.length && left.every((session, index) => sameSessionSummary(session, right[index]))
+);
+
 export function useConversationCatalog(
   initial: InitialConversationState,
   selection: ConversationSelection,
@@ -25,29 +56,30 @@ export function useConversationCatalog(
   const [initialSyncReady, setInitialSyncReady] = useState(false);
   const [archivedView, setArchivedView] = useState(initialArchivedView);
   const [creating, setCreating] = useState(false);
-  const [archiveBusyId, setArchiveBusyId] = useState("");
+  const [archiveBusyIds, setArchiveBusyIds] = useState<ReadonlySet<string>>(() => new Set());
   const [listError, setListError] = useState("");
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
   const archivedViewRef = useRef(initialArchivedView);
   const creatingRef = useRef(false);
+  const archiveBusyIdsRef = useRef(new Set<string>());
   const listRetryTimerRef = useRef(0);
   const listRequestRef = useRef(0);
+  const listAbortControllerRef = useRef<AbortController | null>(null);
   const transientSessionsRef = useRef(new Map<string, SessionSummary>());
   const refreshSessionsRef = useRef<(initialLoad?: boolean, changedThreadId?: string, reloadSelected?: boolean, retry?: boolean) => Promise<void>>(async () => {});
-  const listRequestInFlightRef = useRef<Promise<void> | null>(null);
-  const pendingListRefreshRef = useRef<{
-    initialLoad: boolean;
-    changedThreadId?: string;
-    reloadSelected: boolean;
-    retry: boolean;
-  } | null>(null);
 
   const refreshSessionsOnce = useCallback(async (initialLoad = false, changedThreadId?: string, reloadSelected = true, retry = true) => {
     const requestId = ++listRequestRef.current;
     const requestedArchivedView = archivedViewRef.current;
+    listAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    listAbortControllerRef.current = controller;
     if (initialLoad) setLoadingList(true);
     setListError("");
     try {
-      const serverSessions = await conversationApi.sessions(requestedArchivedView);
+      const serverSessions = (await conversationApi.sessions(requestedArchivedView, controller.signal))
+        .filter((item) => !archiveBusyIdsRef.current.has(item.threadId));
       if (requestId !== listRequestRef.current || requestedArchivedView !== archivedViewRef.current) return;
 
       const serverIds = new Set(serverSessions.map((item) => item.threadId));
@@ -56,7 +88,14 @@ export function useConversationCatalog(
         ? []
         : Array.from(transientSessionsRef.current.values()).reverse();
       const nextSessions = [...transientSessions, ...serverSessions];
-      setSessions(nextSessions);
+      if (!sameSessionList(sessionsRef.current, nextSessions)) {
+        sessionsRef.current = nextSessions;
+        setSessions(nextSessions);
+      }
+      if (requestedArchivedView) {
+        if (selection.selectedIdRef.current) selection.clearSelection();
+        return;
+      }
       const requestedId = new URLSearchParams(window.location.search).get("thread") || "";
       const currentId = selection.selectedIdRef.current;
       const agentScoped = Boolean(new URLSearchParams(window.location.search).get("agent"));
@@ -84,6 +123,7 @@ export function useConversationCatalog(
         await selection.loadSession(nextId, { quiet: !initialLoad });
       }
     } catch (reason) {
+      if (controller.signal.aborted) return;
       if (requestId !== listRequestRef.current || requestedArchivedView !== archivedViewRef.current) return;
       setListError(reason instanceof Error ? reason.message : String(reason));
       if (retry) {
@@ -93,47 +133,19 @@ export function useConversationCatalog(
         }, 10000);
       }
     } finally {
-      if (initialLoad && requestedArchivedView === archivedViewRef.current) setLoadingList(false);
+      if (listAbortControllerRef.current === controller) listAbortControllerRef.current = null;
+      if (!controller.signal.aborted && requestId === listRequestRef.current && requestedArchivedView === archivedViewRef.current) {
+        setLoadingList(false);
+      }
     }
   }, [selection.adoptSelection, selection.clearSelection, selection.loadSession, selection.selectedIdRef]);
 
-  const refreshSessions = useCallback((initialLoad = false, changedThreadId?: string, reloadSelected = true, retry = true) => {
-    const inFlight = listRequestInFlightRef.current;
-    if (inFlight) {
-      const pending = pendingListRefreshRef.current || {
-        initialLoad: false,
-        changedThreadId,
-        reloadSelected: false,
-        retry: false,
-      };
-      pending.initialLoad ||= initialLoad;
-      pending.changedThreadId = pending.changedThreadId === changedThreadId ? changedThreadId : undefined;
-      pending.reloadSelected ||= reloadSelected;
-      pending.retry ||= retry;
-      pendingListRefreshRef.current = pending;
-      return inFlight;
-    }
-
-    const request = refreshSessionsOnce(initialLoad, changedThreadId, reloadSelected, retry);
-    listRequestInFlightRef.current = request;
-    void request.finally(() => {
-      if (listRequestInFlightRef.current !== request) return;
-      listRequestInFlightRef.current = null;
-      const pending = pendingListRefreshRef.current;
-      pendingListRefreshRef.current = null;
-      if (pending) {
-        window.setTimeout(() => {
-          void refreshSessionsRef.current(
-            pending.initialLoad,
-            pending.changedThreadId,
-            pending.reloadSelected,
-            pending.retry,
-          );
-        }, 0);
-      }
-    }).catch(() => {});
-    return request;
-  }, [refreshSessionsOnce]);
+  const refreshSessions = useCallback(
+    (initialLoad = false, changedThreadId?: string, reloadSelected = true, retry = true) => (
+      refreshSessionsOnce(initialLoad, changedThreadId, reloadSelected, retry)
+    ),
+    [refreshSessionsOnce],
+  );
   refreshSessionsRef.current = refreshSessions;
 
   const updateArchiveQuery = useCallback((archived: boolean) => {
@@ -149,6 +161,8 @@ export function useConversationCatalog(
     if (archived === archivedViewRef.current) return;
     archivedViewRef.current = archived;
     setArchivedView(archived);
+    sessionsRef.current = [];
+    setSessions([]);
     selection.clearSelection();
     updateArchiveQuery(archived);
     await refreshSessions(true, undefined, false);
@@ -198,6 +212,7 @@ export function useConversationCatalog(
       if (archivedViewRef.current) {
         archivedViewRef.current = false;
         setArchivedView(false);
+        sessionsRef.current = [];
         setSessions([]);
         selection.clearSelection();
         updateArchiveQuery(false);
@@ -206,7 +221,9 @@ export function useConversationCatalog(
       const detail: SessionDetail = { ...created, messages: [] };
       transientSessionsRef.current.set(created.threadId, created);
       selection.setCreatedSession(detail);
-      setSessions((current) => [created, ...current.filter((item) => item.threadId !== created.threadId)]);
+      const nextSessions = [created, ...sessionsRef.current.filter((item) => item.threadId !== created.threadId)];
+      sessionsRef.current = nextSessions;
+      setSessions(nextSessions);
       return true;
     } catch (reason) {
       setListError(reason instanceof Error ? reason.message : String(reason));
@@ -227,7 +244,9 @@ export function useConversationCatalog(
       archivedViewRef.current = false;
       setArchivedView(false);
       updateArchiveQuery(false);
-      setSessions((current) => [created, ...current.filter((item) => item.threadId !== created.threadId)]);
+      const nextSessions = [created, ...sessionsRef.current.filter((item) => item.threadId !== created.threadId)];
+      sessionsRef.current = nextSessions;
+      setSessions(nextSessions);
       selection.setCreatedSession(detail);
       await selection.loadSession(created.threadId, { quiet: false });
       return true;
@@ -237,42 +256,101 @@ export function useConversationCatalog(
     }
   }, [selection.loadSession, selection.setCreatedSession, updateArchiveQuery]);
 
+  const beginArchiveOperation = useCallback((threadId: string) => {
+    if (archiveBusyIdsRef.current.has(threadId)) return false;
+    const next = new Set(archiveBusyIdsRef.current);
+    next.add(threadId);
+    archiveBusyIdsRef.current = next;
+    setArchiveBusyIds(next);
+    return true;
+  }, []);
+
+  const finishArchiveOperation = useCallback((threadId: string) => {
+    const next = new Set(archiveBusyIdsRef.current);
+    next.delete(threadId);
+    archiveBusyIdsRef.current = next;
+    setArchiveBusyIds(next);
+  }, []);
+
+  const removeSessionOptimistically = useCallback((threadId: string): RemovedSession | null => {
+    const index = sessionsRef.current.findIndex((item) => item.threadId === threadId);
+    if (index < 0) return null;
+    const removed = { session: sessionsRef.current[index], index, archivedView: archivedViewRef.current };
+    const next = sessionsRef.current.filter((item) => item.threadId !== threadId);
+    sessionsRef.current = next;
+    setSessions(next);
+    return removed;
+  }, []);
+
+  const restoreRemovedSession = useCallback((removed: RemovedSession | null) => {
+    if (!removed || removed.archivedView !== archivedViewRef.current) return;
+    if (sessionsRef.current.some((item) => item.threadId === removed.session.threadId)) return;
+    const next = [...sessionsRef.current];
+    next.splice(Math.min(removed.index, next.length), 0, removed.session);
+    sessionsRef.current = next;
+    setSessions(next);
+  }, []);
+
   const archiveSession = useCallback(async (threadId: string) => {
-    if (archiveBusyId) return false;
-    setArchiveBusyId(threadId);
+    if (!beginArchiveOperation(threadId)) return false;
+    let removed: RemovedSession | null = null;
+    let requestFailed = false;
+    let requestError: unknown;
     setListError("");
     try {
-      await conversationApi.archive(threadId);
+      const request = conversationApi.archive(threadId).catch((reason) => {
+        requestFailed = true;
+        requestError = reason;
+      });
+      await waitForArchiveIconFeedback();
+      if (requestFailed) throw requestError;
+      removed = removeSessionOptimistically(threadId);
+      await request;
+      if (requestFailed) throw requestError;
+      window.dispatchEvent(new CustomEvent("negus:conversation-archived", { detail: { threadId } }));
       transientSessionsRef.current.delete(threadId);
       if (selection.selectedIdRef.current === threadId) selection.clearSelection();
-      await refreshSessions(false, threadId, false);
       return true;
     } catch (reason) {
+      restoreRemovedSession(removed);
       setListError(reason instanceof Error ? reason.message : String(reason));
       return false;
     } finally {
-      setArchiveBusyId("");
+      finishArchiveOperation(threadId);
     }
-  }, [archiveBusyId, refreshSessions, selection.clearSelection, selection.selectedIdRef]);
+  }, [beginArchiveOperation, finishArchiveOperation, removeSessionOptimistically, restoreRemovedSession, selection.clearSelection, selection.selectedIdRef]);
 
   const unarchiveSession = useCallback(async (threadId: string) => {
-    if (archiveBusyId) return false;
-    setArchiveBusyId(threadId);
+    if (!beginArchiveOperation(threadId)) return false;
+    let removed: RemovedSession | null = null;
+    let requestFailed = false;
+    let requestError: unknown;
     setListError("");
     try {
-      await conversationApi.unarchive(threadId);
+      const request = conversationApi.unarchive(threadId).catch((reason) => {
+        requestFailed = true;
+        requestError = reason;
+      });
+      await waitForArchiveIconFeedback();
+      if (requestFailed) throw requestError;
+      removed = removeSessionOptimistically(threadId);
+      await request;
+      if (requestFailed) throw requestError;
       if (selection.selectedIdRef.current === threadId) selection.clearSelection();
-      await refreshSessions(false, threadId, false);
       return true;
     } catch (reason) {
+      restoreRemovedSession(removed);
       setListError(reason instanceof Error ? reason.message : String(reason));
       return false;
     } finally {
-      setArchiveBusyId("");
+      finishArchiveOperation(threadId);
     }
-  }, [archiveBusyId, refreshSessions, selection.clearSelection, selection.selectedIdRef]);
+  }, [beginArchiveOperation, finishArchiveOperation, removeSessionOptimistically, restoreRemovedSession, selection.clearSelection, selection.selectedIdRef]);
 
-  useEffect(() => () => window.clearTimeout(listRetryTimerRef.current), []);
+  useEffect(() => () => {
+    window.clearTimeout(listRetryTimerRef.current);
+    listAbortControllerRef.current?.abort();
+  }, []);
 
   return {
     project,
@@ -281,7 +359,7 @@ export function useConversationCatalog(
     loadingList,
     initialSyncReady,
     creating,
-    archiveBusyId,
+    archiveBusyIds,
     listError,
     refreshSessions,
     setArchiveViewMode,

@@ -167,8 +167,8 @@ export function useConversationEvents(
               const threadIds = [...pendingSessionIds];
               pendingSessionIds.clear();
               pendingAllSessions = false;
-              if (allSessions || !threadIds.length) onSessionsChangedRef.current();
-              else threadIds.forEach((changedThreadId) => onSessionsChangedRef.current(changedThreadId));
+              if (allSessions || threadIds.length !== 1) onSessionsChangedRef.current();
+              else onSessionsChangedRef.current(threadIds[0]);
             }, 180);
           }
         } catch {

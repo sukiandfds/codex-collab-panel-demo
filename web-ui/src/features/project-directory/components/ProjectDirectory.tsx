@@ -19,6 +19,11 @@ type ProjectNameMode = "folder" | "project";
 const projectNameModeCacheKey = "negus-project-name-mode-v1";
 const isProjectNameMode = (value: unknown): value is ProjectNameMode => value === "folder" || value === "project";
 const folderName = (root?: string) => root?.split(/[\\/]/u).filter(Boolean).slice(-1)[0] || "";
+const normalizedRoot = (root?: string | null) => String(root || "").replace(/[\\/]+$/u, "").toLocaleLowerCase();
+const sameRoot = (left?: string | null, right?: string | null) => {
+  const normalizedLeft = normalizedRoot(left);
+  return Boolean(normalizedLeft) && normalizedLeft === normalizedRoot(right);
+};
 
 const employeeConversations = (entry: DirectoryProject): DirectoryConversation[] => {
   if (entry.conversations?.length) return entry.conversations;
@@ -66,7 +71,7 @@ interface ProjectDirectoryProps {
   sessionsLoading: boolean;
   sessionsError: string;
   archivedView: boolean;
-  archiveBusyId: string;
+  archiveBusyIds: ReadonlySet<string>;
   onSelect: (threadId: string) => void;
   onArchive: (threadId: string) => Promise<boolean>;
   onUnarchive: (threadId: string) => Promise<boolean>;
@@ -91,7 +96,7 @@ export function ProjectDirectory({
   sessionsLoading,
   sessionsError,
   archivedView,
-  archiveBusyId,
+  archiveBusyIds,
   onSelect,
   onArchive,
   onUnarchive,
@@ -126,16 +131,25 @@ export function ProjectDirectory({
   ));
   const visibleProjects = useMemo(() => {
     const source = namedProjects.length ? namedProjects : currentProject ? [currentProject] : [];
-    return source.map((entry, index) => ({ entry, index })).sort((left, right) => (
+    const archiveEligible = archivedView
+      ? source.filter((entry) => entry.kind === "personal" || entry.kind === "business")
+      : source;
+    return archiveEligible.map((entry, index) => ({ entry, index })).sort((left, right) => (
       Number(left.entry.kind === "employee") - Number(right.entry.kind === "employee")
       || timeValue(right.entry.lastActivityAt) - timeValue(left.entry.lastActivityAt)
       || left.index - right.index
     )).map(({ entry }) => entry);
-  }, [currentProject, namedProjects]);
+  }, [archivedView, currentProject, namedProjects]);
 
   useLayoutEffect(() => {
+    if (archivedView) {
+      setSelectedProjectId((current) => visibleProjects.some((entry) => entry.id === current)
+        ? current
+        : visibleProjects.find((entry) => entry.kind === "personal")?.id || visibleProjects[0]?.id || "");
+      return;
+    }
     if (currentProject?.id) setSelectedProjectId(currentProject.id);
-  }, [currentProject?.id, routeConversationId, routeEmployeeId, routeThreadId, selectedId]);
+  }, [archivedView, currentProject?.id, routeConversationId, routeEmployeeId, routeThreadId, selectedId, visibleProjects]);
 
   const openConversation = async (entry: DirectoryProject, conversation: DirectoryConversation) => {
     if (!entry.employeeId) {
@@ -173,10 +187,21 @@ export function ProjectDirectory({
           const isEmployee = entry.kind === "employee";
           const isBusiness = entry.kind === "business";
           const startsSection = index === 0 || isEmployee !== (visibleProjects[index - 1]?.kind === "employee");
-          const usesSessionFallback = isPersonal && !entry.conversations?.length;
+          const sessionConversations = sessions
+            .filter((session) => sameRoot(session.cwd, entry.root) || (!session.cwd && isCurrent))
+            .map((session, sessionIndex) => ({
+              id: session.threadId,
+              threadId: session.threadId,
+              title: session.title,
+              main: sessionIndex === 0,
+              lastActivityAt: session.updatedAt,
+              messageCount: session.messageCount,
+              archived: session.archived,
+            }));
+          const usesSessionFallback = isPersonal || isBusiness;
           const conversations = isPersonal || isBusiness
-            ? entry.conversations?.length ? entry.conversations : isPersonal ? sessions.map((session, index) => ({ id: session.threadId, threadId: session.threadId, title: session.title, main: index === 0, lastActivityAt: session.updatedAt, messageCount: session.messageCount, archived: session.archived })) : []
-            : employeeConversations(entry);
+            ? sessionConversations
+            : archivedView ? [] : employeeConversations(entry);
           const projectSessions = conversations.map((conversation) => toSession(entry, conversation));
           const projectStatus = isCurrent && currentStatus?.threadId
             ? statusByThread[currentStatus.threadId] || currentStatus
@@ -245,7 +270,7 @@ export function ProjectDirectory({
                     loading={usesSessionFallback ? sessionsLoading : false}
                     error={usesSessionFallback ? sessionsError : ""}
                     archivedView={archivedView}
-                    archiveBusyId={archiveBusyId}
+                    archiveBusyIds={archiveBusyIds}
                     onSelect={(threadId) => {
                       const conversation = conversations.find((item) => (item.threadId || item.id) === threadId);
                       if (conversation) void openConversation(entry, conversation);
@@ -267,6 +292,7 @@ export function ProjectDirectory({
 }
 
 const unavailableArchiveAction = async () => false;
+const noArchiveBusyIds = new Set<string>();
 
 export function ProjectNavigationDirectory({ workspaceName, projects, activeProjectId, loading = false, error = "", onProjectOpen, onEmployeeOpen, onOpened }: {
   workspaceName: string;
@@ -291,7 +317,7 @@ export function ProjectNavigationDirectory({ workspaceName, projects, activeProj
       sessionsLoading={false}
       sessionsError=""
       archivedView={false}
-      archiveBusyId=""
+      archiveBusyIds={noArchiveBusyIds}
       onSelect={() => {}}
       onArchive={unavailableArchiveAction}
       onUnarchive={unavailableArchiveAction}

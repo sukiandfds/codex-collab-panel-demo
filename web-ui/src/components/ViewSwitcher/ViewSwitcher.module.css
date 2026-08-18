@@ -8,7 +8,9 @@
   background: var(--color-surface-soft, #171717);
 }
 
-.root a {
+.root > a,
+.root > button,
+.root > div > button {
   display: inline-flex;
   height: 27px;
   align-items: center;
@@ -19,11 +21,12 @@
   color: var(--color-text-muted, #818181);
   font-size: 11px;
   text-decoration: none;
+  cursor: pointer;
 }
 
-.root a:hover { color: var(--color-text, #ededed); }
+.root > a:hover, .root > button:hover, .root > div > button:hover { color: var(--color-text, #ededed); }
 .root .active { background: var(--color-surface-active, #303030); color: var(--color-text, #ededed); }
-.root svg { width: 14px; height: 14px; stroke-width: 1.8; }
+.root > a > svg, .root > button > svg, .root > div > button > svg { width: 14px; height: 14px; stroke-width: 1.8; }
 
 @media (max-width: 760px) {
   .root {
@@ -33,6 +36,7 @@
     right: 8px;
     display: flex;
   }
-  .root a { width: 30px; padding: 0; }
-  .root span { display: none; }
+  .root > a, .root > button, .root > div > button { width: 30px; padding: 0; }
+  .root > a > span,
+  .root > div > button > span { display: none; }
 }

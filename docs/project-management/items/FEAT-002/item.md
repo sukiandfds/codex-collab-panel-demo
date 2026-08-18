@@ -5,7 +5,7 @@ title: 项目群聊与多 Agent 协作
 category: development
 priority: P1
 status: code_ready_pending_user_review
-updated_at: 2026-08-10
+updated_at: "2026-08-17 11:10 +08:00"
 source: docs/feature-development/features/FEAT-002-group-multi-agent.md
 related: [FEAT-001, FEAT-003, FEAT-005, FEAT-007, FEAT-010]
 product_base_commit: d5b39e8be1e6273299d3606eef3d1153ba001f3e
@@ -18,6 +18,15 @@ last_user_visible_change: 独立员工项目页显示成长事实和待审批建
 ---
 
 # 项目群聊与多 Agent 协作
+
+## 2026-08-17 11:10 +08:00 当前产品决定
+
+- 一个员工在一个项目群聊中对应员工自己项目下的一个长期会话；员工直属单聊与项目群聊会话分开，但都始终属于员工项目。
+- 工作项目保存公共群聊和完整聊天记录，员工可以访问并操作目标项目文件，但不能在工作项目普通会话列表中留下员工 Thread。
+- 首次调用默认按普通新会话开始，不自动加入此前完整群聊；后续调用补入该员工上一次回复之后的新群聊内容。
+- 员工最终回复只生成一次，原样保留在员工会话并发布到工作项目群聊。
+- 每日压缩、复盘、通用/项目经验和中止过程文本发布列为后续能力；归档、删除和退出当前不联动处理员工会话。
+- 本次只确认并记录产品定义，尚未修复代码或完成运行验收。
 
 ## 用户原话
 

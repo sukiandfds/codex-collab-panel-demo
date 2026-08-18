@@ -1,5 +1,7 @@
 # negus 仓库入口
 
+文档更新时间：2026-08-17 11:10 +08:00
+
 本仓库包含两套相互独立的产品代码：
 
 1. **negus Web 协作工作台**：查看和继续真实 Codex 工作，支持群聊、Agent 和交付物。
@@ -10,6 +12,7 @@
 ## negus Web 协作工作台
 
 - 项目说明、运行方式和模块代码索引：[`PROJECT.md`](./PROJECT.md)
+- 当前全部产品功能和不可违反的规则：[`PRODUCT_DEFINITION.md`](./PRODUCT_DEFINITION.md)
 - 助手工作规则：[`AI_ASSISTANT_WORK_RULES.md`](./AI_ASSISTANT_WORK_RULES.md)
 - 功能状态：[`docs/feature-development/FEATURE_STATUS_INDEX.md`](./docs/feature-development/FEATURE_STATUS_INDEX.md)
 - 功能开发说明：[`docs/feature-development/README.md`](./docs/feature-development/README.md)
