@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
@@ -64,6 +65,22 @@ const desktopCandidates = () => {
   return candidates;
 };
 
+const macOSAppCandidates = () => {
+  if (process.platform !== "darwin") return [];
+  const resourcePath = ["Contents", "Resources", "codex"];
+  return ["/Applications", path.join(os.homedir(), "Applications")].flatMap((applicationsRoot) => [
+    path.join(applicationsRoot, "ChatGPT.app", ...resourcePath),
+    path.join(applicationsRoot, "Codex.app", ...resourcePath),
+  ]);
+};
+
+const commandOnPath = () => {
+  const command = process.platform === "win32" ? "where.exe" : "which";
+  const result = spawnSync(command, ["codex"], { encoding: "utf8", timeout: 5000, windowsHide: true });
+  if (result.error || result.status !== 0) return null;
+  return String(result.stdout || "").split(/\r?\n/u).map((value) => value.trim()).find(Boolean) || null;
+};
+
 const resolveCodexCommand = () => {
   const override = process.env.CODEX_APP_SERVER_BIN?.trim();
   if (override) {
@@ -78,12 +95,22 @@ const resolveCodexCommand = () => {
     .sort((left, right) => compareVersions(right.version, left.version));
   if (desktop.length) return desktop[0];
 
+  const macOSApp = macOSAppCandidates()
+    .map(inspectCandidate)
+    .filter(Boolean)
+    .sort((left, right) => compareVersions(right.version, left.version));
+  if (macOSApp.length) return macOSApp[0];
+
   const appData = process.env.APPDATA
     || path.join(process.env.USERPROFILE || "", "AppData", "Roaming");
   const globalNpm = inspectCandidate(path.join(
     appData, "npm", "node_modules", "@openai", "codex", "bin", "codex.js",
   ));
   if (globalNpm) return globalNpm;
+
+  const pathCommand = commandOnPath();
+  const pathCandidate = pathCommand && inspectCandidate(pathCommand);
+  if (pathCandidate) return pathCandidate;
 
   throw new Error("No runnable Codex app-server runtime was found.");
 };

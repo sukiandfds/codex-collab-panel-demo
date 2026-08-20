@@ -6,7 +6,21 @@
     "build:ui": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/build-web-ui.ps1",
     "start:demo": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/start-web-demo.ps1",
     "start:demo:build": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/start-web-demo.ps1 -Build",
-    "restart:demo": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/restart-web-demo.ps1"
+    "restart:demo": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/scripts/restart-web-demo.ps1",
+    "negus:build": "node scripts/negus.mjs build",
+    "negus:init": "node scripts/negus.mjs init",
+    "negus:start": "node scripts/negus.mjs start",
+    "negus:stop": "node scripts/negus.mjs stop",
+    "negus:status": "node scripts/negus.mjs status",
+    "negus:diagnose": "node scripts/negus.mjs diagnose",
+    "negus:restart": "node scripts/negus.mjs restart",
+   "negus:tunnel:login": "node scripts/negus-tunnel.mjs login",
+   "negus:tunnel:setup": "node scripts/negus-tunnel.mjs setup",
+    "negus:tunnel:move": "node scripts/negus-tunnel.mjs move",
+   "negus:tunnel:start": "node scripts/negus-tunnel.mjs start",
+    "negus:tunnel:stop": "node scripts/negus-tunnel.mjs stop",
+    "negus:tunnel:status": "node scripts/negus-tunnel.mjs status",
+    "negus:tunnel:restart": "node scripts/negus-tunnel.mjs restart"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0",
